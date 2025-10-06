@@ -1,0 +1,32 @@
+services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: transcendence_frontend
+    volumes:
+      - frontend_dist:/app/dist
+    networks:
+      - transcendence_network
+
+  nginx:
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
+    container_name: transcendence_nginx
+    ports:
+      - "443:443"
+      - "80:80"
+    volumes:
+      - frontend_dist:/var/www/html:ro
+    networks:
+      - transcendence_network
+    depends_on:
+      - frontend
+
+volumes:
+  frontend_dist:
+
+networks:
+  transcendence_network:
+    driver: bridge
