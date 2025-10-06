@@ -6,6 +6,7 @@ services:
     container_name: transcendence_frontend
     volumes:
       - frontend_dist:/app/dist
+      - ./frontend/src:/app/src
     networks:
       - transcendence_network
 
