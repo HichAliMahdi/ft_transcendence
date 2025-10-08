@@ -3,7 +3,7 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: transcendence_frontend
+    container_name: frontend
     volumes:
       - frontend_dist:/app/dist
       - ./frontend/src:/app/src
@@ -14,7 +14,7 @@ services:
     build:
       context: ./nginx
       dockerfile: Dockerfile
-    container_name: transcendence_nginx
+    container_name: nginx
     ports:
       - "443:443"
       - "80:80"
