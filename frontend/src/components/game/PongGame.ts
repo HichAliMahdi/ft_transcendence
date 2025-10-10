@@ -29,6 +29,8 @@ export class PongGame {
     private keys: { [key: string]: boolean } = {};
     private animationId: number | null = null;
     private isRunning: boolean = false;
+    private lastTime: number = 0;
+    private readonly FRAME_TIME: number = 1000 / 60;
 
     constructor(canvas: HTMLCanvasElement) {
         this.canvas = canvas;
@@ -38,12 +40,12 @@ export class PongGame {
         }
         this.ctx = context;
 
-        // Initialize ball
+        // Initialize ball with consistent speed
         this.ball = {
             x: canvas.width / 2,
             y: canvas.height / 2,
-            dx: 4,
-            dy: 4,
+            dx: 5,
+            dy: 5,
             radius: 8
         };
 
@@ -53,7 +55,7 @@ export class PongGame {
             y: canvas.height / 2 - 50,
             width: 10,
             height: 100,
-            speed: 6
+            speed: 8
         };
 
         this.paddle2 = {
@@ -61,7 +63,7 @@ export class PongGame {
             y: canvas.height / 2 - 50,
             width: 10,
             height: 100,
-            speed: 6
+            speed: 8
         };
 
         // Initialize score
@@ -74,28 +76,41 @@ export class PongGame {
     }
 
     private setupControls(): void {
-        window.addEventListener('keydown', (e) => {
-            this.keys[e.key] = true;
-        });
+        // Prevent default behavior for game keys to avoid browser conflicts
+        const keyHandler = (e: KeyboardEvent) => {
+            if (['w', 's', 'ArrowUp', 'ArrowDown', ' '].includes(e.key)) {
+                e.preventDefault();
+            }
+            
+            if (e.key === ' ') {
+                // Space bar to restart
+                if (!this.isRunning && (this.score.player1 >= 5 || this.score.player2 >= 5)) {
+                    this.resetGame();
+                    this.start();
+                }
+                return;
+            }
+            
+            this.keys[e.key] = (e.type === 'keydown');
+        };
 
-        window.addEventListener('keyup', (e) => {
-            this.keys[e.key] = false;
-        });
+        window.addEventListener('keydown', keyHandler);
+        window.addEventListener('keyup', keyHandler);
     }
 
     private update(): void {
-        // Move paddles
-        if (this.keys['w'] && this.paddle1.y > 0) {
-            this.paddle1.y -= this.paddle1.speed;
+        // Move paddles with boundary checking
+        if (this.keys['w']) {
+            this.paddle1.y = Math.max(0, this.paddle1.y - this.paddle1.speed);
         }
-        if (this.keys['s'] && this.paddle1.y < this.canvas.height - this.paddle1.height) {
-            this.paddle1.y += this.paddle1.speed;
+        if (this.keys['s']) {
+            this.paddle1.y = Math.min(this.canvas.height - this.paddle1.height, this.paddle1.y + this.paddle1.speed);
         }
-        if (this.keys['ArrowUp'] && this.paddle2.y > 0) {
-            this.paddle2.y -= this.paddle2.speed;
+        if (this.keys['ArrowUp']) {
+            this.paddle2.y = Math.max(0, this.paddle2.y - this.paddle2.speed);
         }
-        if (this.keys['ArrowDown'] && this.paddle2.y < this.canvas.height - this.paddle2.height) {
-            this.paddle2.y += this.paddle2.speed;
+        if (this.keys['ArrowDown']) {
+            this.paddle2.y = Math.min(this.canvas.height - this.paddle2.height, this.paddle2.y + this.paddle2.speed);
         }
 
         // Move ball
@@ -103,16 +118,23 @@ export class PongGame {
         this.ball.y += this.ball.dy;
 
         // Ball collision with top/bottom walls
-        if (this.ball.y - this.ball.radius <= 0 || this.ball.y + this.ball.radius >= this.canvas.height) {
+        if (this.ball.y - this.ball.radius <= 0) {
+            this.ball.y = this.ball.radius;
+            this.ball.dy *= -1;
+        } else if (this.ball.y + this.ball.radius >= this.canvas.height) {
+            this.ball.y = this.canvas.height - this.ball.radius;
             this.ball.dy *= -1;
         }
 
-        // Ball collision with paddles
-        if (this.checkPaddleCollision(this.paddle1) || this.checkPaddleCollision(this.paddle2)) {
-            this.ball.dx *= -1;
-            // Add slight speed increase
-            this.ball.dx *= 1.05;
-            this.ball.dy *= 1.05;
+        // Ball collision with paddles with better collision detection
+        if (this.checkPaddleCollision(this.paddle1)) {
+            this.ball.x = this.paddle1.x + this.paddle1.width + this.ball.radius;
+            this.ball.dx = Math.abs(this.ball.dx); // Ensure positive direction
+            this.adjustBallAngle(this.paddle1);
+        } else if (this.checkPaddleCollision(this.paddle2)) {
+            this.ball.x = this.paddle2.x - this.ball.radius;
+            this.ball.dx = -Math.abs(this.ball.dx); // Ensure negative direction
+            this.adjustBallAngle(this.paddle2);
         }
 
         // Ball out of bounds (scoring)
@@ -130,20 +152,62 @@ export class PongGame {
         }
     }
 
+    private adjustBallAngle(paddle: Paddle): void {
+        // Calculate hit position relative to paddle center (-0.5 to 0.5)
+        const hitPos = (this.ball.y - (paddle.y + paddle.height / 2)) / (paddle.height / 2);
+        
+        // Adjust angle based on where the ball hit the paddle
+        const maxAngle = Math.PI / 4; // 45 degrees max
+        const angle = hitPos * maxAngle;
+        
+        // Calculate new speed while maintaining overall velocity
+        const speed = Math.sqrt(this.ball.dx * this.ball.dx + this.ball.dy * this.ball.dy);
+        const direction = this.ball.dx > 0 ? 1 : -1;
+        
+        this.ball.dx = direction * speed * Math.cos(angle);
+        this.ball.dy = speed * Math.sin(angle);
+        
+        // Slight speed increase after each hit (capped)
+        const newSpeed = Math.min(speed * 1.05, 15);
+        const currentSpeed = Math.sqrt(this.ball.dx * this.ball.dx + this.ball.dy * this.ball.dy);
+        const ratio = newSpeed / currentSpeed;
+        
+        this.ball.dx *= ratio;
+        this.ball.dy *= ratio;
+    }
+
     private checkPaddleCollision(paddle: Paddle): boolean {
-        return (
-            this.ball.x - this.ball.radius <= paddle.x + paddle.width &&
-            this.ball.x + this.ball.radius >= paddle.x &&
-            this.ball.y >= paddle.y &&
-            this.ball.y <= paddle.y + paddle.height
-        );
+        // Improved collision detection
+        const closestX = Math.max(paddle.x, Math.min(this.ball.x, paddle.x + paddle.width));
+        const closestY = Math.max(paddle.y, Math.min(this.ball.y, paddle.y + paddle.height));
+        
+        const distanceX = this.ball.x - closestX;
+        const distanceY = this.ball.y - closestY;
+        
+        return (distanceX * distanceX + distanceY * distanceY) <= (this.ball.radius * this.ball.radius);
     }
 
     private resetBall(): void {
         this.ball.x = this.canvas.width / 2;
         this.ball.y = this.canvas.height / 2;
-        this.ball.dx = (Math.random() > 0.5 ? 1 : -1) * 4;
-        this.ball.dy = (Math.random() > 0.5 ? 1 : -1) * 4;
+        
+        // Random direction but consistent speed
+        const angle = (Math.random() * Math.PI / 2) - Math.PI / 4; // -45 to +45 degrees
+        const speed = 5;
+        const direction = Math.random() > 0.5 ? 1 : -1;
+        
+        this.ball.dx = direction * speed * Math.cos(angle);
+        this.ball.dy = speed * Math.sin(angle);
+    }
+
+    private resetGame(): void {
+        this.score.player1 = 0;
+        this.score.player2 = 0;
+        this.resetBall();
+        
+        // Reset paddle positions
+        this.paddle1.y = this.canvas.height / 2 - 50;
+        this.paddle2.y = this.canvas.height / 2 - 50;
     }
 
     private draw(): void {
@@ -175,21 +239,31 @@ export class PongGame {
         // Draw score
         this.ctx.fillStyle = '#eee';
         this.ctx.font = '32px Arial';
+        this.ctx.textAlign = 'center';
         this.ctx.fillText(this.score.player1.toString(), this.canvas.width / 4, 50);
         this.ctx.fillText(this.score.player2.toString(), (3 * this.canvas.width) / 4, 50);
 
         // Draw controls hint
         this.ctx.font = '14px Arial';
         this.ctx.fillStyle = '#888';
+        this.ctx.textAlign = 'left';
         this.ctx.fillText('W/S', 20, this.canvas.height - 20);
-        this.ctx.fillText('↑/↓', this.canvas.width - 50, this.canvas.height - 20);
+        this.ctx.textAlign = 'right';
+        this.ctx.fillText('↑/↓', this.canvas.width - 20, this.canvas.height - 20);
     }
 
-    private gameLoop = (): void => {
+    private gameLoop = (timestamp: number): void => {
         if (!this.isRunning) return;
 
-        this.update();
-        this.draw();
+        // Frame rate limiting
+        const deltaTime = timestamp - this.lastTime;
+        
+        if (deltaTime >= this.FRAME_TIME) {
+            this.update();
+            this.draw();
+            this.lastTime = timestamp - (deltaTime % this.FRAME_TIME);
+        }
+
         this.animationId = requestAnimationFrame(this.gameLoop);
     };
 
@@ -197,7 +271,8 @@ export class PongGame {
         if (this.isRunning) return;
         
         this.isRunning = true;
-        this.gameLoop();
+        this.lastTime = performance.now();
+        this.animationId = requestAnimationFrame(this.gameLoop);
     }
 
     public stop(): void {
@@ -227,12 +302,13 @@ export class PongGame {
         
         this.ctx.font = '18px Arial';
         this.ctx.fillStyle = '#888';
-        this.ctx.fillText('Refresh to play again', this.canvas.width / 2, this.canvas.height / 2 + 60);
+        this.ctx.fillText('Press SPACE to play again', this.canvas.width / 2, this.canvas.height / 2 + 60);
     }
 
     public destroy(): void {
         this.stop();
-        window.removeEventListener('keydown', this.setupControls);
-        window.removeEventListener('keyup', this.setupControls);
+        // Remove event listeners properly
+        window.removeEventListener('keydown', this.setupControls as any);
+        window.removeEventListener('keyup', this.setupControls as any);
     }
 }
