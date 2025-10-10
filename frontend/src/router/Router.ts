@@ -1,5 +1,5 @@
 import { HomePage } from '../components/ui/HomePage';
-import { GamePage } from '../components/game/GamePage';
+import { GamePage } from '../components/ui/GamePage';
 import { TournamentPage } from '../components/ui/TournamentPage';
 
 interface Route {

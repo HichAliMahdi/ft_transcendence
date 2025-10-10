@@ -1,4 +1,4 @@
-import { PongGame } from './PongGame';
+import { PongGame } from '../game/PongGame';
 
 export class GamePage {
     private game: PongGame | null = null;
