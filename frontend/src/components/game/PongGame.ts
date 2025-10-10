@@ -1,6 +1,3 @@
-// Simple Pong Game Prototype
-// Add this to: frontend/src/components/game/PongGame.ts
-
 interface Ball {
     x: number;
     y: number;

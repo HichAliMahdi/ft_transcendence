@@ -1,5 +1,3 @@
-// Update frontend/src/components/game/GamePage.ts
-
 import { PongGame } from './PongGame';
 
 export class GamePage {
