@@ -1,3 +1,6 @@
+import { Tournament } from '../game/Tournament';
+import { PongGame } from '../game/PongGame';
+
 export class TournamentPage {
     public render(): HTMLElement {
         const container = document.createElement('div');
