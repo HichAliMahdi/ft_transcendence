@@ -137,4 +137,70 @@ export class TournamentPage {
         this.container.appendChild(startButton);
     }
     
+    private renderMatch(): void {
+        if (!this.container) return;
+
+        const match = this.tournament.getCurrentMatch();
+        if (!match) return;
+
+        const title = document.createElement('h1');
+        title.textContent = `Round ${match.round} - Match ${match.matchNumber}`;
+        
+        const matchInfo = document.createElement('div');
+        matchInfo.style.cssText = 'background: #16213e; padding: 2rem; border-radius: 8px; margin: 2rem 0; text-align: center;';
+        
+        const vs = document.createElement('h2');
+        vs.style.cssText = 'font-size: 2rem; margin: 1rem 0;';
+        vs.innerHTML = `
+            <span style="color: #0f3460;">${match.player1?.alias || 'BYE'}</span>
+            <span style="color: #888; margin: 0 1rem;">VS</span>
+            <span style="color: #e94560;">${match.player2?.alias || 'BYE'}</span>
+        `;
+        matchInfo.appendChild(vs);
+        
+        const instructions = document.createElement('div');
+        instructions.style.marginTop = '1.5rem';
+        instructions.innerHTML = `
+            <p><strong>Controls:</strong></p>
+            <p>${match.player1?.alias}: W (up) / S (down)</p>
+            <p>${match.player2?.alias}: Arrow Up / Arrow Down</p>
+            <p style="margin-top: 1rem; color: #e94560;"><strong>First to 5 points wins!</strong></p>
+        `;
+        matchInfo.appendChild(instructions);
+        
+        const canvas = document.createElement('canvas');
+        canvas.id = 'gameCanvas';
+        canvas.width = 800;
+        canvas.height = 600;
+        canvas.style.cssText = 'border: 2px solid #0f3460; background: #000; margin: 2rem auto; display: block;';
+        
+        const buttonContainer = document.createElement('div');
+        buttonContainer.style.cssText = 'text-align: center; margin-top: 1rem;';
+        
+        const startButton = document.createElement('button');
+        startButton.textContent = 'Start Match';
+        startButton.onclick = () => {
+            if (!this.currentGame) {
+                this.currentGame = new PongGame(canvas);
+                this.setupGameEndHandler(match.id, match.player1!.id, match.player2!.id);
+            }
+            this.currentGame.start();
+            startButton.disabled = true;
+        };
+        
+        buttonContainer.appendChild(startButton);
+        
+        const bracket = this.renderBracket();
+        
+        this.container.appendChild(title);
+        this.container.appendChild(matchInfo);
+        this.container.appendChild(canvas);
+        this.container.appendChild(buttonContainer);
+        this.container.appendChild(bracket);
+        
+        setTimeout(() => {
+            startButton.click();
+        }, 100);
+    }
+
 }
