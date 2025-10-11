@@ -16,6 +16,7 @@ interface TournamentState {
     players: Player[];
     matches: Match[];
     currentMatch: Match | null;
+    currentRound: number;
     isActive: boolean;
     isComplete: boolean;
 }
@@ -139,5 +140,127 @@ export class Tournament {
             [players[i], players[j]] = [players[j], players[i]];
         }
     }
+    private setNextMatch(): void {
+        const currentRoundMatches = this.state.matches.filter(
+            m => m.round === this.state.currentRound && !m.winner
+        );
 
+        if (currentRoundMatches.length > 0) {
+            this.state.currentMatch = currentRoundMatches[0];
+        } else {
+            this.state.currentMatch = null;
+            this.checkRoundCompletion();
+        }
+    }
+    private checkRoundCompletion(): void {
+        const currentRoundMatches = this.state.matches.filter(
+            m => m.round === this.state.currentRound
+        );
+
+        const allMatchesComplete = currentRoundMatches.every(m => m.winner !== null);
+
+        if (allMatchesComplete) {
+            const winners = currentRoundMatches
+                .map(m => m.winner)
+                .filter(w => w !== null) as Player[];
+
+            if (winners.length === 1) {
+                this.state.isComplete = true;
+                this.state.isActive = false;
+                this.state.currentMatch = null;
+            } else if (winners.length > 1) {
+                this.advanceToNextRound(winners);
+            }
+        }
+    }
+    private advanceToNextRound(winners: Player[]): void {
+        this.state.currentRound++;
+        let matchNumber = 1;
+
+        for (let i = 0; i < winners.length; i += 2) {
+            const match: Match = {
+                id: `match_${this.state.currentRound}_${matchNumber}`,
+                player1: winners[i],
+                player2: winners[i + 1] || null,
+                winner: null,
+                round: this.state.currentRound,
+                matchNumber: matchNumber++
+            };
+
+            if (!match.player2) {
+                match.winner = match.player1;
+            }
+
+            this.state.matches.push(match);
+        }
+
+        this.setNextMatch();
+    }
+
+    public recordMatchWinner(matchId: string, winnerId: string): boolean {
+        const match = this.state.matches.find(m => m.id === matchId);
+        if (!match || match.winner) {
+            return false;
+        }
+
+        if (match.player1?.id === winnerId) {
+            match.winner = match.player1;
+        } else if (match.player2?.id === winnerId) {
+            match.winner = match.player2;
+        } else {
+            return false;
+        }
+
+        this.setNextMatch();
+        this.notifyStateChange();
+        return true;
+    }
+
+    public getCurrentMatch(): Match | null {
+        return this.state.currentMatch;
+    }
+
+    public getMatchesByRound(round: number): Match[] {
+        return this.state.matches.filter(m => m.round === round);
+    }
+
+    public getAllRounds(): number[] {
+        const rounds = new Set(this.state.matches.map(m => m.round));
+        return Array.from(rounds).sort((a, b) => a - b);
+    }
+
+    public getWinner(): Player | null {
+        if (!this.state.isComplete) {
+            return null;
+        }
+
+        const finalRound = Math.max(...this.state.matches.map(m => m.round));
+        const finalMatch = this.state.matches.find(m => m.round === finalRound);
+        
+        return finalMatch?.winner || null;
+    }
+
+    public reset(): void {
+        this.state = {
+            players: [],
+            matches: [],
+            currentMatch: null,
+            currentRound: 1,
+            isActive: false,
+            isComplete: false
+        };
+        this.notifyStateChange();
+    }
+
+    public getPlayers(): Player[] {
+        return [...this.state.players];
+    }
+
+    public isActive(): boolean {
+        return this.state.isActive;
+    }
+    
+    public isComplete(): boolean {
+        return this.state.isComplete;
+    }
 }
