@@ -5,6 +5,7 @@ export class TournamentPage {
     private tournament: Tournament;
     private currentGame: PongGame | null = null;
     private container: HTMLElement | null = null;
+    private gameCheckInterval: number | null = null;
 
     constructor() {
         this.tournament = new Tournament();
@@ -143,6 +144,9 @@ export class TournamentPage {
         const match = this.tournament.getCurrentMatch();
         if (!match) return;
 
+        // Clean up any existing game first
+        this.cleanupCurrentGame();
+
         const title = document.createElement('h1');
         title.textContent = `Round ${match.round} - Match ${match.matchNumber}`;
         
@@ -180,10 +184,9 @@ export class TournamentPage {
         const startButton = document.createElement('button');
         startButton.textContent = 'Start Match';
         startButton.onclick = () => {
-            if (!this.currentGame) {
-                this.currentGame = new PongGame(canvas);
-                this.setupGameEndHandler(match.id, match.player1!.id, match.player2!.id);
-            }
+            // Create the game instance only when button is clicked
+            this.currentGame = new PongGame(canvas);
+            this.setupGameEndHandler(match.id, match.player1!.id, match.player2!.id);
             this.currentGame.start();
             startButton.disabled = true;
         };
@@ -198,33 +201,44 @@ export class TournamentPage {
         this.container.appendChild(buttonContainer);
         this.container.appendChild(bracket);
         
-        setTimeout(() => {
-            startButton.click();
-        }, 100);
+        // Don't auto-start the game - removed the setTimeout
     }
 
     private setupGameEndHandler(matchId: string, player1Id: string, player2Id: string): void {
-        const checkGameEnd = () => {
-            if (!this.currentGame) return;
+        // Clear any existing interval
+        if (this.gameCheckInterval !== null) {
+            clearInterval(this.gameCheckInterval);
+        }
+
+        // Use setInterval instead of recursive setTimeout for better reliability
+        this.gameCheckInterval = window.setInterval(() => {
+            if (!this.currentGame) {
+                if (this.gameCheckInterval !== null) {
+                    clearInterval(this.gameCheckInterval);
+                    this.gameCheckInterval = null;
+                }
+                return;
+            }
             
             const score = (this.currentGame as any).score;
             if (score.player1 >= 5) {
                 this.handleMatchEnd(matchId, player1Id);
             } else if (score.player2 >= 5) {
                 this.handleMatchEnd(matchId, player2Id);
-            } else {
-                setTimeout(checkGameEnd, 100);
             }
-        };
-        
-        setTimeout(checkGameEnd, 100);
+        }, 100);
     }
 
     private handleMatchEnd(matchId: string, winnerId: string): void {
+        // Clear the game check interval
+        if (this.gameCheckInterval !== null) {
+            clearInterval(this.gameCheckInterval);
+            this.gameCheckInterval = null;
+        }
+
         if (this.currentGame) {
             setTimeout(() => {
-                this.currentGame?.destroy();
-                this.currentGame = null;
+                this.cleanupCurrentGame();
                 
                 this.tournament.recordMatchWinner(matchId, winnerId);
                 
@@ -232,6 +246,17 @@ export class TournamentPage {
                     this.updateUI();
                 }, 2000);
             }, 3000);
+        }
+    }
+
+    private cleanupCurrentGame(): void {
+        if (this.currentGame) {
+            this.currentGame.destroy();
+            this.currentGame = null;
+        }
+        if (this.gameCheckInterval !== null) {
+            clearInterval(this.gameCheckInterval);
+            this.gameCheckInterval = null;
         }
     }
 
@@ -355,9 +380,6 @@ export class TournamentPage {
     }
 
     public cleanup(): void {
-        if (this.currentGame) {
-            this.currentGame.destroy();
-            this.currentGame = null;
-        }
+        this.cleanupCurrentGame();
     }
 }
