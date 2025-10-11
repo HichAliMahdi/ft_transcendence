@@ -4,17 +4,18 @@ import { TournamentPage } from '../components/ui/TournamentPage';
 
 interface Route {
     path: string;
-    view: () => HTMLElement;
+    view: () => any;
 }
 
 export class Router {
     private routes: Route[];
+    private currentPage: any = null;
 
     constructor() {
         this.routes = [
-            { path: '/', view: () => new HomePage().render() },
-            { path: '/game', view: () => new GamePage().render() },
-            { path: '/tournament', view: () => new TournamentPage().render() },
+            { path: '/', view: () => new HomePage() },
+            { path: '/game', view: () => new GamePage() },
+            { path: '/tournament', view: () => new TournamentPage() },
         ];
     }
 
@@ -24,13 +25,19 @@ export class Router {
     }
 
     public handleRoute(): void {
+        if (this.currentPage && typeof this.currentPage.cleanup === 'function') {
+            this.currentPage.cleanup();
+        }
+
         const path = window.location.pathname;
         const route = this.routes.find(r => r.path === path) || this.routes[0];
+        
+        this.currentPage = route.view();
         
         const content = document.getElementById('content');
         if (content) {
             content.innerHTML = '';
-            content.appendChild(route.view());
+            content.appendChild(this.currentPage.render());
         }
     }
 }
