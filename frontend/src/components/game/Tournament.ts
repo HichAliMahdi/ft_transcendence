@@ -100,4 +100,44 @@ export class Tournament {
         return true;
     }
 
+    private generateMatches(): void {
+        const players = [...this.state.players];
+        this.shufflePlayers(players);
+        const numPlayers = players.length;
+        const isPowerOfTwo = (numPlayers & (numPlayers - 1)) === 0;
+        if (!isPowerOfTwo) {
+            const nextPowerOfTwo = Math.pow(2, Math.ceil(Math.log2(numPlayers)));
+            const byes = nextPowerOfTwo - numPlayers;
+            
+            for (let i = 0; i < byes; i++) {
+                players.push(null as any);
+            }
+        }
+        this.state.matches = [];
+        let matchNumber = 1;
+        for (let i = 0; i < players.length; i += 2) {
+            const match: Match = {
+                id: `match_${this.state.currentRound}_${matchNumber}`,
+                player1: players[i] || null,
+                player2: players[i + 1] || null,
+                winner: null,
+                round: this.state.currentRound,
+                matchNumber: matchNumber++
+            };
+            if (match.player1 && !match.player2) {
+                match.winner = match.player1;
+            } else if (!match.player1 && match.player2) {
+                match.winner = match.player2;
+            }
+            this.state.matches.push(match);
+        }
+        this.setNextMatch();
+    }
+    private shufflePlayers(players: Player[]): void {
+        for (let i = players.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [players[i], players[j]] = [players[j], players[i]];
+        }
+    }
+
 }
