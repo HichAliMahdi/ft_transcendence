@@ -75,9 +75,10 @@ export class PongGame {
         this.setupControls();
     }
 
+    private keyHandler: ((e: KeyboardEvent) => void) | null = null;
     private setupControls(): void {
         // Prevent default behavior for game keys to avoid browser conflicts
-        const keyHandler = (e: KeyboardEvent) => {
+        this.keyHandler = (e: KeyboardEvent) => { // Store the handler reference
             if (['w', 's', 'ArrowUp', 'ArrowDown', ' '].includes(e.key)) {
                 e.preventDefault();
             }
@@ -94,8 +95,8 @@ export class PongGame {
             this.keys[e.key] = (e.type === 'keydown');
         };
 
-        window.addEventListener('keydown', keyHandler);
-        window.addEventListener('keyup', keyHandler);
+        window.addEventListener('keydown', this.keyHandler);
+        window.addEventListener('keyup', this.keyHandler);
     }
 
     private update(): void {
@@ -307,8 +308,11 @@ export class PongGame {
 
     public destroy(): void {
         this.stop();
-        // Remove event listeners properly
-        window.removeEventListener('keydown', this.setupControls as any);
-        window.removeEventListener('keyup', this.setupControls as any);
+
+        if (this.keyHandler) {
+            window.removeEventListener('keydown', this.keyHandler);
+            window.removeEventListener('keyup', this.keyHandler);
+            this.keyHandler = null;
+        }
     }
 }
