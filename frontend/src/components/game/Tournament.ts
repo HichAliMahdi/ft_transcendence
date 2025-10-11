@@ -20,6 +20,18 @@ interface TournamentState {
     isComplete: boolean;
 }
 
-export class Tournament{
-    
+export class Tournament {
+    private state: TournamentState;
+    private onStateChange?: () => void;
+
+    constructor() {
+        this.state = {
+            players: [],
+            matches: [],
+            currentMatch: null,
+            currentRound: 1,
+            isActive: false,
+            isComplete: false
+        };
+    }
 }
