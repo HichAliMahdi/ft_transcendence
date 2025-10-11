@@ -28,8 +28,10 @@ body {
 
 #main-nav h1 {
   background: linear-gradient(90deg, #ff6ec4, #7873f5);
+  background-clip: text;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
+  color: #ff6ec4;
   font-weight: 700;
   letter-spacing: 2px;
   text-transform: uppercase;

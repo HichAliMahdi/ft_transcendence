@@ -31,6 +31,7 @@ export class PongGame {
     private isRunning: boolean = false;
     private lastTime: number = 0;
     private readonly FRAME_TIME: number = 1000 / 60;
+    private keyHandler: ((e: KeyboardEvent) => void) | null = null;
 
     constructor(canvas: HTMLCanvasElement) {
         this.canvas = canvas;
@@ -40,7 +41,7 @@ export class PongGame {
         }
         this.ctx = context;
 
-        // Initialize ball with consistent speed
+        // Initialize properties directly in constructor
         this.ball = {
             x: canvas.width / 2,
             y: canvas.height / 2,
@@ -49,7 +50,6 @@ export class PongGame {
             radius: 8
         };
 
-        // Initialize paddles
         this.paddle1 = {
             x: 20,
             y: canvas.height / 2 - 50,
@@ -66,7 +66,6 @@ export class PongGame {
             speed: 8
         };
 
-        // Initialize score
         this.score = {
             player1: 0,
             player2: 0
@@ -75,10 +74,12 @@ export class PongGame {
         this.setupControls();
     }
 
-    private keyHandler: ((e: KeyboardEvent) => void) | null = null;
     private setupControls(): void {
-        // Prevent default behavior for game keys to avoid browser conflicts
-        this.keyHandler = (e: KeyboardEvent) => { // Store the handler reference
+        // Remove existing listeners first to prevent duplicates
+        this.removeEventListeners();
+
+        // Create new handler
+        this.keyHandler = (e: KeyboardEvent) => {
             if (['w', 's', 'ArrowUp', 'ArrowDown', ' '].includes(e.key)) {
                 e.preventDefault();
             }
@@ -97,6 +98,14 @@ export class PongGame {
 
         window.addEventListener('keydown', this.keyHandler);
         window.addEventListener('keyup', this.keyHandler);
+    }
+
+    private removeEventListeners(): void {
+        if (this.keyHandler) {
+            window.removeEventListener('keydown', this.keyHandler);
+            window.removeEventListener('keyup', this.keyHandler);
+            this.keyHandler = null;
+        }
     }
 
     private update(): void {
@@ -209,6 +218,9 @@ export class PongGame {
         // Reset paddle positions
         this.paddle1.y = this.canvas.height / 2 - 50;
         this.paddle2.y = this.canvas.height / 2 - 50;
+        
+        // Clear any existing game over state
+        this.isRunning = true;
     }
 
     private draw(): void {
@@ -308,11 +320,39 @@ export class PongGame {
 
     public destroy(): void {
         this.stop();
+        this.removeEventListeners();
+    }
 
-        if (this.keyHandler) {
-            window.removeEventListener('keydown', this.keyHandler);
-            window.removeEventListener('keyup', this.keyHandler);
-            this.keyHandler = null;
-        }
+    // Public method to completely reset the game for a new match
+    public resetForNewMatch(): void {
+        this.stop();
+        this.resetGameState();
+        this.keys = {};
+    }
+
+    private resetGameState(): void {
+        // Reset ball
+        this.ball.x = this.canvas.width / 2;
+        this.ball.y = this.canvas.height / 2;
+        this.ball.dx = 5;
+        this.ball.dy = 5;
+        this.ball.radius = 8;
+
+        // Reset paddles
+        this.paddle1.x = 20;
+        this.paddle1.y = this.canvas.height / 2 - 50;
+        this.paddle1.width = 10;
+        this.paddle1.height = 100;
+        this.paddle1.speed = 8;
+
+        this.paddle2.x = this.canvas.width - 30;
+        this.paddle2.y = this.canvas.height / 2 - 50;
+        this.paddle2.width = 10;
+        this.paddle2.height = 100;
+        this.paddle2.speed = 8;
+
+        // Reset score
+        this.score.player1 = 0;
+        this.score.player2 = 0;
     }
 }
