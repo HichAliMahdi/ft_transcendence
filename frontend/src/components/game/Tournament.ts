@@ -87,5 +87,17 @@ export class Tournament {
         this.notifyStateChange();
         return true;
     }
-    
+
+    public startTournament(): boolean {
+        if (this.state.players.length < 2) {
+            return false;
+        }
+
+        this.state.isActive = true;
+        this.state.currentRound = 1;
+        this.generateMatches();
+        this.notifyStateChange();
+        return true;
+    }
+
 }
