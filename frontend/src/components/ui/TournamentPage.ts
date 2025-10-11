@@ -219,7 +219,7 @@ export class TournamentPage {
         
         setTimeout(checkGameEnd, 100);
     }
-    
+
     private handleMatchEnd(matchId: string, winnerId: string): void {
         if (this.currentGame) {
             setTimeout(() => {
@@ -235,4 +235,129 @@ export class TournamentPage {
         }
     }
 
+    private renderBracket(): HTMLElement {
+        const bracket = document.createElement('div');
+        bracket.style.cssText = 'background: #16213e; padding: 2rem; border-radius: 8px; margin-top: 2rem;';
+        
+        const title = document.createElement('h3');
+        title.textContent = 'Tournament Bracket';
+        title.style.marginBottom = '1.5rem';
+        bracket.appendChild(title);
+        
+        const rounds = this.tournament.getAllRounds();
+        
+        rounds.forEach(round => {
+            const roundDiv = document.createElement('div');
+            roundDiv.style.marginBottom = '1.5rem';
+            
+            const roundTitle = document.createElement('h4');
+            roundTitle.textContent = `Round ${round}`;
+            roundTitle.style.cssText = 'color: #0f3460; margin-bottom: 0.75rem;';
+            roundDiv.appendChild(roundTitle);
+            
+            const matches = this.tournament.getMatchesByRound(round);
+            const matchesGrid = document.createElement('div');
+            matchesGrid.style.cssText = 'display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 1rem;';
+            
+            matches.forEach(match => {
+                const matchDiv = document.createElement('div');
+                matchDiv.style.cssText = `background: #0f3460; padding: 1rem; border-radius: 4px; ${match.winner ? 'opacity: 0.7;' : ''}`;
+                
+                const p1 = document.createElement('div');
+                p1.textContent = match.player1?.alias || 'BYE';
+                p1.style.cssText = `padding: 0.5rem; ${match.winner?.id === match.player1?.id ? 'background: #e94560; font-weight: bold;' : ''}`;
+                
+                const p2 = document.createElement('div');
+                p2.textContent = match.player2?.alias || 'BYE';
+                p2.style.cssText = `padding: 0.5rem; margin-top: 0.25rem; ${match.winner?.id === match.player2?.id ? 'background: #e94560; font-weight: bold;' : ''}`;
+                
+                matchDiv.appendChild(p1);
+                matchDiv.appendChild(p2);
+                matchesGrid.appendChild(matchDiv);
+            });
+            
+            roundDiv.appendChild(matchesGrid);
+            bracket.appendChild(roundDiv);
+        });
+        
+        return bracket;
+    }
+
+    private renderWaitingScreen(): void {
+        if (!this.container) return;
+
+        const title = document.createElement('h1');
+        title.textContent = 'Preparing Next Match...';
+        
+        const message = document.createElement('p');
+        message.textContent = 'Please wait while the next match is being set up.';
+        message.style.cssText = 'font-size: 1.2rem; margin-top: 2rem;';
+        
+        this.container.appendChild(title);
+        this.container.appendChild(message);
+    }
+
+    private renderWinner(): void {
+        if (!this.container) return;
+
+        const winner = this.tournament.getWinner();
+        
+        const title = document.createElement('h1');
+        title.textContent = 'Tournament Complete! 🏆';
+        title.style.textAlign = 'center';
+        
+        const winnerCard = document.createElement('div');
+        winnerCard.style.cssText = 'background: #16213e; padding: 3rem; border-radius: 8px; margin: 2rem auto; text-align: center; max-width: 600px; border: 3px solid #e94560;';
+        
+        const winnerTitle = document.createElement('h2');
+        winnerTitle.textContent = 'Champion';
+        winnerTitle.style.cssText = 'color: #e94560; font-size: 2rem; margin-bottom: 1rem;';
+        
+        const winnerName = document.createElement('h3');
+        winnerName.textContent = winner?.alias || 'Unknown';
+        winnerName.style.cssText = 'font-size: 3rem; color: #0f3460; margin-bottom: 2rem;';
+        
+        const trophy = document.createElement('div');
+        trophy.textContent = '🏆';
+        trophy.style.fontSize = '5rem';
+        
+        winnerCard.appendChild(winnerTitle);
+        winnerCard.appendChild(winnerName);
+        winnerCard.appendChild(trophy);
+        
+        const bracket = this.renderBracket();
+        
+        const buttonContainer = document.createElement('div');
+        buttonContainer.style.cssText = 'text-align: center; margin-top: 2rem;';
+        
+        const newTournamentBtn = document.createElement('button');
+        newTournamentBtn.textContent = 'New Tournament';
+        newTournamentBtn.style.cssText = 'font-size: 1.2rem; padding: 1rem 2rem; margin-right: 1rem;';
+        newTournamentBtn.onclick = () => {
+            this.tournament.reset();
+            this.updateUI();
+        };
+        
+        const homeBtn = document.createElement('button');
+        homeBtn.textContent = 'Back to Home';
+        homeBtn.style.cssText = 'font-size: 1.2rem; padding: 1rem 2rem; background: #0f3460;';
+        homeBtn.onclick = () => {
+            window.location.href = '/';
+        };
+        
+        buttonContainer.appendChild(newTournamentBtn);
+        buttonContainer.appendChild(homeBtn);
+        
+        this.container.appendChild(title);
+        this.container.appendChild(winnerCard);
+        this.container.appendChild(bracket);
+        this.container.appendChild(buttonContainer);
+    }
+
+    public cleanup(): void {
+        if (this.currentGame) {
+            this.currentGame.destroy();
+            this.currentGame = null;
+        }
+    }
 }
