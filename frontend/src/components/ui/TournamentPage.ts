@@ -136,7 +136,7 @@ export class TournamentPage {
         this.container.appendChild(playersList);
         this.container.appendChild(startButton);
     }
-    
+
     private renderMatch(): void {
         if (!this.container) return;
 
@@ -201,6 +201,38 @@ export class TournamentPage {
         setTimeout(() => {
             startButton.click();
         }, 100);
+    }
+
+    private setupGameEndHandler(matchId: string, player1Id: string, player2Id: string): void {
+        const checkGameEnd = () => {
+            if (!this.currentGame) return;
+            
+            const score = (this.currentGame as any).score;
+            if (score.player1 >= 5) {
+                this.handleMatchEnd(matchId, player1Id);
+            } else if (score.player2 >= 5) {
+                this.handleMatchEnd(matchId, player2Id);
+            } else {
+                setTimeout(checkGameEnd, 100);
+            }
+        };
+        
+        setTimeout(checkGameEnd, 100);
+    }
+    
+    private handleMatchEnd(matchId: string, winnerId: string): void {
+        if (this.currentGame) {
+            setTimeout(() => {
+                this.currentGame?.destroy();
+                this.currentGame = null;
+                
+                this.tournament.recordMatchWinner(matchId, winnerId);
+                
+                setTimeout(() => {
+                    this.updateUI();
+                }, 2000);
+            }, 3000);
+        }
     }
 
 }
