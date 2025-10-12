@@ -195,11 +195,16 @@ export class PongGame {
         if (this.keys['s']) {
             this.paddle1.y = Math.min(this.canvas.height - this.paddle1.height, this.paddle1.y + this.paddle1.speed);
         }
-        if (this.keys['ArrowUp']) {
-            this.paddle2.y = Math.max(0, this.paddle2.y - this.paddle2.speed);
-        }
-        if (this.keys['ArrowDown']) {
-            this.paddle2.y = Math.min(this.canvas.height - this.paddle2.height, this.paddle2.y + this.paddle2.speed);
+        // Added logic of moving based on gameMode
+        if (this.gameMode === 'pvp') {
+            if (this.keys['ArrowUp']) {
+                this.paddle2.y = Math.max(0, this.paddle2.y - this.paddle2.speed);
+            }
+            if (this.keys['ArrowDown']) {
+                this.paddle2.y = Math.min(this.canvas.height - this.paddle2.height, this.paddle2.y + this.paddle2.speed);
+            }
+        } else {
+            this.updateAIPaddle();
         }
 
         // Move ball
