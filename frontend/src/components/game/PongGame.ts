@@ -19,6 +19,9 @@ interface Score {
     player2: number;
 }
 
+type GameMode = 'pvp' | 'pve';
+type IDifficulty = 'easy' | 'medium' | 'hard';
+
 export class PongGame {
     private canvas: HTMLCanvasElement;
     private ctx: CanvasRenderingContext2D;
