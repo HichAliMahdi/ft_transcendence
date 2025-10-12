@@ -24,7 +24,7 @@ type AIDifficulty = 'easy' | 'medium' | 'hard';
 
 interface GameConfig {
     mode: GameMode;
-    aiDiddiculty?: AIDifficulty;
+    aiDifficulty?: AIDifficulty;
 }
 
 export class PongGame {
@@ -40,8 +40,8 @@ export class PongGame {
     private lastTime: number = 0;
     private readonly FRAME_TIME: number = 1000 / 60;
     private keyHandler: ((e: KeyboardEvent) => void) | null = null;
-
-    // Adding AI properties
+    
+    // AI properties
     private gameMode: GameMode;
     private aiDifficulty: AIDifficulty;
     private aiTarget: number = 0;
@@ -56,6 +56,10 @@ export class PongGame {
         }
         this.ctx = context;
 
+        this.gameMode = config.mode;
+        this.aiDifficulty = config.aiDifficulty || 'medium';
+
+        // Initialize properties
         this.ball = {
             x: canvas.width / 2,
             y: canvas.height / 2,
@@ -119,28 +123,28 @@ export class PongGame {
         }
     }
 
-    private getAISettings(): { speed: number, error: number, reactionDelay: number }{
-        switch (this.aiDifficulty){
+    private getAISettings(): { speed: number, error: number, reactionDelay: number } {
+        switch (this.aiDifficulty) {
             case 'easy':
-                return {
+                return { 
                     speed: 0.5,
                     error: 80,
                     reactionDelay: 200
                 };
             case 'medium':
-                return {
-                    speed: 0.75,
+                return { 
+                    speed: 0.75, 
                     error: 40,
                     reactionDelay: 100
                 };
             case 'hard':
-                return {
-                    speed: 0.95,
+                return { 
+                    speed: 0.95, 
                     error: 15,
                     reactionDelay: 30
                 };
             default:
-                return { speed: 0.75, error: 40, reactionDelay: 100};
+                return { speed: 0.75, error: 40, reactionDelay: 100 };
         }
     }
 
@@ -148,36 +152,46 @@ export class PongGame {
         const distanceX = this.paddle2.x - this.ball.x;
         const timeToReach = distanceX / Math.abs(this.ball.dx);
         let predictedY = this.ball.y + (this.ball.dy * timeToReach);
-
+        
+        // Account for wall bounces
         const bounces = Math.floor(Math.abs(predictedY) / this.canvas.height);
-        predictedY = predictedY % this.canvas.height
-
-        if (predictedY < 0)
+        predictedY = predictedY % this.canvas.height;
+        
+        if (predictedY < 0) {
             predictedY = Math.abs(predictedY);
-        if (bounces % 2 === 1)
+        }
+        if (bounces % 2 === 1) {
             predictedY = this.canvas.height - predictedY;
+        }
+        
         return predictedY;
     }
 
     private updateAIPaddle(): void {
         const currentTime = performance.now();
         const settings = this.getAISettings();
-        // update AI target
-        if (currentTime - this.aiLastUpdate > settings.reactionDelay){
-            if (this.ball.dx > 0){
+        
+        // Update AI target with reaction delay
+        if (currentTime - this.aiLastUpdate > settings.reactionDelay) {
+            if (this.ball.dx > 0) {
+                // Ball moving toward AI
                 this.aiTarget = this.predictBallY();
+                // Add error based on difficulty
                 this.aiTarget += (Math.random() - 0.5) * settings.error * 2;
             } else {
+                // Ball moving away, return to center
                 this.aiTarget = this.canvas.height / 2;
             }
             this.aiLastUpdate = currentTime;
         }
-        // Move AI paddle to target
+        
+        // Move AI paddle toward target
         const paddleCenter = this.paddle2.y + this.paddle2.height / 2;
-        const distace = this.aiTarget - paddleCenter;
-        if (Math.abs(distace) > 5){
+        const distance = this.aiTarget - paddleCenter;
+        
+        if (Math.abs(distance) > 5) {
             const moveSpeed = this.paddle2.speed * settings.speed;
-            if (distace > 0){
+            if (distance > 0) {
                 this.paddle2.y = Math.min(
                     this.canvas.height - this.paddle2.height,
                     this.paddle2.y + moveSpeed
@@ -189,13 +203,15 @@ export class PongGame {
     }
 
     private update(): void {
+        // Move player 1 paddle (always human controlled)
         if (this.keys['w']) {
             this.paddle1.y = Math.max(0, this.paddle1.y - this.paddle1.speed);
         }
         if (this.keys['s']) {
             this.paddle1.y = Math.min(this.canvas.height - this.paddle1.height, this.paddle1.y + this.paddle1.speed);
         }
-        // Added logic of moving based on gameMode
+
+        // Move player 2 paddle based on game mode
         if (this.gameMode === 'pvp') {
             if (this.keys['ArrowUp']) {
                 this.paddle2.y = Math.max(0, this.paddle2.y - this.paddle2.speed);
@@ -220,14 +236,14 @@ export class PongGame {
             this.ball.dy *= -1;
         }
 
-        // Ball collision with paddles with better collision detection
+        // Ball collision with paddles
         if (this.checkPaddleCollision(this.paddle1)) {
             this.ball.x = this.paddle1.x + this.paddle1.width + this.ball.radius;
-            this.ball.dx = Math.abs(this.ball.dx); // Ensure positive direction
+            this.ball.dx = Math.abs(this.ball.dx);
             this.adjustBallAngle(this.paddle1);
         } else if (this.checkPaddleCollision(this.paddle2)) {
             this.ball.x = this.paddle2.x - this.ball.radius;
-            this.ball.dx = -Math.abs(this.ball.dx); // Ensure negative direction
+            this.ball.dx = -Math.abs(this.ball.dx);
             this.adjustBallAngle(this.paddle2);
         }
 
@@ -247,21 +263,15 @@ export class PongGame {
     }
 
     private adjustBallAngle(paddle: Paddle): void {
-        // Calculate hit position relative to paddle center (-0.5 to 0.5)
         const hitPos = (this.ball.y - (paddle.y + paddle.height / 2)) / (paddle.height / 2);
-        
-        // Adjust angle based on where the ball hit the paddle
-        const maxAngle = Math.PI / 4; // 45 degrees max
+        const maxAngle = Math.PI / 4;
         const angle = hitPos * maxAngle;
-        
-        // Calculate new speed while maintaining overall velocity
         const speed = Math.sqrt(this.ball.dx * this.ball.dx + this.ball.dy * this.ball.dy);
         const direction = this.ball.dx > 0 ? 1 : -1;
         
         this.ball.dx = direction * speed * Math.cos(angle);
         this.ball.dy = speed * Math.sin(angle);
         
-        // Slight speed increase after each hit (capped)
         const newSpeed = Math.min(speed * 1.05, 15);
         const currentSpeed = Math.sqrt(this.ball.dx * this.ball.dx + this.ball.dy * this.ball.dy);
         const ratio = newSpeed / currentSpeed;
@@ -271,7 +281,6 @@ export class PongGame {
     }
 
     private checkPaddleCollision(paddle: Paddle): boolean {
-        // Improved collision detection
         const closestX = Math.max(paddle.x, Math.min(this.ball.x, paddle.x + paddle.width));
         const closestY = Math.max(paddle.y, Math.min(this.ball.y, paddle.y + paddle.height));
         
@@ -285,8 +294,7 @@ export class PongGame {
         this.ball.x = this.canvas.width / 2;
         this.ball.y = this.canvas.height / 2;
         
-        // Random direction but consistent speed
-        const angle = (Math.random() * Math.PI / 2) - Math.PI / 4; // -45 to +45 degrees
+        const angle = (Math.random() * Math.PI / 2) - Math.PI / 4;
         const speed = 5;
         const direction = Math.random() > 0.5 ? 1 : -1;
         
@@ -298,12 +306,8 @@ export class PongGame {
         this.score.player1 = 0;
         this.score.player2 = 0;
         this.resetBall();
-        
-        // Reset paddle positions
         this.paddle1.y = this.canvas.height / 2 - 50;
         this.paddle2.y = this.canvas.height / 2 - 50;
-        
-        // Clear any existing game over state
         this.isRunning = true;
     }
 
@@ -346,13 +350,16 @@ export class PongGame {
         this.ctx.textAlign = 'left';
         this.ctx.fillText('W/S', 20, this.canvas.height - 20);
         this.ctx.textAlign = 'right';
-        this.ctx.fillText('↑/↓', this.canvas.width - 20, this.canvas.height - 20);
+        if (this.gameMode === 'pvp') {
+            this.ctx.fillText('↑/↓', this.canvas.width - 20, this.canvas.height - 20);
+        } else {
+            this.ctx.fillText(`AI (${this.aiDifficulty})`, this.canvas.width - 20, this.canvas.height - 20);
+        }
     }
 
     private gameLoop = (timestamp: number): void => {
         if (!this.isRunning) return;
 
-        // Frame rate limiting
         const deltaTime = timestamp - this.lastTime;
         
         if (deltaTime >= this.FRAME_TIME) {
@@ -382,9 +389,10 @@ export class PongGame {
 
     private endGame(): void {
         this.stop();
-        const winner = this.score.player1 >= 5 ? 'Player 1' : 'Player 2';
+        const winner = this.score.player1 >= 5 
+            ? 'Player 1' 
+            : this.gameMode === 'pvp' ? 'Player 2' : 'AI';
         
-        // Draw game over screen
         this.ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
         
@@ -407,7 +415,6 @@ export class PongGame {
         this.removeEventListeners();
     }
 
-    // Public method to completely reset the game for a new match
     public resetForNewMatch(): void {
         this.stop();
         this.resetGameState();
@@ -415,14 +422,12 @@ export class PongGame {
     }
 
     private resetGameState(): void {
-        // Reset ball
         this.ball.x = this.canvas.width / 2;
         this.ball.y = this.canvas.height / 2;
         this.ball.dx = 5;
         this.ball.dy = 5;
         this.ball.radius = 8;
 
-        // Reset paddles
         this.paddle1.x = 20;
         this.paddle1.y = this.canvas.height / 2 - 50;
         this.paddle1.width = 10;
@@ -435,8 +440,11 @@ export class PongGame {
         this.paddle2.height = 100;
         this.paddle2.speed = 8;
 
-        // Reset score
         this.score.player1 = 0;
         this.score.player2 = 0;
+    }
+    
+    public getScore(): Score {
+        return { ...this.score };
     }
 }
