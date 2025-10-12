@@ -20,7 +20,12 @@ interface Score {
 }
 
 type GameMode = 'pvp' | 'pve';
-type IDifficulty = 'easy' | 'medium' | 'hard';
+type AIDifficulty = 'easy' | 'medium' | 'hard';
+
+interface GameConfig {
+    mode: GameMode;
+    aiDiddiculty?: AIDifficulty;
+}
 
 export class PongGame {
     private canvas: HTMLCanvasElement;
@@ -35,6 +40,17 @@ export class PongGame {
     private lastTime: number = 0;
     private readonly FRAME_TIME: number = 1000 / 60;
     private keyHandler: ((e: KeyboardEvent) => void) | null = null;
+
+    // Adding AI properties
+    private gameMode: GameMode;
+    private aiDifficulty: AIDifficulty;
+    private aiTarget: number = 0;
+    private aiReactionDelay: number = 0;
+    private aiLastUpdate: number = 0;
+
+    constructor(canvas: HTMLCanvasElement, config: GameConfig = { mode: 'pvp' }){
+        this.canvas = canvas;
+    }
 
     constructor(canvas: HTMLCanvasElement) {
         this.canvas = canvas;
