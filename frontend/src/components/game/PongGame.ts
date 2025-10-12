@@ -145,7 +145,18 @@ export class PongGame {
     }
 
     private predictBallY(): number {
-        
+        const distanceX = this.paddle2.x - this.ball.x;
+        const timeToReach = distanceX / Math.abs(this.ball.dx);
+        let predictedY = this.ball.y + (this.ball.dy * timeToReach);
+
+        const bounces = Math.floor(Math.abs(predictedY) / this.canvas.height);
+        predictedY = predictedY % this.canvas.height
+
+        if (predictedY < 0)
+            predictedY = Math.abs(predictedY);
+        if (bounces % 2 === 1)
+            predictedY = this.canvas.height - predictedY;
+        return predictedY;
     }
 
     private update(): void {
