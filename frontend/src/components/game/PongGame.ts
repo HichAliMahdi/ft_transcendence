@@ -45,7 +45,6 @@ export class PongGame {
     private gameMode: GameMode;
     private aiDifficulty: AIDifficulty;
     private aiTarget: number = 0;
-    private aiReactionDelay: number = 0;
     private aiLastUpdate: number = 0;
 
     constructor(canvas: HTMLCanvasElement, config: GameConfig = { mode: 'pvp' }) {
