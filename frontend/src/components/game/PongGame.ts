@@ -48,11 +48,7 @@ export class PongGame {
     private aiReactionDelay: number = 0;
     private aiLastUpdate: number = 0;
 
-    constructor(canvas: HTMLCanvasElement, config: GameConfig = { mode: 'pvp' }){
-        this.canvas = canvas;
-    }
-
-    constructor(canvas: HTMLCanvasElement) {
+    constructor(canvas: HTMLCanvasElement, config: GameConfig = { mode: 'pvp' }) {
         this.canvas = canvas;
         const context = canvas.getContext('2d');
         if (!context) {
@@ -60,7 +56,6 @@ export class PongGame {
         }
         this.ctx = context;
 
-        // Initialize properties directly in constructor
         this.ball = {
             x: canvas.width / 2,
             y: canvas.height / 2,
@@ -94,17 +89,14 @@ export class PongGame {
     }
 
     private setupControls(): void {
-        // Remove existing listeners first to prevent duplicates
         this.removeEventListeners();
 
-        // Create new handler
         this.keyHandler = (e: KeyboardEvent) => {
             if (['w', 's', 'ArrowUp', 'ArrowDown', ' '].includes(e.key)) {
                 e.preventDefault();
             }
             
             if (e.key === ' ') {
-                // Space bar to restart
                 if (!this.isRunning && (this.score.player1 >= 5 || this.score.player2 >= 5)) {
                     this.resetGame();
                     this.start();
@@ -127,8 +119,36 @@ export class PongGame {
         }
     }
 
+    private getAISettings(): { speed: number, error: number, reactionDelay: number }{
+        switch (this.aiDifficulty){
+            case 'easy':
+                return {
+                    speed: 0.5,
+                    error: 80,
+                    reactionDelay: 200
+                };
+            case 'medium':
+                return {
+                    speed: 0.75,
+                    error: 40,
+                    reactionDelay: 100
+                };
+            case 'hard':
+                return {
+                    speed: 0.95,
+                    error: 15,
+                    reactionDelay: 30
+                };
+            default:
+                return { speed: 0.75, error: 40, reactionDelay: 100};
+        }
+    }
+
+    private predictBallY(): number {
+        
+    }
+
     private update(): void {
-        // Move paddles with boundary checking
         if (this.keys['w']) {
             this.paddle1.y = Math.max(0, this.paddle1.y - this.paddle1.speed);
         }
