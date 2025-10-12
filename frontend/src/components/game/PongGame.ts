@@ -159,6 +159,35 @@ export class PongGame {
         return predictedY;
     }
 
+    private updateAIPaddle(): void {
+        const currentTime = performance.now();
+        const settings = this.getAISettings();
+        // update AI target
+        if (currentTime - this.aiLastUpdate > settings.reactionDelay){
+            if (this.ball.dx > 0){
+                this.aiTarget = this.predictBallY();
+                this.aiTarget += (Math.random() - 0.5) * settings.error * 2;
+            } else {
+                this.aiTarget = this.canvas.height / 2;
+            }
+            this.aiLastUpdate = currentTime;
+        }
+        // Move AI paddle to target
+        const paddleCenter = this.paddle2.y + this.paddle2.height / 2;
+        const distace = this.aiTarget - paddleCenter;
+        if (Math.abs(distace) > 5){
+            const moveSpeed = this.paddle2.speed * settings.speed;
+            if (distace > 0){
+                this.paddle2.y = Math.min(
+                    this.canvas.height - this.paddle2.height,
+                    this.paddle2.y + moveSpeed
+                );
+            } else {
+                this.paddle2.y = Math.max(0, this.paddle2.y - moveSpeed);
+            }
+        }
+    }
+
     private update(): void {
         if (this.keys['w']) {
             this.paddle1.y = Math.max(0, this.paddle1.y - this.paddle1.speed);
