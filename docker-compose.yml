@@ -5,23 +5,30 @@ services:
       - "${BACKEND_PORT}:3000"
     environment:
       - NODE_ENV=${NODE_ENV}
-      - DB_PATH=${DB_PATH}
+      - DB_PATH=/data/pong.db
       - JWT_SECRET=${JWT_SECRET}
+      - FRONTEND_URL=http://frontend:5173
     volumes:
       - ./data:/data
-    depends_on:
-      - database
-  
+    networks:
+      - transcendence_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
   frontend:
-    build:
+    build: 
       context: ./frontend
       dockerfile: Dockerfile
     container_name: frontend
     volumes:
       - frontend_dist:/app/dist
-      - ./frontend/src:/app/src
     networks:
       - transcendence_network
+    depends_on:
+      - backend
 
   nginx:
     build:
@@ -32,11 +39,13 @@ services:
       - "443:443"
       - "80:80"
     volumes:
-      - frontend_dist:/var/www/html:ro
+      - frontend_dist:/usr/share/nginx/html:ro
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
     networks:
       - transcendence_network
     depends_on:
       - frontend
+      - backend
 
 volumes:
   frontend_dist:
