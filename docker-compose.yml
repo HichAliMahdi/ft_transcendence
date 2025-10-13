@@ -1,4 +1,17 @@
 services:
+  backend:
+    build: ./backend
+    ports:
+      - "${BACKEND_PORT}:3000"
+    environment:
+      - NODE_ENV=${NODE_ENV}
+      - DB_PATH=${DB_PATH}
+      - JWT_SECRET=${JWT_SECRET}
+    volumes:
+      - ./data:/data
+    depends_on:
+      - database
+  
   frontend:
     build:
       context: ./frontend
