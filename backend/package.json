@@ -1,5 +1,5 @@
 {
-  "name": "ft_transcendence-backend",
+  "name": "transcendence-backend",
   "version": "1.0.0",
   "description": "Backend for Pong website",
   "main": "dist/index.js",
