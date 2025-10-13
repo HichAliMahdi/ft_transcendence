@@ -1,4 +1,5 @@
 import Fastify, { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import routes from './routes';
 
 const fastify: FastifyInstance = Fastify({
     logger: true
