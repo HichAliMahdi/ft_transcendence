@@ -1,0 +1,20 @@
+backend/
+├── src/
+│   ├── config/
+│   │   └── index.ts
+│   ├── database/
+│   │   └── db.ts
+│   ├── models/
+│   │   ├── User.ts
+│   │   ├── Tournament.ts
+│   │   └── Game.ts
+│   ├── routes/
+│   │   ├── index.ts
+│   │   ├── health.ts
+│   │   ├── users.ts
+│   │   ├── tournaments.ts
+│   │   └── games.ts
+│   └── index.ts
+├── Dockerfile
+├── package.json
+└── tsconfig.json
