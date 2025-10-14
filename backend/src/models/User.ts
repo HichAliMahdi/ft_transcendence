@@ -16,5 +16,17 @@ export class UserModel {
             INSERT INTO users (username, email, password_hash, avatar_url)
             VALUES (?, ?, ?, ?)
         );
+        const result = stmt.run (
+            user.username,
+            user.email,
+            user.password_hash,
+            user.avatar_url
+        );
+        return this.findById(result.lastInsertRowid as number);
+    }
+
+    static findById(id: number) : User {
+        const stmt = db.prepare('SELECT * FROM users WHERE id = ?');
+        return stmt.get(id) as User;
     }
 }
