@@ -1,7 +1,8 @@
 import { FastifyInstance } from 'fastify';
 import healthRoutes from './health';
+import tournamentRoutes from './tournaments';
 
 export default async function routes(fastify: FastifyInstance) {
   fastify.register(healthRoutes, { prefix: '/api' });
-  // You'll add more routes here later
+  // add more routes here later
 }

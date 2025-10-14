@@ -5,7 +5,7 @@ export default async function healthRoutes(fastify: FastifyInstance) {
     return { 
       status: 'OK', 
       timestamp: new Date().toISOString(),
-      service: 'transcendence-backend'
+      service: 'transcendence-backend',
       version: '1.0.0'
     };
   });
