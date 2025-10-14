@@ -11,7 +11,7 @@ export interface Tournament {
 export class TournamentModel {
     static create(name: string) : Tournament {
         const stmt = db.prepare(
-            //TODO
+            //TODOhttps://elearning.intra.42.fr/
         );
     }
     static findById(id: number): Tournament {
