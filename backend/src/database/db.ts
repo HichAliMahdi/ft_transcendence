@@ -7,7 +7,7 @@ export function initializeDatabase(): void {
     db.exec(
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT UNIQUE NOT NULLm
+            username TEXT UNIQUE NOT NULL,
             email TEXT UNIQUE,
             password_has TEXT,
             avatar_url TEXT DEFAULT '/default-avatar.png',

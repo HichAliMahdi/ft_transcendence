@@ -9,3 +9,12 @@ export interface User {
     created_at: string;
     updated_at: string;
 }
+
+export class UserModel {
+    static create(user: Omit<User, 'id' | 'created_at' | 'updated_at'>): User {
+        const stmt = db.prepare(
+            INSERT INTO users (username, email, password_hash, avatar_url)
+            VALUES (?, ?, ?, ?)
+        );
+    }
+}
