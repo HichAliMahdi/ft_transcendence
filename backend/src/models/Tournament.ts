@@ -7,3 +7,21 @@ export interface Tournament {
     winner_id?: number;
     created_at: string;
 }
+
+export class TournamentModel {
+    static create(name: string) : Tournament {
+        const stmt = db.prepare(
+            //TODO
+        );
+    }
+    static findById(id: number): Tournament {
+        //TODO
+    }
+    static findAll() : Tournament[] {
+        //TODO
+    }
+    static updateStatus(id: number, status: 'pending' | 'active' | 'completed') : Tournament {
+        //TODO
+    }
+}
+
