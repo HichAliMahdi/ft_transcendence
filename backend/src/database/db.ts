@@ -37,3 +37,24 @@ export function initializeDatabase(): void {
             FOREIGN KEY (user_id) REFERENCES users (id)
         )
     );
+
+    db.exec (
+        CREATE TABLE IF NOT EXISTS games (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tournament_id INTEGER,
+            player1_id INTEGER,
+            player2_id INTEGER,
+            player1_score INTEGER DEFAULT 0,
+            player2_score INTEGER DEFAULT 0,
+            winner_id INTEGER,
+            game_type TEXT DEFAULT 'pong',
+            status TEXT DEFAULT 'completed',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (tournament_id) REFERENCES tournaments (id),
+            FOREIGN KEY (player1_id) REFERENCES users (id),
+            FOREIGN KEY (player2_id) REFERENCES users (id),
+            FOREIGN KEY (winner_id) REFERENCES users (id)
+        )
+    );
+    console.log('Database initialized successfully');
+}
