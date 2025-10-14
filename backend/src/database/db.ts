@@ -17,5 +17,12 @@ export function initializeDatabase(): void {
     );
 
     db.exec(
-        
-    )
+        CREATE TABLE IF NOT EXISTS tournament (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT null,
+            status TEXT DEFAULT 'pending',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            winner_id INTEGER,
+            FOREIGN KEY (winner_id) REFERENCES users (id)
+        )
+    );
