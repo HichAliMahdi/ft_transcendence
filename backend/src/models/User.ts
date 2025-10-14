@@ -29,4 +29,14 @@ export class UserModel {
         const stmt = db.prepare('SELECT * FROM users WHERE id = ?');
         return stmt.get(id) as User;
     }
+
+    static findByUsername(username: string): User | null {
+        const stmt = db.prepare('SELECT * FROM users WHERE username = ?');
+        return (stmt.get(username) as User) || null;
+    }
+
+    static findAll() : User[] {
+        const stmt = db.prepare('SELECT * FROM users ORDER BY created_at DESC');
+        return stmt.all() as User[];
+    }
 }
