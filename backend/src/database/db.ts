@@ -26,3 +26,14 @@ export function initializeDatabase(): void {
             FOREIGN KEY (winner_id) REFERENCES users (id)
         )
     );
+
+    db.exec (
+        CREATE TABLE IF NOT EXISTS tournament_participants (
+            tournament_id INTEGER,
+            user_id INTEGER,
+            alias TEXT NOT null,
+            PRIMARY KEY (tournament_id, user_id),
+            FOREIGN KEY (tournament_id) REFERENCES tournaments (id),
+            FOREIGN KEY (user_id) REFERENCES users (id)
+        )
+    );
