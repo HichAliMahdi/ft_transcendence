@@ -18,15 +18,17 @@ export class TournamentModel {
         return this.findById(result.lastInsertRowid as number);
     }
     static findById(id: number): Tournament {
-        constt stmt = db.prepare('SELECT * FROM tournaments WHERE id = ?');
+        const stmt = db.prepare('SELECT * FROM tournaments WHERE id = ?');
         return stmt.get(id) as Tournament;
     }
     static findAll() : Tournament[] {
-        constt stmt = db.prepare('SELECT * FROM tournaments ORDER BY created_at DESC');
+        const stmt = db.prepare('SELECT * FROM tournaments ORDER BY created_at DESC');
         return stmt.all() as Tournament[];
     }
     static updateStatus(id: number, status: 'pending' | 'active' | 'completed') : Tournament {
-        //TODO
+        const stmt = db.prepare('UPDATE tournaments SET status = ? WHERE id = ?');
+        stmt.run(status, id);
+        return this.findById(id);
     }
 }
 
