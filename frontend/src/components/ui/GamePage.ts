@@ -125,7 +125,7 @@ export class GamePage {
         
         const backButton = document.createElement('button');
         backButton.textContent = '← Back to Mode Selection';
-        backButton.className = 'bg-game-dark hover:bg-blue-800 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-300 mt-4';
+        backButton.className = 'bg-game-dark hover:bg-blue-800 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-300 mt-4 mx-auto';
         backButton.onclick = () => this.renderModeSelection();
         
         difficultySection.appendChild(difficultyButtons);
