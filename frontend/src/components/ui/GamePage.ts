@@ -11,7 +11,7 @@ export class GamePage {
 
     public render(): HTMLElement {
         this.container = document.createElement('div');
-        this.container.className = 'container';
+        this.container.className = 'container mx-auto p-8 fade-in';
         
         this.renderModeSelection();
         
@@ -25,12 +25,11 @@ export class GamePage {
         
         const title = document.createElement('h1');
         title.textContent = 'Pong Game';
-        title.style.textAlign = 'center';
-        title.style.marginBottom = '2rem';
+        title.className = 'text-4xl font-bold text-white text-center mb-8 gradient-text';
         
         // Mode selection
         const modeSection = document.createElement('div');
-        modeSection.style.cssText = 'background: rgba(255, 255, 255, 0.05); padding: 2rem; border-radius: 12px; margin-bottom: 2rem;';
+        modeSection.className = 'glass-effect p-8 rounded-2xl mb-8';
         
         const modeTitle = document.createElement('h2');
         modeTitle.textContent = 'Select Game Mode';
