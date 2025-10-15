@@ -96,7 +96,7 @@ export class TournamentPage {
         if (players.length === 0) {
             const emptyMsg = document.createElement('p');
             emptyMsg.textContent = 'No players registered yet';
-            emptyMsg.className = 'text-gray-500 text-center py-4';
+            emptyMsg.className = 'text-white-500 text-center py-4';
             playersList.appendChild(emptyMsg);
         } else {
             const ul = document.createElement('ul');
@@ -155,16 +155,17 @@ export class TournamentPage {
 
         const title = document.createElement('h1');
         title.textContent = `Round ${match.round} - Match ${match.matchNumber}`;
+        title.className = 'text-3xl font-bold text-white mb-6 gradient-text';
         
         const matchInfo = document.createElement('div');
-        matchInfo.style.cssText = 'background: #16213e; padding: 2rem; border-radius: 8px; margin: 2rem 0; text-align: center;';
-        
+        matchInfo.className = 'glass-effect p-8 rounded-2xl my-8 text-center';
+
         const vs = document.createElement('h2');
-        vs.style.cssText = 'font-size: 2rem; margin: 1rem 0;';
+        vs.className = 'text-4xl my-4';
         vs.innerHTML = `
-            <span style="color: #0f3460;">${match.player1?.alias || 'BYE'}</span>
-            <span style="color: #888; margin: 0 1rem;">VS</span>
-            <span style="color: #e94560;">${match.player2?.alias || 'BYE'}</span>
+            <span class="text-blue-400 font-bold">${match.player1?.alias || 'BYE'}</span>
+            <span class="text-gray-500 mx-6">VS</span>
+            <span class="text-game-red font-bold">${match.player2?.alias || 'BYE'}</span>
         `;
         matchInfo.appendChild(vs);
         
