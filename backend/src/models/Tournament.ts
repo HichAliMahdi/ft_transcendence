@@ -14,12 +14,15 @@ export class TournamentModel {
             INSERT INTO tournaments (name, status)
             VALUES (?, 'pending')
         );
+        const result = stmt.run(name);
+        return this.findById(result.lastInsertRowid as number);
     }
     static findById(id: number): Tournament {
-        //TODO
+        constt stmt = db.prepare('SELECT * FROM tournaments WHERE id = ?');
+        return stmt.get(id) as Tournament;
     }
     static findAll() : Tournament[] {
-        //TODO
+        
     }
     static updateStatus(id: number, status: 'pending' | 'active' | 'completed') : Tournament {
         //TODO
