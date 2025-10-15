@@ -36,12 +36,12 @@ export class GamePage {
         modeTitle.className = 'text-2xl font-semibold text-white mb-6 text-center';
         
         const modeButtons = document.createElement('div');
-        modeButtons.style.cssText = 'display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;';
+        modeButtons.className = 'flex flex-col sm:flex-row gap-6 justify-center items-center';
         
         // PvP Button
         const pvpButton = document.createElement('button');
         pvpButton.textContent = '👥 Player vs Player';
-        pvpButton.style.cssText = 'padding: 1.5rem 2rem; font-size: 1.1rem; min-width: 220px;';
+        pvpButton.className = 'btn-primary text-lg px-8 py-6 min-w-[250px]';
         pvpButton.onclick = () => {
             this.selectedMode = 'pvp';
             this.renderGameScreen();
@@ -50,7 +50,7 @@ export class GamePage {
         // PvE Button
         const pveButton = document.createElement('button');
         pveButton.textContent = '🤖 Player vs AI';
-        pveButton.style.cssText = 'padding: 1.5rem 2rem; font-size: 1.1rem; min-width: 220px;';
+        pveButton.className = 'btn-primary text-lg px-8 py-6 min-w-[250px]';
         pveButton.onclick = () => {
             this.selectedMode = 'pve';
             this.renderDifficultySelection();
@@ -64,10 +64,10 @@ export class GamePage {
         
         // Instructions
         const instructions = document.createElement('div');
-        instructions.style.cssText = 'background: rgba(255, 255, 255, 0.03); padding: 1.5rem; border-radius: 12px; margin-top: 2rem;';
+        instructions.className = 'glass-effect p-6 rounded-2xl mt-8';
         instructions.innerHTML = `
-            <h3 style="margin-bottom: 1rem;">Game Rules</h3>
-            <ul style="line-height: 1.8;">
+            <h3 class="text-xl font-semibold text-white mb-4">Game Rules</h3>
+            <ul class="text-gray-300 leading-loose space-y-2">
                 <li><strong>PvP Mode:</strong> Two players compete on the same keyboard</li>
                 <li><strong>PvE Mode:</strong> Challenge the AI at different difficulty levels</li>
                 <li><strong>Goal:</strong> First to 5 points wins!</li>
