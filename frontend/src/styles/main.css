@@ -1,120 +1,41 @@
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    @apply m-0 p-0 box-border;
+  }
+
+  body {
+    @apply font-sans bg-gradient-to-br from-primary-dark to-primary-light text-white min-h-screen leading-relaxed;
+  }
 }
 
-body {
-  font-family: "Poppins", sans-serif;
-  background: radial-gradient(circle at top left, #1f1c2c, #928dab);
-  color: #fefefe;
-  min-height: 100vh;
-  line-height: 1.7;
+@layer components {
+  .gradient-text {
+    @apply bg-gradient-to-r from-accent-pink to-accent-purple bg-clip-text text-transparent;
+  }
+
+  .glass-effect {
+    @apply bg-white/5 backdrop-blur-md;
+  }
+
+  .btn-primary {
+    @apply bg-gradient-to-br from-accent-pink to-accent-purple text-white border-0 
+           px-7 py-3.5 rounded-xl text-base font-semibold cursor-pointer tracking-wide 
+           transition-all duration-300 shadow-lg shadow-accent-pink/40
+           hover:-translate-y-1 hover:shadow-xl hover:shadow-accent-purple/50
+           disabled:bg-gray-600 disabled:cursor-not-allowed disabled:shadow-none;
+  }
 }
 
-#app {
-  display: flex;
-  flex-direction: column;
-  min-height: 100vh;
-}
-
-#main-nav {
-  background: rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(10px);
-  padding: 1.2rem 2rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.2);
-}
-
-#main-nav h1 {
-  background: linear-gradient(90deg, #ff6ec4, #7873f5);
-  background-clip: text;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  color: #ff6ec4;
-  font-weight: 700;
-  letter-spacing: 2px;
-  text-transform: uppercase;
-  margin-bottom: 0.5rem;
-}
-
-#main-nav ul {
-  list-style: none;
-  display: flex;
-  gap: 2rem;
-}
-
-#main-nav a {
-  color: #fefefe;
-  text-decoration: none;
-  font-weight: 500;
-  letter-spacing: 0.5px;
-  padding: 0.5rem 1rem;
-  border-radius: 10px;
-  transition: all 0.4s ease;
-  position: relative;
-}
-
-#main-nav a::after {
-  content: "";
-  position: absolute;
-  width: 0;
-  height: 2px;
-  bottom: 0;
-  left: 0;
-  background: linear-gradient(90deg, #ff6ec4, #7873f5);
-  transition: width 0.3s ease;
-}
-
-#main-nav a:hover::after {
-  width: 100%;
-}
-
-#main-nav a:hover {
-  color: #ffb6f0;
-  transform: translateY(-2px);
-}
-
-#content {
-  flex: 1;
-  padding: 3rem 2rem;
-  animation: fadeIn 0.8s ease;
-}
-
-.container {
-  max-width: 1100px;
-  margin: 0 auto;
-  background: rgba(255, 255, 255, 0.05);
-  padding: 2rem;
-  border-radius: 20px;
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
-  backdrop-filter: blur(8px);
-}
-
-button {
-  background: linear-gradient(135deg, #ff6ec4, #7873f5);
-  color: #fff;
-  border: none;
-  padding: 0.85rem 1.75rem;
-  border-radius: 12px;
-  font-size: 1rem;
-  font-weight: 600;
-  cursor: pointer;
-  letter-spacing: 0.5px;
-  transition: all 0.3s ease;
-  box-shadow: 0 4px 15px rgba(255, 110, 196, 0.4);
-}
-
-button:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 6px 20px rgba(120, 115, 245, 0.5);
-  background: linear-gradient(135deg, #ff85c1, #9d8ff5);
-}
-
-button:disabled {
-  background: #666;
-  cursor: not-allowed;
-  box-shadow: none;
+@layer utilities {
+  .fade-in {
+    animation: fadeIn 0.8s ease;
+  }
 }
 
 @keyframes fadeIn {
