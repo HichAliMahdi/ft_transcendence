@@ -22,7 +22,8 @@ export class TournamentModel {
         return stmt.get(id) as Tournament;
     }
     static findAll() : Tournament[] {
-        
+        constt stmt = db.prepare('SELECT * FROM tournaments ORDER BY created_at DESC');
+        return stmt.all() as Tournament[];
     }
     static updateStatus(id: number, status: 'pending' | 'active' | 'completed') : Tournament {
         //TODO
