@@ -12,10 +12,10 @@ export interface User {
 
 export class UserModel {
     static create(user: Omit<User, 'id' | 'created_at' | 'updated_at'>): User {
-        const stmt = db.prepare(
+        const stmt = db.prepare(`
             INSERT INTO users (username, email, password_hash, avatar_url)
             VALUES (?, ?, ?, ?)
-        );
+        `);
         const result = stmt.run (
             user.username,
             user.email,
@@ -26,17 +26,17 @@ export class UserModel {
     }
 
     static findById(id: number) : User {
-        const stmt = db.prepare('SELECT * FROM users WHERE id = ?');
+        const stmt = db.prepare(`SELECT * FROM users WHERE id = ?`);
         return stmt.get(id) as User;
     }
 
     static findByUsername(username: string): User | null {
-        const stmt = db.prepare('SELECT * FROM users WHERE username = ?');
+        const stmt = db.prepare(`SELECT * FROM users WHERE username = ?`);
         return (stmt.get(username) as User) || null;
     }
 
     static findAll() : User[] {
-        const stmt = db.prepare('SELECT * FROM users ORDER BY created_at DESC');
+        const stmt = db.prepare(`SELECT * FROM users ORDER BY created_at DESC`);
         return stmt.all() as User[];
     }
 }

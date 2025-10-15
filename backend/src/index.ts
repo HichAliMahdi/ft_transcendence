@@ -1,40 +1,48 @@
-import Fastify, { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import Fastify from 'fastify';
+import cors from '@fastify/cors';
+import { config } from './config';
+import { initializeDatabase } from './database/db';
 import routes from './routes';
 
-const fastify: FastifyInstance = Fastify({
-    logger: true
+const fastify = Fastify({ 
+  logger: {
+    level: config.server.nodeEnv === 'development' ? 'info' : 'warn',
+    transport: config.server.nodeEnv === 'development' ? {
+      target: 'pino-pretty',
+      options: {
+        translateTime: 'HH:MM:ss Z',
+        ignore: 'pid,hostname',
+      },
+    } : undefined,
+  }
 });
 
-fastify.get('./health', async (request: FastifyRequest, reply: FastifyReply) => {
-    return {status: 'OK', message: 'server is running!'};
+// Initialize database
+initializeDatabase();
+
+// Register CORS
+fastify.register(cors, {
+  origin: config.cors.origin,
+  credentials: true,
 });
 
-fastify.get('/', async (request: FastifyRequest, reply: FastifyReply) => {
-    return {
-        message: 'Welcome to my transcendence API',
-        endpoints: {
-            health: '/health',
-            users: '/users (TODO)',
-            game: '/game (TODO'
-        }
-    };
-});
+// Register routes
+fastify.register(routes);
 
+// Start server
 const start = async (): Promise<void> => {
-    try {
-        const HOST = process.env.HOST || '0.0.0.0';
-        const PORT = parseInt(process.env.PORT || '3000');
-
-        await fastify.listen({
-            host: HOST,
-            port: PORT
-        });
-        console.log(`Server running at http://${HOST}:${PORT}`);
-    } catch (err) {
-        fastify.log.error(err);
-        process.exit(1);
-    }
+  try {
+    await fastify.listen({ 
+      host: config.server.host, 
+      port: config.server.port 
+    });
+    
+    console.log(`🚀 Server running at http://${config.server.host}:${config.server.port}`);
+    console.log(`📊 Health check available at http://${config.server.host}:${config.server.port}/api/health`);
+  } catch (err) {
+    fastify.log.error(err);
+    process.exit(1);
+  }
 };
-
 
 start();
