@@ -77,39 +77,42 @@ export class TournamentPage {
                 addButton.click();
             }
         });
-        
-        registrationForm.appendChild(input);
-        registrationForm.appendChild(addButton);
+
+        const formContainer = document.createElement('div');
+        formContainer.className = 'flex flex-col sm:flex-row gap-4 items-center justify-center';
+        formContainer.appendChild(input);
+        formContainer.appendChild(addButton);
+        registrationForm.appendChild(formContainer);
         
         const playersList = document.createElement('div');
-        playersList.className = 'players-list';
-        playersList.style.cssText = 'background: #16213e; padding: 1.5rem; border-radius: 8px; margin-bottom: 2rem;';
+        playersList.className = 'glass-effect p-6 rounded-2xl mb-8';
         
         const playersTitle = document.createElement('h3');
         playersTitle.textContent = `Registered Players (${this.tournament.getPlayers().length})`;
-        playersTitle.style.marginBottom = '1rem';
+        playersTitle.className = 'text-2xl font-semibold text-white mb-4';
         playersList.appendChild(playersTitle);
         
         const players = this.tournament.getPlayers();
         if (players.length === 0) {
             const emptyMsg = document.createElement('p');
             emptyMsg.textContent = 'No players registered yet';
-            emptyMsg.style.color = '#888';
+            emptyMsg.className = 'text-gray-500 text-center py-4';
             playersList.appendChild(emptyMsg);
         } else {
             const ul = document.createElement('ul');
-            ul.style.cssText = 'list-style: none; display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem;';
+            ul.className = 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4';
             
             players.forEach(player => {
                 const li = document.createElement('li');
-                li.style.cssText = 'background: #0f3460; padding: 0.75rem 1rem; border-radius: 4px; display: flex; justify-content: space-between; align-items: center;';
+                li.className = 'bg-game-dark px-4 py-3 rounded-lg flex justify-between items-center transition-colors duration-300 hover:bg-blue-700';
                 
                 const span = document.createElement('span');
                 span.textContent = player.alias;
+                span.className = 'text-white font-medium';
                 
                 const removeBtn = document.createElement('button');
                 removeBtn.textContent = '×';
-                removeBtn.style.cssText = 'background: #e94560; padding: 0.25rem 0.5rem; font-size: 1.2rem; line-height: 1; min-width: auto;';
+                removeBtn.className = 'bg-game-red hover:bg-red-600 text-white px-3 py-1 text-xl leading-none rounded-lg transition-colors duration-300';
                 removeBtn.onclick = () => {
                     this.tournament.removePlayer(player.id);
                 };
@@ -125,8 +128,11 @@ export class TournamentPage {
         const startButton = document.createElement('button');
         startButton.textContent = 'Start Tournament';
         startButton.disabled = players.length < 2;
-        startButton.style.fontSize = '1.2rem';
-        startButton.style.padding = '1rem 2rem';
+        startButton.className = `text-xl font-bold py-4 px-8 rounded-lg transition-colors duration-300 ${
+            players.length >= 2 
+                ? 'btn-primary' 
+                : 'bg-gray-600 text-gray-400 cursor-not-allowed'
+        }`;
         startButton.onclick = () => {
             this.tournament.startTournament();
         };
