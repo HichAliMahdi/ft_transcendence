@@ -12,7 +12,7 @@ export default async function tournamentRoutes(fastify: FastifyInstance) {
       const tournaments = TournamentModel.findAll();
       return { tournaments };
     } catch (error) {
-      reply.code(500).send({ error: 'Failed to fetch tournaments' });
+      return reply.code(500).send({ error: 'Failed to fetch tournaments' });
     }
   });
 
@@ -29,7 +29,7 @@ export default async function tournamentRoutes(fastify: FastifyInstance) {
         const tournament = TournamentModel.create(name.trim());
         return { tournament };
       } catch (error) {
-        reply.code(500).send({ error: 'Failed to create tournament' });
+        return reply.code(500).send({ error: 'Failed to create tournament' });
       }
     }
   );
@@ -47,7 +47,7 @@ export default async function tournamentRoutes(fastify: FastifyInstance) {
 
         return { tournament };
       } catch (error) {
-        reply.code(500).send({ error: 'Failed to fetch tournament' });
+        return reply.code(500).send({ error: 'Failed to fetch tournament' });
       }
     }
   );

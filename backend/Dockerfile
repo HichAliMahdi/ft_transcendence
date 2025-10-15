@@ -11,10 +11,9 @@ WORKDIR /app
 COPY package*.json ./
 COPY tsconfig.json ./
 
-RUN npm install
+RUN npm install && npm install pino-pretty --save-dev
 
 COPY src ./src
-
 RUN npm run build
 
 EXPOSE 3000

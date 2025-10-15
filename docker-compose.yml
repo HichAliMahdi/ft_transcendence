@@ -19,12 +19,13 @@ services:
       retries: 3
 
   frontend:
-    build: 
+    build:
       context: ./frontend
       dockerfile: Dockerfile
     container_name: frontend
     volumes:
       - frontend_dist:/app/dist
+      - ./frontend/src:/app/src
     networks:
       - transcendence_network
     depends_on:
@@ -39,8 +40,7 @@ services:
       - "443:443"
       - "80:80"
     volumes:
-      - frontend_dist:/usr/share/nginx/html:ro
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - frontend_dist:/var/www/html:ro
     networks:
       - transcendence_network
     depends_on:
