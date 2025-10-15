@@ -14,7 +14,7 @@ export class TournamentPage {
 
     public render(): HTMLElement {
         this.container = document.createElement('div');
-        this.container.className = 'container tournament-container';
+        this.container.className = 'container mx-auto p-8 tournament-container fade-in';
         this.updateUI();
         return this.container;
     }
@@ -41,24 +41,24 @@ export class TournamentPage {
 
         const title = document.createElement('h1');
         title.textContent = 'Tournament Registration';
+        title.className = 'text-4xl font-bold text-white mb-4 gradient-text';
         
         const subtitle = document.createElement('p');
         subtitle.textContent = 'Register players for the tournament (minimum 2 players)';
-        subtitle.style.marginBottom = '2rem';
+        subtitle.className = 'text-gray-300 text-lg mb-8';
         
         const registrationForm = document.createElement('div');
-        registrationForm.className = 'registration-form';
-        registrationForm.style.cssText = 'background: #16213e; padding: 2rem; border-radius: 8px; margin-bottom: 2rem;';
+        registrationForm.className = 'glass-effect p-8 rounded-2xl mb-8';
         
         const input = document.createElement('input');
         input.type = 'text';
         input.placeholder = 'Enter player alias';
         input.maxLength = 20;
-        input.style.cssText = 'padding: 0.75rem; font-size: 1rem; border: 2px solid #0f3460; border-radius: 4px; background: #1a1a2e; color: #eee; width: 300px;';
-        
+        input.className = 'px-4 py-3 text-lg border-2 border-blue-800 rounded-xl bg-primary-dark text-white w-full md:w-80 focus:outline-none focus:border-accent-pink transition-colors duration-300';
+
         const addButton = document.createElement('button');
         addButton.textContent = 'Add Player';
-        addButton.style.marginLeft = '1rem';
+        addButton.className = 'btn-primary ml-4';
         addButton.onclick = () => {
             const alias = input.value.trim();
             if (alias) {
