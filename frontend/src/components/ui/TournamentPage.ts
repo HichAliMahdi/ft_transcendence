@@ -170,12 +170,12 @@ export class TournamentPage {
         matchInfo.appendChild(vs);
         
         const instructions = document.createElement('div');
-        instructions.style.marginTop = '1.5rem';
+        instructions.className = 'mt-6';
         instructions.innerHTML = `
-            <p><strong>Controls:</strong></p>
-            <p>${match.player1?.alias}: W (up) / S (down)</p>
-            <p>${match.player2?.alias}: Arrow Up / Arrow Down</p>
-            <p style="margin-top: 1rem; color: #e94560;"><strong>First to 5 points wins!</strong></p>
+            <p class="font-semibold text-white mb-3">Controls:</p>
+            <p class="text-gray-300">${match.player1?.alias}: W (up) / S (down)</p>
+            <p class="text-gray-300">${match.player2?.alias}: Arrow Up / Arrow Down</p>
+            <p class="mt-4 text-game-red font-bold text-lg">First to 5 points wins!</p>
         `;
         matchInfo.appendChild(instructions);
         
@@ -183,13 +183,14 @@ export class TournamentPage {
         canvas.id = 'gameCanvas';
         canvas.width = 800;
         canvas.height = 600;
-        canvas.style.cssText = 'border: 2px solid #0f3460; background: #000; margin: 2rem auto; display: block;';
+        canvas.className = 'border-2 border-game-dark bg-black mx-auto my-8 rounded-xl block';
         
         const buttonContainer = document.createElement('div');
-        buttonContainer.style.cssText = 'text-align: center; margin-top: 1rem;';
+        buttonContainer.className = 'text-center mt-6';
         
         const startButton = document.createElement('button');
         startButton.textContent = 'Start Match';
+        startButton.className = 'bg-game-red hover:bg-red-600 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-200';
         startButton.onclick = () => {
             // Create the game instance only when button is clicked
             this.currentGame = new PongGame(canvas);
@@ -269,11 +270,11 @@ export class TournamentPage {
 
     private renderBracket(): HTMLElement {
         const bracket = document.createElement('div');
-        bracket.style.cssText = 'background: #16213e; padding: 2rem; border-radius: 8px; margin-top: 2rem;';
+        bracket.className = 'bg-game-dark p-8 rounded-lg mt-8';
         
         const title = document.createElement('h3');
         title.textContent = 'Tournament Bracket';
-        title.style.marginBottom = '1.5rem';
+        title.className = 'text-2xl font-semibold text-white mb-6';
         bracket.appendChild(title);
         
         const rounds = this.tournament.getAllRounds();
