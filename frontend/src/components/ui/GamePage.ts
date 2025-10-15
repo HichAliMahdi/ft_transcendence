@@ -33,7 +33,7 @@ export class GamePage {
         
         const modeTitle = document.createElement('h2');
         modeTitle.textContent = 'Select Game Mode';
-        modeTitle.style.marginBottom = '1.5rem';
+        modeTitle.className = 'text-2xl font-semibold text-white mb-6 text-center';
         
         const modeButtons = document.createElement('div');
         modeButtons.style.cssText = 'display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;';
