@@ -178,7 +178,7 @@ export class GamePage {
             startButton.disabled = true;
             stopButton.disabled = false;
         };
-        
+
         const stopButton = document.createElement('button');
         stopButton.textContent = 'Stop Game';
         stopButton.disabled = true;
@@ -193,7 +193,7 @@ export class GamePage {
     
         const backButton = document.createElement('button');
         backButton.textContent = '← Back to Menu';
-        backButton.style.background = '#0f3460';
+        backButton.className = 'bg-game-dark hover:bg-blue-800 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-300';
         backButton.onclick = () => {
             this.cleanup();
             this.renderModeSelection();
