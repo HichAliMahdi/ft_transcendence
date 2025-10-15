@@ -9,6 +9,8 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 COPY package*.json ./
+COPY tailwind.config.js ./
+COPY postcss.config.js ./
 RUN npm install
 
 COPY tsconfig.json vite.config.ts ./
