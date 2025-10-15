@@ -4,5 +4,5 @@ import tournamentRoutes from './tournaments';
 
 export default async function routes(fastify: FastifyInstance) {
   fastify.register(healthRoutes, { prefix: '/api' });
-  // add more routes here later
+  fastify.register(tournamentRoutes, { prefix: '/api' });
 }
