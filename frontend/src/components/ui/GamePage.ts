@@ -88,14 +88,13 @@ export class GamePage {
         
         const title = document.createElement('h1');
         title.textContent = 'Select AI Difficulty';
-        title.style.textAlign = 'center';
-        title.style.marginBottom = '2rem';
+        title.className = 'text-4xl font-bold text-white text-center mb-8 gradient-text';
         
         const difficultySection = document.createElement('div');
-        difficultySection.style.cssText = 'background: rgba(255, 255, 255, 0.05); padding: 2rem; border-radius: 12px;';
+        difficultySection.className = 'glass-effect p-8 rounded-2xl';
         
         const difficultyButtons = document.createElement('div');
-        difficultyButtons.style.cssText = 'display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;';
+        difficultyButtons.className = 'grid grid-cols-1 md:grid-cols-3 gap-6 mb-8';
         
         const difficulties: { level: AIDifficulty; emoji: string; description: string }[] = [
             { level: 'easy', emoji: '😊', description: 'Relaxed gameplay - AI is slow and makes mistakes' },
@@ -105,14 +104,10 @@ export class GamePage {
         
         difficulties.forEach(({ level, emoji, description }) => {
             const card = document.createElement('div');
-            card.style.cssText = 'background: rgba(255, 255, 255, 0.08); padding: 1.5rem; border-radius: 8px; cursor: pointer; transition: all 0.3s; border: 2px solid transparent;';
+            card.className = 'glass-effect p-6 rounded-xl cursor-pointer transition-all duration-300 border-2 border-transparent hover:border-accent-pink hover:-translate-y-2';
             card.onmouseover = () => {
                 card.style.borderColor = '#ff6ec4';
                 card.style.transform = 'translateY(-5px)';
-            };
-            card.onmouseout = () => {
-                card.style.borderColor = 'transparent';
-                card.style.transform = 'translateY(0)';
             };
             card.onclick = () => {
                 this.selectedDifficulty = level;
@@ -120,9 +115,9 @@ export class GamePage {
             };
             
             card.innerHTML = `
-                <div style="font-size: 3rem; text-align: center; margin-bottom: 1rem;">${emoji}</div>
-                <h3 style="text-align: center; margin-bottom: 0.5rem; text-transform: capitalize;">${level}</h3>
-                <p style="text-align: center; font-size: 0.9rem; color: #ccc;">${description}</p>
+                <div class="text-6xl text-center mb-4">${emoji}</div>
+                <h3 class="text-xl font-semibold text-white text-center mb-3 capitalize">${level}</h3>
+                <p class="text-sm text-gray-300 text-center leading-relaxed">${description}</p>
             `;
             
             difficultyButtons.appendChild(card);
@@ -130,7 +125,7 @@ export class GamePage {
         
         const backButton = document.createElement('button');
         backButton.textContent = '← Back to Mode Selection';
-        backButton.style.cssText = 'background: #0f3460; margin-top: 1rem;';
+        backButton.className = 'bg-game-dark hover:bg-blue-800 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-300 mt-4';
         backButton.onclick = () => this.renderModeSelection();
         
         difficultySection.appendChild(difficultyButtons);
@@ -149,11 +144,10 @@ export class GamePage {
         title.textContent = this.selectedMode === 'pvp' 
             ? 'Player vs Player' 
             : `Player vs AI (${this.selectedDifficulty})`;
-        title.style.textAlign = 'center';
-        title.style.marginBottom = '1rem';
+        title.className = 'text-3xl font-bold text-white text-center mb-4 gradient-text';
         
         const instructions = document.createElement('div');
-        instructions.style.cssText = 'text-align: center; margin-bottom: 1.5rem;';
+        instructions.className = 'text-center mb-6 glass-effect p-4 rounded-xl';
         instructions.innerHTML = `
             <p><strong>Controls:</strong></p>
             <p>Player 1: W (up) / S (down)</p>
@@ -165,13 +159,14 @@ export class GamePage {
         canvas.id = 'gameCanvas';
         canvas.width = 800;
         canvas.height = 600;
-        canvas.style.cssText = 'border: 2px solid #0f3460; background: #000; margin: 1rem auto; display: block; border-radius: 8px;';
-        
+        canvas.className = 'border-2 border-game-dark bg-black mx-auto my-6 rounded-xl block';
+
         const buttonContainer = document.createElement('div');
-        buttonContainer.style.cssText = 'text-align: center; margin-top: 1rem; display: flex; gap: 1rem; justify-content: center;';
+        buttonContainer.className = 'text-center mt-6 flex flex-col sm:flex-row gap-4 justify-center items-center';
         
         const startButton = document.createElement('button');
         startButton.textContent = 'Start Game';
+        startButton.className = 'btn-primary disabled:bg-gray-600 disabled:cursor-not-allowed disabled:shadow-none';
         startButton.onclick = () => {
             if (!this.game) {
                 this.game = new PongGame(canvas, {
