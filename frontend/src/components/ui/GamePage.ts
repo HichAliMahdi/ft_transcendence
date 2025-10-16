@@ -65,17 +65,33 @@ export class GamePage {
         // Instructions
         const instructions = document.createElement('div');
         instructions.className = 'glass-effect p-6 rounded-2xl mt-8';
-        instructions.innerHTML = `
-            <h3 class="text-xl font-semibold text-white mb-4">Game Rules</h3>
-            <ul class="text-gray-300 leading-loose space-y-2">
-                <li><strong>PvP Mode:</strong> Two players compete on the same keyboard</li>
-                <li><strong>PvE Mode:</strong> Challenge the AI at different difficulty levels</li>
-                <li><strong>Goal:</strong> First to 5 points wins!</li>
-                <li><strong>Player 1 Controls:</strong> W (up) / S (down)</li>
-                <li><strong>Player 2 Controls:</strong> Arrow Up / Arrow Down (PvP only)</li>
-            </ul>
-        `;
+
+        const title2 = document.createElement('h3');
+        title2.className = 'text-xl font-semibold text-white mb-4';
+        title2.textContent = 'Game Rules';
+
+        const list = document.createElement('ul');
+        list.className = 'text-gray-300 leading-loose space-y-2';
+
+        const rules = [
+            { label: 'PvP Mode:', text: 'Two players compete on the same keyboard' },
+            { label: 'PvE Mode:', text: 'Challenge the AI at different difficulty levels' },
+            { label: 'Goal:', text: 'First to 5 points wins!' },
+            { label: 'Player 1 Controls:', text: 'W (up) / S (down)' },
+            { label: 'Player 2 Controls:', text: 'Arrow Up / Arrow Down (PvP only)' }
+        ];
         
+        rules.forEach(rule => {
+            const li = document.createElement('li');
+            const strong = document.createElement('strong');
+            strong.textContent = rule.label;
+            li.appendChild(strong);
+            li.appendChild(document.createTextNode(' ' + rule.text));
+            list.appendChild(li);
+        });
+        instructions.appendChild(title2);
+        instructions.appendChild(list);
+
         this.container.appendChild(title);
         this.container.appendChild(modeSection);
         this.container.appendChild(instructions);
