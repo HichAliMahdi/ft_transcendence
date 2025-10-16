@@ -327,7 +327,7 @@ export class TournamentPage {
         
         rounds.forEach(round => {
             const roundDiv = document.createElement('div');
-            roundDiv.style.marginBottom = '1.5rem';
+            roundDiv.className = 'mb-6';
             
             const roundTitle = document.createElement('h4');
             roundTitle.textContent = `Round ${round}`;
