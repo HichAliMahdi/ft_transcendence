@@ -56,22 +56,41 @@ export class TournamentPage {
         input.maxLength = 20;
         input.className = 'px-4 py-3 text-lg border-2 border-blue-800 rounded-xl bg-primary-dark text-white w-full md:w-80 focus:outline-none focus:border-accent-pink transition-colors duration-300';
 
+        const errorMsg = document.createElement('p');
+        errorMsg.className = 'text-red-500 text-sm mt-2 hidden';
+        errorMsg.id = 'alias-error';
+
         const addButton = document.createElement('button');
         addButton.textContent = 'Add Player';
         addButton.className = 'btn-primary ml-4';
         addButton.onclick = () => {
             const alias = input.value.trim();
-            if (alias) {
-                const success = this.tournament.addPlayer(alias);
-                if (success) {
-                    input.value = '';
-                    input.focus();
-                } else {
-                    alert('Player alias already exists or is invalid!');
-                }
+            errorMsg.classList.add('hidden');
+            if (!alias) {
+                errorMsg.textContent = 'Please enter a player alias';
+                errorMsg.classList.remove('hidden');
+                return;
+            }
+            if (alias.length > 20) {
+                errorMsg.textContent = 'Alias must be 20 characters or less';
+                errorMsg.classList.remove('hidden');
+                return;
+            }
+            if (!/^[a-zA-Z0-9\s_-]+$/.test(alias)) {
+                errorMsg.textContent = 'Only letters, numbers, spaces, - and _ are allowed';
+                errorMsg.classList.remove('hidden');
+                return;
+            }
+            const success = this.tournament.addPlayer(alias);
+            if (success) {
+                input.value = '';
+                input.focus();
+            } else {
+                errorMsg.textContent = 'This alias is already taken!';
+                errorMsg.classList.remove('hidden');
             }
         };
-        
+
         input.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
                 addButton.click();
@@ -82,6 +101,7 @@ export class TournamentPage {
         formContainer.className = 'flex flex-col sm:flex-row gap-4 items-center justify-center';
         formContainer.appendChild(input);
         formContainer.appendChild(addButton);
+        formContainer.appendChild(errorMsg);
         registrationForm.appendChild(formContainer);
         
         const playersList = document.createElement('div');
