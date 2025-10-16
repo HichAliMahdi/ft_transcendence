@@ -285,24 +285,24 @@ export class TournamentPage {
             
             const roundTitle = document.createElement('h4');
             roundTitle.textContent = `Round ${round}`;
-            roundTitle.style.cssText = 'color: #0f3460; margin-bottom: 0.75rem;';
+            roundTitle.className = 'text-game-red text-xl mb-4 font-bold';
             roundDiv.appendChild(roundTitle);
             
             const matches = this.tournament.getMatchesByRound(round);
             const matchesGrid = document.createElement('div');
-            matchesGrid.style.cssText = 'display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 1rem;';
+            matchesGrid.className = 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4';
             
             matches.forEach(match => {
                 const matchDiv = document.createElement('div');
-                matchDiv.style.cssText = `background: #0f3460; padding: 1rem; border-radius: 4px; ${match.winner ? 'opacity: 0.7;' : ''}`;
+                matchDiv.className = `bg-game-dark p-4 rounded-lg transition-all duration-300 ${match.winner ? 'opacity-70' : 'hover:bg-blue-700'}`;
                 
                 const p1 = document.createElement('div');
                 p1.textContent = match.player1?.alias || 'BYE';
-                p1.style.cssText = `padding: 0.5rem; ${match.winner?.id === match.player1?.id ? 'background: #e94560; font-weight: bold;' : ''}`;
+                p1.className = `px-3 py-2 rounded ${match.winner?.id === match.player1?.id ? 'bg-game-red font-bold' : ''}`;
                 
                 const p2 = document.createElement('div');
                 p2.textContent = match.player2?.alias || 'BYE';
-                p2.style.cssText = `padding: 0.5rem; margin-top: 0.25rem; ${match.winner?.id === match.player2?.id ? 'background: #e94560; font-weight: bold;' : ''}`;
+                p2.className = `px-3 py-2 rounded mt-2 ${match.winner?.id === match.player2?.id ? 'bg-game-red font-bold' : ''}`;
                 
                 matchDiv.appendChild(p1);
                 matchDiv.appendChild(p2);
