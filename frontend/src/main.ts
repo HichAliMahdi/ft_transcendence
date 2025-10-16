@@ -26,6 +26,15 @@ class App {
             this.router.handleRoute();
         });
 
+        window.addEventListener('error', (event) => {
+            console.error('Global error caught:', event.error);
+            if (event.error?.message?.includes('Canvas')) {
+                event.preventDefault();
+            }
+        });
+        window.addEventListener('unhandledrejection', (event) => {
+            console.error('Unhandled promise rejection:', event.reason);
+        });
         this.router.handleRoute();
     }
 }
