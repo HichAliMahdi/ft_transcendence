@@ -321,10 +321,11 @@ export class TournamentPage {
 
         const title = document.createElement('h1');
         title.textContent = 'Preparing Next Match...';
+        title.className = 'text-3xl font-bold text-white text-center gradient-text';
         
         const message = document.createElement('p');
         message.textContent = 'Please wait while the next match is being set up.';
-        message.style.cssText = 'font-size: 1.2rem; margin-top: 2rem;';
+        message.className = 'text-xl text-gray-300 text-center mt-8';
         
         this.container.appendChild(title);
         this.container.appendChild(message);
@@ -337,22 +338,22 @@ export class TournamentPage {
         
         const title = document.createElement('h1');
         title.textContent = 'Tournament Complete! 🏆';
-        title.style.textAlign = 'center';
+        title.className = 'text-4xl font-bold text-white text-center mb-8 gradient-text';
         
         const winnerCard = document.createElement('div');
-        winnerCard.style.cssText = 'background: #16213e; padding: 3rem; border-radius: 8px; margin: 2rem auto; text-align: center; max-width: 600px; border: 3px solid #e94560;';
+        winnerCard.className = 'glass-effect p-12 rounded-2xl mx-auto text-center max-w-2xl border-4 border-game-red';
         
         const winnerTitle = document.createElement('h2');
         winnerTitle.textContent = 'Champion';
-        winnerTitle.style.cssText = 'color: #e94560; font-size: 2rem; margin-bottom: 1rem;';
+        winnerTitle.className = 'text-game-red text-3xl mb-4 font-bold';
         
         const winnerName = document.createElement('h3');
         winnerName.textContent = winner?.alias || 'Unknown';
-        winnerName.style.cssText = 'font-size: 3rem; color: #0f3460; margin-bottom: 2rem;';
+        winnerName.className = 'text-5xl text-blue-400 mb-8 font-bold gradient-text';
         
         const trophy = document.createElement('div');
         trophy.textContent = '🏆';
-        trophy.style.fontSize = '5rem';
+        trophy.className = 'text-8xl';
         
         winnerCard.appendChild(winnerTitle);
         winnerCard.appendChild(winnerName);
@@ -361,11 +362,11 @@ export class TournamentPage {
         const bracket = this.renderBracket();
         
         const buttonContainer = document.createElement('div');
-        buttonContainer.style.cssText = 'text-align: center; margin-top: 2rem;';
+        buttonContainer.className = 'text-center mt-8 flex flex-col sm:flex-row gap-4 justify-center';
         
         const newTournamentBtn = document.createElement('button');
         newTournamentBtn.textContent = 'New Tournament';
-        newTournamentBtn.style.cssText = 'font-size: 1.2rem; padding: 1rem 2rem; margin-right: 1rem;';
+        newTournamentBtn.className = 'btn-primary text-lg px-8 py-4';
         newTournamentBtn.onclick = () => {
             this.tournament.reset();
             this.updateUI();
@@ -373,7 +374,7 @@ export class TournamentPage {
         
         const homeBtn = document.createElement('button');
         homeBtn.textContent = 'Back to Home';
-        homeBtn.style.cssText = 'font-size: 1.2rem; padding: 1rem 2rem; background: #0f3460;';
+        homeBtn.className = 'bg-game-dark hover:bg-blue-800 text-white font-bold text-lg py-4 px-8 rounded-lg transition-colors duration-300';
         homeBtn.onclick = () => {
             window.location.href = '/';
         };
