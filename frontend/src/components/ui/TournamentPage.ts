@@ -182,12 +182,27 @@ export class TournamentPage {
         
         const instructions = document.createElement('div');
         instructions.className = 'mt-6';
-        instructions.innerHTML = `
-            <p class="font-semibold text-white mb-3">Controls:</p>
-            <p class="text-gray-300">${match.player1?.alias}: W (up) / S (down)</p>
-            <p class="text-gray-300">${match.player2?.alias}: Arrow Up / Arrow Down</p>
-            <p class="mt-4 text-game-red font-bold text-lg">First to 5 points wins!</p>
-        `;
+
+        const controlsTitle = document.createElement('p');
+        controlsTitle.className = 'font-semibold text-white mb-3';
+        controlsTitle.textContent = 'Controls:';
+
+        const player1Controls = document.createElement('p');
+        player1Controls.className = 'text-gray-300';
+        player1Controls.textContent = `${match.player1?.alias}: W (up) / S (down)`;
+
+        const player2Controls = document.createElement('p');
+        player2Controls.className = 'text-gray-300';
+        player2Controls.textContent = `${match.player2?.alias}: Arrow Up / Arrow Down`;
+
+        const winCondition = document.createElement('p');
+        winCondition.className = 'mt-4 text-game-red font-bold text-lg';
+        winCondition.textContent = 'First to 5 points wins!';
+
+        instructions.appendChild(controlsTitle);
+        instructions.appendChild(player1Controls);
+        instructions.appendChild(player2Controls);
+        instructions.appendChild(winCondition);
         matchInfo.appendChild(instructions);
         
         const canvas = document.createElement('canvas');
