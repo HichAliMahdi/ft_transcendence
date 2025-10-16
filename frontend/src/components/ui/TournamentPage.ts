@@ -162,11 +162,22 @@ export class TournamentPage {
 
         const vs = document.createElement('h2');
         vs.className = 'text-4xl my-4';
-        vs.innerHTML = `
-            <span class="text-blue-400 font-bold">${match.player1?.alias || 'BYE'}</span>
-            <span class="text-gray-500 mx-6">VS</span>
-            <span class="text-game-red font-bold">${match.player2?.alias || 'BYE'}</span>
-        `;
+
+        const player1Span = document.createElement('span');
+        player1Span.className = 'text-blue-400 font-bold';
+        player1Span.textContent = match.player1?.alias || 'BYE';
+
+        const vsText = document.createElement('span');
+        vsText.className = 'text-gray-500 mx-6';
+        vsText.textContent = 'VS';
+
+        const player2Span = document.createElement('span');
+        player2Span.className = 'text-game-red font-bold';
+        player2Span.textContent = match.player2?.alias || 'BYE';
+    
+        vs.appendChild(player1Span);
+        vs.appendChild(vsText);
+        vs.appendChild(player2Span);
         matchInfo.appendChild(vs);
         
         const instructions = document.createElement('div');
