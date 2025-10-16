@@ -121,16 +121,6 @@ export class GamePage {
         difficulties.forEach(({ level, emoji, description }) => {
             const card = document.createElement('div');
             card.className = 'glass-effect p-6 rounded-xl cursor-pointer transition-all duration-300 border-2 border-transparent hover:border-accent-pink hover:-translate-y-2';
-            card.onmouseover = () => {
-                card.style.borderColor = '#ff6ec4';
-                card.style.transform = 'translateY(-5px)';
-            };
-
-            card.onmouseout = () => {
-                card.style.borderColor = 'transparent';
-                card.style.transform = 'translateY(0)';
-            };
-
             card.onclick = () => {
                 this.selectedDifficulty = level;
                 this.renderGameScreen();
