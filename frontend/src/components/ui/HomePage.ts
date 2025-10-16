@@ -2,14 +2,36 @@ export class HomePage {
     public render(): HTMLElement {
         const container = document.createElement('div');
         container.className = 'container mx-auto p-8 text-center fade-in';
-        container.innerHTML = `
-            <h1 class="text-5xl font-bold gradient-text mb-6">Welcome to PONG</h1>
-            <p class="text-xl text-gray-300 mb-12">The ultimate Pong tournament platform</p>
-            <div class="flex flex-col sm:flex-row gap-6 justify-center items-center mt-12">
-                <button class="btn-primary text-lg px-8 py-4" onclick="window.location.href='/game'">Quick Play</button>
-                <button class="btn-primary text-lg px-8 py-4" onclick="window.location.href='/tournament'">Start Tournament</button>
-            </div>
-        `;
+
+        const title = document.createElement('h1');
+        title.className = 'text-5xl font-bold gradient-text mb-6';
+        title.textContent = 'Welcome to PONG';
+
+        const subtitle = document.createElement('p');
+        subtitle.className = 'text-xl text-gray-300 mb-12';
+        subtitle.textContent = 'The ultimate Pong tournament platform';
+
+        const buttonContainer = document.createElement('div');
+        buttonContainer.className = 'flex flex-col sm:flex-row gap-6 justify-center items-center mt-12';
+
+        const quickPlayButton = document.createElement('button');
+        quickPlayButton.className = 'btn-primary text-lg px-8 py-4';
+        quickPlayButton.textContent = 'Quick Play';
+        quickPlayButton.onclick = () => {
+            window.location.href = '/game';
+        };
+        const tournamentButton = document.createElement('button');
+        tournamentButton.className = 'btn-primary text-lg px-8 py-4';
+        tournamentButton.textContent = 'Start Tournament';
+        tournamentButton.onclick = () => {
+            window.location.href = '/tournament';
+        }
+        buttonContainer.appendChild(quickPlayButton);
+        buttonContainer.appendChild(tournamentButton);
+
+        container.appendChild(title);
+        container.appendChild(subtitle);
+        container.appendChild(buttonContainer);
         return container;
     }
 }
