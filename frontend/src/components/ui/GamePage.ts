@@ -125,16 +125,32 @@ export class GamePage {
                 card.style.borderColor = '#ff6ec4';
                 card.style.transform = 'translateY(-5px)';
             };
+
+            card.onmouseout = () => {
+                card.style.borderColor = 'transparent';
+                card.style.transform = 'translateY(0)';
+            };
+
             card.onclick = () => {
                 this.selectedDifficulty = level;
                 this.renderGameScreen();
             };
             
-            card.innerHTML = `
-                <div class="text-6xl text-center mb-4">${emoji}</div>
-                <h3 class="text-xl font-semibold text-white text-center mb-3 capitalize">${level}</h3>
-                <p class="text-sm text-gray-300 text-center leading-relaxed">${description}</p>
-            `;
+            const emojiDiv = document.createElement('div');
+            emojiDiv.className = 'text-6xl text-center mb-4';
+            emojiDiv.textContent = emoji;
+
+            const levelTitle = document.createElement('h3');
+            levelTitle.className = 'text-xl font-semibold text-white text-center mb-3 capitalize';
+            levelTitle.textContent = level;
+
+            const desc = document.createElement('p');
+            desc.className = 'text-sm text-gray-300 text-center leading-relaxed';
+            desc.textContent = description;
+
+            card.appendChild(emojiDiv);
+            card.appendChild(levelTitle);
+            card.appendChild(desc);
             
             difficultyButtons.appendChild(card);
         });
@@ -164,12 +180,27 @@ export class GamePage {
         
         const instructions = document.createElement('div');
         instructions.className = 'text-center mb-6 glass-effect p-4 rounded-xl';
-        instructions.innerHTML = `
-            <p><strong>Controls:</strong></p>
-            <p>Player 1: W (up) / S (down)</p>
-            ${this.selectedMode === 'pvp' ? '<p>Player 2: Arrow Up / Arrow Down</p>' : '<p>AI controls Player 2</p>'}
-            <p style="color: #e94560; font-weight: bold; margin-top: 0.5rem;">First to 5 points wins!</p>
-        `;
+        const controlsTitle = document.createElement('p');
+        const strongTag = document.createElement('strong');
+        strongTag.textContent = 'Controls:';
+        controlsTitle.appendChild(strongTag);
+
+        const player1Text = document.createElement('p');
+        player1Text.textContent = 'Player 1: W (up) / S (down)';
+
+        const player2Text = document.createElement('p');
+        player2Text.textContent = this.selectedMode === 'pvp'
+            ? 'Player 2: Arrow Up / Arrow Down' 
+            : 'AI controls Player 2';
+
+        const winText = document.createElement('p');
+        winText.className = 'text-game-red font-bold mt-2';
+        winText.textContent = 'First to 5 points wins!';
+
+        instructions.appendChild(controlsTitle);
+        instructions.appendChild(player1Text);
+        instructions.appendChild(player2Text);
+        instructions.appendChild(winText);
         
         const canvas = document.createElement('canvas');
         canvas.id = 'gameCanvas';
