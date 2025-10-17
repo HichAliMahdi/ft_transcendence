@@ -188,7 +188,11 @@ export class MultiplayerPongGame {
     }
 
     private movePaddle(paddle: MultiplayerPaddle, delta: number): void {
-        
+        if (paddle.playerId === 1 || paddle.playerId === 3) { // Horizontal
+            paddle.x = Math.max(0, Math.min(this.canvas.width - paddle.width, paddle.x + delta));
+        } else { // Vertical
+            paddle.y = Math.max(0, Math.min(this.canvas.height - paddle.height, paddle.y + delta));
+        }
     }
 
     private checkPaddleCollision(paddle: MultiplayerPaddle): boolean {
