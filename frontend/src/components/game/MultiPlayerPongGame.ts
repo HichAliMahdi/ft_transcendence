@@ -150,11 +150,45 @@ export class MultiplayerPongGame {
     }
 
     private update(): void {
-
+        // Update paddle position
+        this.paddles.forEach(paddle => {
+            if (this.keys[paddle.keys.up]) {
+                this.movePaddle(paddle, -paddle.speed);
+            }
+            if (this.keys[paddle.keys.down]) {
+                this.movePaddle(paddle, paddle.speed);
+            }
+        });
+        // update ball position
+        this.ball.x += this.ball.dx;
+        this.ball.y += this.ball.dy;
+        // Ball collision with paddles
+        this.paddles.forEach(paddle => {
+            if (this.checkPaddleCollision(paddle)) {
+                this.handlePaddleCollision(paddle);
+            }
+        });
+        // Ball wall colision and scoring
+        if (this.ball.x - this.ball.radius <= 0) { // player 2 scores
+            this.score.player2++;
+            this.resetBall();
+        } else if (this.ball.x + this.ball.radius >= this.canvas.width) { //player 4 scores
+            this.score.player4++;
+            this.resetBall();
+        }
+        if (this.ball.y - this.ball.radius <= 0) { // player 3 scores
+            this.score.player3++;
+            this.resetBall();
+        } else if (this.ball.y + this.ball.radius >= this.canvas.height) { // player 1 scores
+            this.score.player1++;
+            this.resetBall();
+        }
+        if (this.isGameOver()) // game ending first to 5
+            this.endGame();
     }
 
     private movePaddle(paddle: MultiplayerPaddle, delta: number): void {
-
+        
     }
 
     private checkPaddleCollision(paddle: MultiplayerPaddle): boolean {
