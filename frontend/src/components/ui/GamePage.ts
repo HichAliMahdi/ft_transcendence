@@ -1,258 +1,215 @@
 import { PongGame } from '../game/PongGame';
 import { MultiplayerPongGame } from '../game/MultiPlayerPongGame';
 
-type GameMode = 'pvp' | 'pve';
-type AIDifficulty = 'easy' | 'medium' | 'hard';
-
 export class GamePage {
     private game: PongGame | MultiplayerPongGame | null = null;
-    private isMultiplayer: boolean = false;
     private container: HTMLElement | null = null;
     private aiDifficultySelect: HTMLSelectElement | null = null;
     private aiDifficultyContainer: HTMLDivElement | null = null;
     private instructions: HTMLParagraphElement | null = null;
 
-    public render(): HTMLElement {
+    render(): HTMLElement {
         this.container = document.createElement('div');
-        this.container.className = 'container mx-auto p-8 fade-in';
+        this.container.className = 'game-page fade-in';
         
-        this.renderModeSelection();
+        const mainContainer = document.createElement('div');
+        mainContainer.className = 'max-w-6xl mx-auto';
         
+        const title = document.createElement('h1');
+        title.className = 'gradient-text text-4xl font-bold text-center mb-8';
+        title.textContent = 'Play Pong';
+        
+        const modeCard = this.createModeSelectionCard();
+        
+        const canvasContainer = this.createCanvasContainer();
+        
+        const instructionsContainer = document.createElement('div');
+        instructionsContainer.className = 'mt-6 text-center text-gray-300';
+        
+        this.instructions = document.createElement('p');
+        this.instructions.className = 'text-lg';
+        this.instructions.textContent = 'Use W/S and Arrow keys to control paddles';
+        
+        instructionsContainer.appendChild(this.instructions);
+        
+        mainContainer.appendChild(title);
+        mainContainer.appendChild(modeCard);
+        mainContainer.appendChild(canvasContainer);
+        mainContainer.appendChild(instructionsContainer);
+        
+        this.container.appendChild(mainContainer);
+        
+        this.setupEventListeners();
         return this.container;
     }
 
-    private renderModeSelection(): void {
-        if (!this.container) return;
-
-        this.container.innerHTML = '';
+    private createModeSelectionCard(): HTMLElement {
+        const card = document.createElement('div');
+        card.className = 'glass-effect rounded-2xl p-8 mb-8';
         
-        const title = document.createElement('h1');
-        title.textContent = 'Pong Game';
-        title.className = 'text-4xl font-bold text-white text-center mb-8 gradient-text';
-        
-        // Mode selection
-        const modeSection = document.createElement('div');
-        modeSection.className = 'glass-effect p-8 rounded-2xl mb-8';
-        
-        const modeTitle = document.createElement('h2');
-        modeTitle.textContent = 'Select Game Mode';
-        modeTitle.className = 'text-2xl font-semibold text-white mb-6 text-center';
-        
-        const modeButtons = document.createElement('div');
-        modeButtons.className = 'flex flex-col sm:flex-row gap-6 justify-center items-center';
+        const buttonContainer = document.createElement('div');
+        buttonContainer.className = 'flex gap-4 mb-6';
         
         // PvP Button
-        const pvpButton = document.createElement('button');
-        pvpButton.textContent = '👥 Player vs Player';
-        pvpButton.className = 'btn-primary text-lg px-8 py-6 min-w-[250px]';
-        pvpButton.onclick = () => {
-            this.selectedMode = 'pvp';
-            this.renderGameScreen();
-        };
+        const pvpBtn = document.createElement('button');
+        pvpBtn.id = 'pvp-btn';
+        pvpBtn.className = 'btn-primary flex-1';
+        pvpBtn.textContent = '1 vs 1';
         
         // PvE Button
-        const pveButton = document.createElement('button');
-        pveButton.textContent = '🤖 Player vs AI';
-        pveButton.className = 'btn-primary text-lg px-8 py-6 min-w-[250px]';
-        pveButton.onclick = () => {
-            this.selectedMode = 'pve';
-            this.renderDifficultySelection();
-        };
+        const pveBtn = document.createElement('button');
+        pveBtn.id = 'pve-btn';
+        pveBtn.className = 'btn-primary flex-1';
+        pveBtn.textContent = 'vs AI';
         
-        modeButtons.appendChild(pvpButton);
-        modeButtons.appendChild(pveButton);
+        // Multiplayer Button
+        const multiplayerBtn = document.createElement('button');
+        multiplayerBtn.id = 'multiplayer-btn';
+        multiplayerBtn.className = 'btn-primary flex-1 bg-game-red';
+        multiplayerBtn.textContent = '4 Players';
         
-        modeSection.appendChild(modeTitle);
-        modeSection.appendChild(modeButtons);
+        buttonContainer.appendChild(pvpBtn);
+        buttonContainer.appendChild(pveBtn);
+        buttonContainer.appendChild(multiplayerBtn);
         
-        // Instructions
-        const instructions = document.createElement('div');
-        instructions.className = 'glass-effect p-6 rounded-2xl mt-8';
-
-        const title2 = document.createElement('h3');
-        title2.className = 'text-xl font-semibold text-white mb-4';
-        title2.textContent = 'Game Rules';
-
-        const list = document.createElement('ul');
-        list.className = 'text-gray-300 leading-loose space-y-2';
-
-        const rules = [
-            { label: 'PvP Mode:', text: 'Two players compete on the same keyboard' },
-            { label: 'PvE Mode:', text: 'Challenge the AI at different difficulty levels' },
-            { label: 'Goal:', text: 'First to 5 points wins!' },
-            { label: 'Player 1 Controls:', text: 'W (up) / S (down)' },
-            { label: 'Player 2 Controls:', text: 'Arrow Up / Arrow Down (PvP only)' }
-        ];
+        // AI Difficulty Selector
+        this.aiDifficultyContainer = document.createElement('div');
+        this.aiDifficultyContainer.className = 'hidden mb-4';
         
-        rules.forEach(rule => {
-            const li = document.createElement('li');
-            const strong = document.createElement('strong');
-            strong.textContent = rule.label;
-            li.appendChild(strong);
-            li.appendChild(document.createTextNode(' ' + rule.text));
-            list.appendChild(li);
-        });
-        instructions.appendChild(title2);
-        instructions.appendChild(list);
-
-        this.container.appendChild(title);
-        this.container.appendChild(modeSection);
-        this.container.appendChild(instructions);
+        const difficultyLabel = document.createElement('label');
+        difficultyLabel.className = 'text-white mb-2 block';
+        difficultyLabel.textContent = 'AI Difficulty:';
+        
+        this.aiDifficultySelect = document.createElement('select');
+        this.aiDifficultySelect.id = 'ai-difficulty-select';
+        this.aiDifficultySelect.className = 'w-full p-3 rounded-xl bg-white/10 text-white border border-white/20';
+        
+        const easyOption = document.createElement('option');
+        easyOption.value = 'easy';
+        easyOption.textContent = 'Easy';
+        
+        const mediumOption = document.createElement('option');
+        mediumOption.value = 'medium';
+        mediumOption.selected = true;
+        mediumOption.textContent = 'Medium';
+        
+        const hardOption = document.createElement('option');
+        hardOption.value = 'hard';
+        hardOption.textContent = 'Hard';
+        
+        this.aiDifficultySelect.appendChild(easyOption);
+        this.aiDifficultySelect.appendChild(mediumOption);
+        this.aiDifficultySelect.appendChild(hardOption);
+        
+        this.aiDifficultyContainer.appendChild(difficultyLabel);
+        this.aiDifficultyContainer.appendChild(this.aiDifficultySelect);
+        
+        card.appendChild(buttonContainer);
+        card.appendChild(this.aiDifficultyContainer);
+        
+        return card;
     }
 
-    private renderDifficultySelection(): void {
-        if (!this.container) return;
-
-        this.container.innerHTML = '';
-        
-        const title = document.createElement('h1');
-        title.textContent = 'Select AI Difficulty';
-        title.className = 'text-4xl font-bold text-white text-center mb-8 gradient-text';
-        
-        const difficultySection = document.createElement('div');
-        difficultySection.className = 'glass-effect p-8 rounded-2xl';
-        
-        const difficultyButtons = document.createElement('div');
-        difficultyButtons.className = 'grid grid-cols-1 md:grid-cols-3 gap-6 mb-8';
-        
-        const difficulties: { level: AIDifficulty; emoji: string; description: string }[] = [
-            { level: 'easy', emoji: '😊', description: 'Relaxed gameplay - AI is slow and makes mistakes' },
-            { level: 'medium', emoji: '😎', description: 'Balanced challenge - AI is competent but beatable' },
-            { level: 'hard', emoji: '😤', description: 'Intense challenge - AI is fast and accurate' }
-        ];
-        
-        difficulties.forEach(({ level, emoji, description }) => {
-            const card = document.createElement('div');
-            card.className = 'glass-effect p-6 rounded-xl cursor-pointer transition-all duration-300 border-2 border-transparent hover:border-accent-pink hover:-translate-y-2';
-            card.onclick = () => {
-                this.selectedDifficulty = level;
-                this.renderGameScreen();
-            };
-            
-            const emojiDiv = document.createElement('div');
-            emojiDiv.className = 'text-6xl text-center mb-4';
-            emojiDiv.textContent = emoji;
-
-            const levelTitle = document.createElement('h3');
-            levelTitle.className = 'text-xl font-semibold text-white text-center mb-3 capitalize';
-            levelTitle.textContent = level;
-
-            const desc = document.createElement('p');
-            desc.className = 'text-sm text-gray-300 text-center leading-relaxed';
-            desc.textContent = description;
-
-            card.appendChild(emojiDiv);
-            card.appendChild(levelTitle);
-            card.appendChild(desc);
-            
-            difficultyButtons.appendChild(card);
-        });
-        
-        const backButton = document.createElement('button');
-        backButton.textContent = '← Back to Mode Selection';
-        backButton.className = 'bg-game-dark hover:bg-blue-800 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-300 mt-4 mx-auto';
-        backButton.onclick = () => this.renderModeSelection();
-        
-        difficultySection.appendChild(difficultyButtons);
-        difficultySection.appendChild(backButton);
-        
-        this.container.appendChild(title);
-        this.container.appendChild(difficultySection);
-    }
-
-    private renderGameScreen(): void {
-        if (!this.container) return;
-
-        this.container.innerHTML = '';
-        
-        const title = document.createElement('h1');
-        title.textContent = this.selectedMode === 'pvp' 
-            ? 'Player vs Player' 
-            : `Player vs AI (${this.selectedDifficulty})`;
-        title.className = 'text-3xl font-bold text-white text-center mb-4 gradient-text';
-        
-        const instructions = document.createElement('div');
-        instructions.className = 'text-center mb-6 glass-effect p-4 rounded-xl';
-        const controlsTitle = document.createElement('p');
-        const strongTag = document.createElement('strong');
-        strongTag.textContent = 'Controls:';
-        controlsTitle.appendChild(strongTag);
-
-        const player1Text = document.createElement('p');
-        player1Text.textContent = 'Player 1: W (up) / S (down)';
-
-        const player2Text = document.createElement('p');
-        player2Text.textContent = this.selectedMode === 'pvp'
-            ? 'Player 2: Arrow Up / Arrow Down' 
-            : 'AI controls Player 2';
-
-        const winText = document.createElement('p');
-        winText.className = 'text-game-red font-bold mt-2';
-        winText.textContent = 'First to 5 points wins!';
-
-        instructions.appendChild(controlsTitle);
-        instructions.appendChild(player1Text);
-        instructions.appendChild(player2Text);
-        instructions.appendChild(winText);
+    private createCanvasContainer(): HTMLElement {
+        const container = document.createElement('div');
+        container.className = 'glass-effect rounded-2xl p-1';
         
         const canvas = document.createElement('canvas');
         canvas.id = 'gameCanvas';
-        canvas.width = 800;
-        canvas.height = 600;
-        canvas.className = 'border-2 border-game-dark bg-black mx-auto my-6 rounded-xl block';
-
-        const buttonContainer = document.createElement('div');
-        buttonContainer.className = 'text-center mt-6 flex flex-col sm:flex-row gap-4 justify-center items-center';
+        canvas.className = 'w-full h-96 rounded-xl';
         
-        const startButton = document.createElement('button');
-        startButton.textContent = 'Start Game';
-        startButton.className = 'btn-primary disabled:bg-gray-600 disabled:cursor-not-allowed disabled:shadow-none';
-        startButton.onclick = () => {
-            if (!this.game) {
-                this.game = new PongGame(canvas, {
-                    mode: this.selectedMode,
-                    aiDifficulty: this.selectedDifficulty
-                });
-            }
-            this.game.start();
-            startButton.disabled = true;
-            stopButton.disabled = false;
-        };
-
-        const stopButton = document.createElement('button');
-        stopButton.textContent = 'Stop Game';
-        stopButton.disabled = true;
-        stopButton.className = 'bg-red-700 hover:bg-red-800 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-300 disabled:opacity-50 disabled:cursor-not-allowed';
-        stopButton.onclick = () => {
-            if (this.game) {
-                this.game.stop();
-            }
-            startButton.disabled = false;
-            stopButton.disabled = true;
-        };
-    
-        const backButton = document.createElement('button');
-        backButton.textContent = '← Back to Menu';
-        backButton.className = 'bg-game-dark hover:bg-blue-800 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-300';
-        backButton.onclick = () => {
-            this.cleanup();
-            this.renderModeSelection();
-        };
-        
-        buttonContainer.appendChild(startButton);
-        buttonContainer.appendChild(stopButton);
-        buttonContainer.appendChild(backButton);
-        
-        this.container.appendChild(title);
-        this.container.appendChild(instructions);
-        this.container.appendChild(canvas);
-        this.container.appendChild(buttonContainer);
+        container.appendChild(canvas);
+        return container;
     }
-    
-    public cleanup(): void {
+
+    private setupEventListeners(): void {
+        const pvpBtn = document.getElementById('pvp-btn') as HTMLButtonElement;
+        const pveBtn = document.getElementById('pve-btn') as HTMLButtonElement;
+        const multiplayerBtn = document.getElementById('multiplayer-btn') as HTMLButtonElement;
+
+        pvpBtn.addEventListener('click', () => {
+            this.startGame('pvp');
+            this.hideAIDifficulty();
+            this.setInstructions('Player 1: W/S | Player 2: Arrow Keys');
+        });
+
+        pveBtn.addEventListener('click', () => {
+            this.showAIDifficulty();
+        });
+
+        multiplayerBtn.addEventListener('click', () => {
+            this.startMultiplayerGame();
+            this.hideAIDifficulty();
+            this.setInstructions('P1: A/D (Top) | P2: ↑/↓ (Right) | P3: J/L (Bottom) | P4: W/S (Left)');
+        });
+
+        if (this.aiDifficultySelect) {
+            this.aiDifficultySelect.addEventListener('change', () => {
+                const difficulty = this.aiDifficultySelect?.value as 'easy' | 'medium' | 'hard';
+                this.startGame('pve', difficulty);
+            });
+        }
+
+        // Start with PvP by default
+        this.startGame('pvp');
+    }
+
+    private startGame(mode: 'pvp' | 'pve', difficulty?: 'easy' | 'medium' | 'hard'): void {
+        this.cleanup();
+
+        const canvas = document.getElementById('gameCanvas') as HTMLCanvasElement;
+        if (!canvas) return;
+
+        const config = mode === 'pve' 
+            ? { mode: 'pve' as const, aiDifficulty: difficulty } 
+            : { mode: 'pvp' as const };
+        this.game = new PongGame(canvas, config);
+        this.game.start();
+    }
+
+    private startMultiplayerGame(): void {
+        this.cleanup();
+
+        const canvas = document.getElementById('gameCanvas') as HTMLCanvasElement;
+        if (!canvas) return;
+
+        this.game = new MultiplayerPongGame(canvas);
+        this.game.start();
+    }
+
+    private showAIDifficulty(): void {
+        if (this.aiDifficultyContainer) {
+            this.aiDifficultyContainer.classList.remove('hidden');
+        }
+        const difficulty = this.aiDifficultySelect?.value as 'easy' | 'medium' | 'hard';
+        this.startGame('pve', difficulty);
+        this.setInstructions('Player: W/S | AI: Automatic');
+    }
+
+    private hideAIDifficulty(): void {
+        if (this.aiDifficultyContainer) {
+            this.aiDifficultyContainer.classList.add('hidden');
+        }
+    }
+
+    private setInstructions(text: string): void {
+        if (this.instructions) {
+            this.instructions.textContent = text;
+        }
+    }
+
+    private cleanup(): void {
         if (this.game) {
             this.game.destroy();
             this.game = null;
         }
+    }
+
+    public destroy(): void {
+        this.cleanup();
+        this.container = null;
+        this.aiDifficultySelect = null;
+        this.aiDifficultyContainer = null;
+        this.instructions = null;
     }
 }
