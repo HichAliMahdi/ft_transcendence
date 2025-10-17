@@ -245,15 +245,28 @@ export class MultiplayerPongGame {
     }
 
     private resetBall(): void {
+        this.ball.x = this.canvas.width / 2;
+        this.ball.y = this.canvas.height / 2;
 
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 4;
+
+        this.ball.dx = Math.cos(angle) * speed;
+        this.ball.dy = Math.sin(angle) * speed;
     }
 
     private isGameOver(): boolean {
-
+        return this.score.player1 >= 5 || this.score.player2 >= 5 || this.score.player3 >= 5 || this.score.player4 >= 5;
     }
 
     private getWinner(): number {
-
+        const scores = [
+            { player: 1, score: this.score.player1 },
+            { player: 2, score: this.score.player2 },
+            { player: 3, score: this.score.player3 },
+            { player: 4, score: this.score.player4 }
+        ];
+        return scores.reduce((max, current) => current.score > max.score ? current : max).player;
     }
 
     private draw(): void {
