@@ -351,23 +351,62 @@ export class MultiplayerPongGame {
     }
 
     private gameLoop = (timestamp: number): void => {
+        if (!this.isRunning) return;
 
-    }
+        const deltaTime = timestamp - this.lastTime;
+        
+        if (deltaTime >= this.FRAME_TIME) {
+            this.update();
+            this.draw();
+            this.lastTime = timestamp - (deltaTime % this.FRAME_TIME);
+        }
+
+        this.animationId = requestAnimationFrame(this.gameLoop);
+    };
 
     public start(): void {
-
+        if (this.isRunning) return;
+        
+        this.isRunning = true;
+        this.lastTime = performance.now();
+        this.animationId = requestAnimationFrame(this.gameLoop);
     }
 
     public stop(): void {
-
+        this.isRunning = false;
+        if (this.animationId !== null) {
+            cancelAnimationFrame(this.animationId);
+            this.animationId = null;
+        }
     }
 
     private endGame(): void {
-
+        this.stop();
+        const winner = this.getWinner();
+        
+        this.ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
+        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        
+        this.ctx.fillStyle = '#e94560';
+        this.ctx.font = '48px Arial';
+        this.ctx.textAlign = 'center';
+        this.ctx.fillText('GAME OVER', this.canvas.width / 2, this.canvas.height / 2 - 60);
+        
+        this.ctx.fillStyle = '#f8fafc';
+        this.ctx.font = '32px Arial';
+        this.ctx.fillText(`Player ${winner} Wins!`, this.canvas.width / 2, this.canvas.height / 2);
+        
+        this.ctx.font = '18px Arial';
+        this.ctx.fillStyle = '#94a3b8';
+        this.ctx.fillText('Press SPACE to play again', this.canvas.width / 2, this.canvas.height / 2 + 60);
     }
 
     private removeEventListeners(): void {
-
+        if (this.keyHandler) {
+            window.removeEventListener('keydown', this.keyHandler);
+            window.removeEventListener('keyup', this.keyHandler);
+            this.keyHandler = null;
+        }
     }
     
     public destroy(): void {
