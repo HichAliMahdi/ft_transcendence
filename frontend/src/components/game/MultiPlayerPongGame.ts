@@ -127,11 +127,16 @@ export class MultiplayerPongGame {
     }
 
     private resizeCanvas(): void {
-
+        const container = this.canvas.parentElement;
+        if (container) {
+            this.canvas.width = container.clientWidth;
+            this.canvas.height = container.clientHeight;
+            this.resetPaddlePositions();
+        }
     }
 
     private resetPaddlePositions(): void {
-
+        
     }
 
     private update(): void {
