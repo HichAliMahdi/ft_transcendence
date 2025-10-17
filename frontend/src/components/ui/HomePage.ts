@@ -34,6 +34,7 @@ export class HomePage {
         }
         buttonContainer.appendChild(quickPlayButton);
         buttonContainer.appendChild(tournamentButton);
+        buttonContainer.appendChild(multiplayerbutton);
 
         container.appendChild(title);
         container.appendChild(subtitle);
