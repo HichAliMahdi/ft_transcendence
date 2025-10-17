@@ -136,7 +136,17 @@ export class MultiplayerPongGame {
     }
 
     private resetPaddlePositions(): void {
-        
+        this.paddles[0].x = this.canvas.width / 2 - 50; // Player 1
+        this.paddles[0].y = 20;
+
+        this.paddles[1].x = this.canvas.width - 30; // Player 2
+        this.paddles[1].y = this.canvas.height / 2 - 50;
+
+        this.paddles[2].x = this.canvas.width / 2 - 50; // Player 3
+        this.paddles[2].y = this.canvas.height - 30;
+
+        this.paddles[3].x = 20; // Player 4
+        this.paddles[3].y = this.canvas.height / 2 - 50;
     }
 
     private update(): void {
