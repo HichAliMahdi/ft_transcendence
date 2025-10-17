@@ -196,11 +196,52 @@ export class MultiplayerPongGame {
     }
 
     private checkPaddleCollision(paddle: MultiplayerPaddle): boolean {
+        const closestX = Math.max(paddle.x, Math.min(this.ball.x, paddle.x + paddle.width));
+        const closestY = Math.max(paddle.y, Math.min(this.ball.y, paddle.y + paddle.height));
 
+        const distanceX = this.ball.x - closestX;
+        const distanceY = this.ball.y - closestY;
+
+        return (distanceX * distanceX + distanceY * distanceY) <= (this.ball.radius * this.ball.radius);
     }
 
     private handlePaddleCollision(paddle: MultiplayerPaddle): void {
+        const paddleCenterX = paddle.x + paddle.width / 2;
+        const paddleCenterY = paddle.y + paddle.height / 2;
 
+        let hitRatio: number;
+
+        if (paddle.playerId === 1 || paddle.playerId === 3) {
+            hitRatio = (this.ball.x - paddleCenterX) / (paddle.width / 2);
+            this.ball.dy = -this.ball.dy;
+            this.ball.dx = hitRatio * 8;
+
+            if (paddle.playerId === 1) {
+                this.ball.y = paddle.y + paddle.height + this.ball.radius;
+            } else {
+                this.ball.y = paddle.y - this.ball.radius;
+            }
+        } else {
+            // Vertical paddles
+            hitRatio = (this.ball.y - paddleCenterY) / (paddle.height / 2);
+            this.ball.dx = -this.ball.dx;
+            this.ball.dy = hitRatio * 8;
+            
+            // Adjust ball position
+            if (paddle.playerId === 2) {
+                this.ball.x = paddle.x - this.ball.radius;
+            } else {
+                this.ball.x = paddle.x + paddle.width + this.ball.radius;
+            }
+        }
+
+        // increase speed
+        const speed = Math.sqrt(this.ball.dx * this.ball.dx + this.ball.dy * this.ball.dy);
+        const newSpeed = Math.min(speed * 1.05, 12);
+        const ratio = newSpeed / speed;
+
+        this.ball.dx *= ratio;
+        this.ball.dy *= ratio;
     }
 
     private resetBall(): void {
