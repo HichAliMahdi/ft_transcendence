@@ -114,15 +114,73 @@ export class MultiplayerPongGame {
 
     }
 
+    private resetPaddlePositions(): void {
+
+    }
+
+    private update(): void {
+
+    }
+
+    private movePaddle(paddle: MultiplayerPaddle, delta: number): void {
+
+    }
+
+    private checkPaddleCollision(paddle: MultiplayerPaddle): boolean {
+
+    }
+
+    private handlePaddleCollision(paddle: MultiplayerPaddle): void {
+
+    }
+
+    private resetBall(): void {
+
+    }
+
+    private isGameOver(): boolean {
+
+    }
+
+    private getWinner(): number {
+
+    }
+
+    private draw(): void {
+
+    }
+
+    private gameLoop = (timestamp: number): void => {
+
+    }
+
+    public start(): void {
+
+    }
+
+    public stop(): void {
+
+    }
+
+    private endGame(): void {
+
+    }
+
     private removeEventListeners(): void {
 
     }
     
     public destroy(): void {
-
+        this.stop();
+        this.removeEventListeners();
+        window.removeEventListener('resize', () => this.resizeCanvas());
     }
 
     public resetGame(): void {
-
+        this.score = { player1: 0, player2: 0, player3: 0, player4: 0 };
+        this.resetBall();
+        this.resetPaddlePositions();
+        this.keys = {};
+        this.isRunning = true;
     }
 }
