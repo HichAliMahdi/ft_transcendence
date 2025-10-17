@@ -108,6 +108,22 @@ export class MultiplayerPongGame {
 
     private setupControls(): void {
         this.removeEventListeners();
+        this.keyHandler = (e: KeyboardEvent) => {
+            if (['w', 's', 'a', 'd', 'j', 'l', 'ArrowUp', 'ArrowDown', ' '].includes(e.key)) {
+                e.preventDefault();
+            }
+            if (e.key === ' ' ) {
+                if (!this.isRunning && this.isGameOver()) {
+                    this.resetGame();
+                    this.start();
+                }
+                return;
+            }
+            this.keys[e.key] = (e.type === 'keydown');
+        };
+        window.addEventListener('keydown', this.keyHandler);
+        window.addEventListener('keyup', this.keyHandler);
+        window.addEventListener('resize', () => this.resizeCanvas());
     }
 
     private resizeCanvas(): void {
