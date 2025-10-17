@@ -1,6 +1,7 @@
 import { HomePage } from '../components/ui/HomePage';
 import { GamePage } from '../components/ui/GamePage';
 import { TournamentPage } from '../components/ui/TournamentPage';
+import { MultiplayerPage } from '../components/ui/MultiPlayerPage';
 
 interface Route {
     path: string;
@@ -16,6 +17,7 @@ export class Router {
             { path: '/', view: () => new HomePage() },
             { path: '/game', view: () => new GamePage() },
             { path: '/tournament', view: () => new TournamentPage() },
+            { path: '/multiplayer', view: () => new MultiplayerPage() },
         ];
     }
 
