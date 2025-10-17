@@ -270,7 +270,84 @@ export class MultiplayerPongGame {
     }
 
     private draw(): void {
+        this.ctx.fillStyle = '#0f172a';
+        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
+        this.ctx.strokeStyle = '#334155';
+        this.ctx.lineWidth = 2;
+        this.ctx.setLineDash([5, 5]);
+
+        this.ctx.beginPath();
+        this.ctx.moveTo(this.canvas.width / 2, 0);
+        this.ctx.lineTo(this.canvas.width / 2, this.canvas.height);
+        this.ctx.moveTo(0, this.canvas.height / 2);
+        this.ctx.lineTo(this.canvas.width, this.canvas.height / 2);
+        this.ctx.stroke();
+        this.ctx.setLineDash([]);
+
+        const paddleColors = ['#e94560', '#7873f5', '#ff6ec4', '#0f3460'];
+        this.paddles.forEach((paddle, index) => {
+            this.ctx.fillStyle = paddleColors[index];
+            this.ctx.fillRect(paddle.x, paddle.y, paddle.width, paddle.height);
+            
+            this.ctx.fillStyle = '#fff';
+            this.ctx.font = '12px Arial';
+            this.ctx.textAlign = 'center';
+            this.ctx.textBaseline = 'middle';
+            
+            if (paddle.playerId === 1 || paddle.playerId === 3) {
+                this.ctx.fillText(
+                    `P${paddle.playerId}`,
+                    paddle.x + paddle.width / 2,
+                    paddle.y + paddle.height / 2
+                );
+            } else {
+                this.ctx.save();
+                this.ctx.translate(paddle.x + paddle.width / 2, paddle.y + paddle.height / 2);
+                this.ctx.rotate(Math.PI / 2);
+                this.ctx.fillText(`P${paddle.playerId}`, 0, 0);
+                this.ctx.restore();
+            }
+        });
+        this.ctx.fillStyle = '#f8fafc';
+        this.ctx.beginPath();
+        this.ctx.arc(this.ball.x, this.ball.y, this.ball.radius, 0, Math.PI * 2);
+        this.ctx.fill();
+
+        this.ctx.fillStyle = '#e2e8f0';
+        this.ctx.font = '24px Arial';
+        this.ctx.textAlign = 'center';
+        
+
+        this.ctx.fillText(this.score.player1.toString(), this.canvas.width / 2, 60);
+
+        this.ctx.fillText(this.score.player2.toString(), this.canvas.width - 60, this.canvas.height / 2);
+
+        this.ctx.fillText(this.score.player3.toString(), this.canvas.width / 2, this.canvas.height - 40);
+
+        this.ctx.fillText(this.score.player4.toString(), 60, this.canvas.height / 2);
+
+
+        this.ctx.font = '12px Arial';
+        this.ctx.fillStyle = '#64748b';
+        
+
+        this.ctx.textAlign = 'center';
+        this.ctx.fillText('P1: A/D', this.canvas.width / 2, 30);
+
+        this.ctx.save();
+        this.ctx.translate(this.canvas.width - 20, this.canvas.height / 2);
+        this.ctx.rotate(Math.PI / 2);
+        this.ctx.fillText('P2: ↑/↓', 0, 0);
+        this.ctx.restore();
+ 
+        this.ctx.fillText('P3: J/L', this.canvas.width / 2, this.canvas.height - 15);
+
+        this.ctx.save();
+        this.ctx.translate(20, this.canvas.height / 2);
+        this.ctx.rotate(-Math.PI / 2);
+        this.ctx.fillText('P4: W/S', 0, 0);
+        this.ctx.restore();
     }
 
     private gameLoop = (timestamp: number): void => {
