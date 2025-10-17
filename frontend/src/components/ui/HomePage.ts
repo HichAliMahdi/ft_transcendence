@@ -26,6 +26,12 @@ export class HomePage {
         tournamentButton.onclick = () => {
             window.location.href = '/tournament';
         }
+        const multiplayerbutton = document.createElement('button');
+        multiplayerbutton.className = 'btn-primary text-lg px-8 py-4';
+        multiplayerbutton.textContent = 'Multiplayer';
+        multiplayerbutton.onclick = () => {
+            window.location.href = '/multiplayer';
+        }
         buttonContainer.appendChild(quickPlayButton);
         buttonContainer.appendChild(tournamentButton);
 
