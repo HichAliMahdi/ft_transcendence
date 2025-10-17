@@ -423,3 +423,5 @@ export class MultiplayerPongGame {
         this.isRunning = true;
     }
 }
+
+//TODO Change logic
