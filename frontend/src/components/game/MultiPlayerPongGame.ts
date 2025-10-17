@@ -35,4 +35,22 @@ export class MultiplayerPongGame {
     private lastTime: number = 0;
     private readonly FRAME_TIME: number = 1000 / 60;
     private keyHandler: ((e: KeyboardEvent) => void) | null = null;
+
+    constructor(canvas: HTMLCanvasElement) {
+        this.canvas = canvas;
+        const context = canvas.getContext('2d');
+        if (!context)
+            throw new Error('Could not get canvas context');
+        this.ctx = context;
+    }
+
+    // Initializing ball in the center of the game
+    this.ball = {
+        x: canvas.width / 2,
+        y: canvas.height / 2,
+        dx: 4,
+        dy: 4,
+        radius: 8
+    };
+    
 }
