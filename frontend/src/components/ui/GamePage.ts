@@ -39,6 +39,7 @@ export class GamePage {
         
         this.container.appendChild(mainContainer);
         
+        // Setup event listeners AFTER all elements are created and appended
         this.setupEventListeners();
         return this.container;
     }
@@ -123,42 +124,53 @@ export class GamePage {
     }
 
     private setupEventListeners(): void {
-        const pvpBtn = document.getElementById('pvp-btn') as HTMLButtonElement;
-        const pveBtn = document.getElementById('pve-btn') as HTMLButtonElement;
-        const multiplayerBtn = document.getElementById('multiplayer-btn') as HTMLButtonElement;
+        // Use setTimeout to ensure DOM is fully rendered
+        setTimeout(() => {
+            const pvpBtn = document.getElementById('pvp-btn') as HTMLButtonElement;
+            const pveBtn = document.getElementById('pve-btn') as HTMLButtonElement;
+            const multiplayerBtn = document.getElementById('multiplayer-btn') as HTMLButtonElement;
 
-        pvpBtn.addEventListener('click', () => {
-            this.startGame('pvp');
-            this.hideAIDifficulty();
-            this.setInstructions('Player 1: W/S | Player 2: Arrow Keys');
-        });
+            if (!pvpBtn || !pveBtn || !multiplayerBtn) {
+                console.error('Game mode buttons not found');
+                return;
+            }
 
-        pveBtn.addEventListener('click', () => {
-            this.showAIDifficulty();
-        });
-
-        multiplayerBtn.addEventListener('click', () => {
-            this.startMultiplayerGame();
-            this.hideAIDifficulty();
-            this.setInstructions('P1: A/D (Top) | P2: ↑/↓ (Right) | P3: J/L (Bottom) | P4: W/S (Left)');
-        });
-
-        if (this.aiDifficultySelect) {
-            this.aiDifficultySelect.addEventListener('change', () => {
-                const difficulty = this.aiDifficultySelect?.value as 'easy' | 'medium' | 'hard';
-                this.startGame('pve', difficulty);
+            pvpBtn.addEventListener('click', () => {
+                this.startGame('pvp');
+                this.hideAIDifficulty();
+                this.setInstructions('Player 1: W/S | Player 2: Arrow Keys');
             });
-        }
 
-        // Start with PvP by default
-        this.startGame('pvp');
+            pveBtn.addEventListener('click', () => {
+                this.showAIDifficulty();
+            });
+
+            multiplayerBtn.addEventListener('click', () => {
+                this.startMultiplayerGame();
+                this.hideAIDifficulty();
+                this.setInstructions('P1: A/D (Top) | P2: ↑/↓ (Right) | P3: J/L (Bottom) | P4: W/S (Left)');
+            });
+
+            if (this.aiDifficultySelect) {
+                this.aiDifficultySelect.addEventListener('change', () => {
+                    const difficulty = this.aiDifficultySelect?.value as 'easy' | 'medium' | 'hard';
+                    this.startGame('pve', difficulty);
+                });
+            }
+
+            // Start with PvP by default
+            this.startGame('pvp');
+        }, 0);
     }
 
     private startGame(mode: 'pvp' | 'pve', difficulty?: 'easy' | 'medium' | 'hard'): void {
         this.cleanup();
 
         const canvas = document.getElementById('gameCanvas') as HTMLCanvasElement;
-        if (!canvas) return;
+        if (!canvas) {
+            console.error('Canvas not found');
+            return;
+        }
 
         const config = mode === 'pve' 
             ? { mode: 'pve' as const, aiDifficulty: difficulty } 
@@ -171,7 +183,10 @@ export class GamePage {
         this.cleanup();
 
         const canvas = document.getElementById('gameCanvas') as HTMLCanvasElement;
-        if (!canvas) return;
+        if (!canvas) {
+            console.error('Canvas not found');
+            return;
+        }
 
         this.game = new MultiplayerPongGame(canvas);
         this.game.start();
