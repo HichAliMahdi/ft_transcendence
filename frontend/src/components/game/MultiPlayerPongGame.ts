@@ -107,10 +107,22 @@ export class MultiplayerPongGame {
     }
 
     private setupControls(): void {
-        
+        this.removeEventListeners();
+    }
+
+    private resizeCanvas(): void {
+
+    }
+
+    private removeEventListeners(): void {
+
     }
     
-    private resizeCanvas(): void {
+    public destroy(): void {
+
+    }
+
+    public resetGame(): void {
 
     }
 }
