@@ -22,3 +22,17 @@ interface MultiplayerScore {
     player3: number;
     player4: number;
 }
+
+export class MultiplayerPongGame {
+    private canvas: HTMLCanvasElement;
+    private ctx: CanvasRenderingContext2D;
+    private ball: MultiplayerBall;
+    private paddles: MultiplayerPaddle[];
+    private score: MultiplayerScore;
+    private keys: { [key: string]: boolean } = {};
+    private animationId: number | null = null;
+    private isRunning: boolean = false;
+    private lastTime: number = 0;
+    private readonly FRAME_TIME: number = 1000 / 60;
+    private keyHandler: ((e: KeyboardEvent) => void) | null = null;
+}

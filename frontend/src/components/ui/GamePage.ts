@@ -1,4 +1,5 @@
 import { PongGame } from '../game/PongGame';
+import { MultiplayerPongGame } from '../game/MultiPlayerPongGame';
 
 type GameMode = 'pvp' | 'pve';
 type AIDifficulty = 'easy' | 'medium' | 'hard';
