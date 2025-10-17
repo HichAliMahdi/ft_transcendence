@@ -5,10 +5,12 @@ type GameMode = 'pvp' | 'pve';
 type AIDifficulty = 'easy' | 'medium' | 'hard';
 
 export class GamePage {
-    private game: PongGame | null = null;
-    private selectedMode: GameMode = 'pvp';
-    private selectedDifficulty: AIDifficulty = 'medium';
+    private game: PongGame | MultiplayerPongGame | null = null;
+    private isMultiplayer: boolean = false;
     private container: HTMLElement | null = null;
+    private aiDifficultySelect: HTMLSelectElement | null = null;
+    private aiDifficultyContainer: HTMLDivElement | null = null;
+    private instructions: HTMLParagraphElement | null = null;
 
     public render(): HTMLElement {
         this.container = document.createElement('div');
