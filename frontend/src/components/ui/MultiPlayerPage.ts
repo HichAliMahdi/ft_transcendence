@@ -58,6 +58,43 @@ export class MultiplayerPage {
             connectionCard.appendChild(spinner);
             connectionCard.appendChild(cancelButton);
         }
+        const instructions = document.createElement('div');
+        instructions.className = 'glass-effect p-6 rounded-2xl mt-8 max-w-2xl mx-auto';
+
+        const instructionsTitle = document.createElement('h3');
+        instructionsTitle.textContent = 'How to Play Online';
+        instructionsTitle.className = 'text-xl font-semibold text-white mb-4 text-center';
+
+        const instructionsList = document.createElement('ul');
+        instructionsList.className = 'text-gray-300 space-y-2';
+
+        const points = [
+            'Click "Find Online Match" to search for an opponent',
+            'You will be automatically paired with another player',
+            'Control your paddle using W (up) and S (down) keys',
+            'First to 5 points wins the match',
+            'Game runs in real-time with your opponent'
+        ];
+        
+        points.forEach(point => {
+            const li = document.createElement('li');
+            li.className = 'flex items-start';
+            
+            const bullet = document.createElement('span');
+            bullet.textContent = '•';
+            bullet.className = 'mr-2 text-accent-pink';
+            
+            li.appendChild(bullet);
+            li.appendChild(document.createTextNode(point));
+            instructionsList.appendChild(li);
+        });
+
+        instructions.appendChild(instructionsTitle);
+        instructions.appendChild(instructionsList);
+
+        this.container.appendChild(title);
+        this.container.appendChild(connectionCard);
+        this.container.appendChild(instructions);
     }
 
     private disconnect(): void {
