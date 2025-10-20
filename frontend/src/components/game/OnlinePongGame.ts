@@ -30,26 +30,31 @@ export class OnlinePongGame {
             score: { player1:0, player2: 0 }
         };
 
+        this.setupControls();
+        this.setupSocketListeners();
+        this.start();
+
     }
 
     private setupControls(): void {
         this.removeEventListeners();
+
         this.keyHandler = (e: KeyboardEvent) => {
-            if (['w', 's', 'a', 'd', 'j', 'l', 'ArrowUp', 'ArrowDown', ' '].includes(e.key)) {
+            if (['w', 's'].includes(e.key)) {
                 e.preventDefault();
+                this.keys[e.key] = (e.type === 'keydown');
+                // send paddle movement to server
+                if (this.socket){
+                    this.socket.send(JSON.stringify({
+                        type: 'paddleMove',
+                        direction: e.key === 'w' ? 'up' : 'down',
+                        keydown: e.type === 'keydown'
+                    }));
+                } 
             }
-            if (e.key === ' ' ) {
-                if (!this.isRunning && this.isGameOver()) {
-                    this.resetGame();
-                    this.start();
-                }
-                return;
-            }
-            this.keys[e.key] = (e.type === 'keydown');
         };
         window.addEventListener('keydown', this.keyHandler);
         window.addEventListener('keyup', this.keyHandler);
-        window.addEventListener('resize', () => this.resizeCanvas());
     }
 
     private resizeCanvas(): void {
