@@ -143,7 +143,42 @@ export class MultiplayerPage {
         this.game = new OnlinePongGame(canvas, this.socket!);
     }
 
-    
+
+    // For demo purposes, we'll simulate WebSocket connection
+    // In a real implementation, connect to your WebSocket server created in backend
+    private connectToServer(): void {
+        this.status = 'connecting';
+        this.renderConnectionScreen();
+
+        setTimeout(() => {
+            this.socket = this.createMockWebSocket();
+            this.status = 'waiting';
+            this.renderConnectionScreen();
+
+            // Simulate finding a match after 2-5 seconds
+            setTimeout(() => {
+                this.playerId = 'player_' + Math.random().toString(36).substr(2, 9);
+                this.roomId = 'room_' + Math.random().toString(36).substr(2, 9);
+                this.status = 'playing';
+                this.renderGameScreen();
+            }, 2000 + Math.random() * 3000);
+        }, 1000);
+    }
+
+    // This is a mock WebSocket for demonstration
+    // In a real implementation, ze zill use actual WebSocket connection
+    private createMockWebSocket(): WebSocket {
+        const mockSocket = {
+            send: (data: string) => {
+                console.log('Sending:', data);
+            },
+            close: () => {
+                console.log('Connection closed');
+            }
+        } as any;
+
+        return mockSocket;
+    }
 
     private disconnect(): void {
         if (this.socket) {
@@ -154,7 +189,6 @@ export class MultiplayerPage {
             this.game = null;
         }
         this.status = 'disconnected';
-        this.playerId = null;
         this.roomId = null;
         this.renderConnectionScreen();
     }
