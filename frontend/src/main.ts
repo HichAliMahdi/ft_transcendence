@@ -35,6 +35,25 @@ class App {
         window.addEventListener('unhandledrejection', (event) => {
             console.error('Unhandled promise rejection:', event.reason);
         });
+
+        const nav = document.getElementById('main-nav');
+        if (nav){
+            let lastScrollY = window.scrollY;
+            window.addEventListener('scroll', () => {
+                if (window.scrollY > lastScrollY) {
+                    nav.style.transform = 'translateY(-100%)';
+                } else {
+                    nav.style.transform = 'translateY(0)';
+                }
+                lastScrollY = window.scrollY;
+            });
+            document.addEventListener('mousemove', (e) => {
+                if (e.clientY < 80) {
+                    nav.style.transform = 'translateY(0)';
+                }
+            });
+        }
+
         this.router.handleRoute();
     }
 }
