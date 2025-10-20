@@ -57,148 +57,33 @@ export class OnlinePongGame {
         window.addEventListener('keyup', this.keyHandler);
     }
 
-    private resizeCanvas(): void {
-        const container = this.canvas.parentElement;
-        if (container) {
-            this.canvas.width = container.clientWidth;
-            this.canvas.height = container.clientHeight;
-            this.resetPaddlePositions();
+    private removeEventListeners(): void {
+        if (this.keyHandler) {
+            window.removeEventListener('keydown', this.keyHandler);
+            window.removeEventListener('keyup', this.keyHandler);
+            this.keyHandler = null;
         }
     }
 
-    private resetPaddlePositions(): void {
-        this.paddles[0].x = this.canvas.width / 2 - 50; // Player 1
-        this.paddles[0].y = 20;
-
-        this.paddles[1].x = this.canvas.width - 30; // Player 2
-        this.paddles[1].y = this.canvas.height / 2 - 50;
-
-        this.paddles[2].x = this.canvas.width / 2 - 50; // Player 3
-        this.paddles[2].y = this.canvas.height - 30;
-
-        this.paddles[3].x = 20; // Player 4
-        this.paddles[3].y = this.canvas.height / 2 - 50;
-    }
-
-    private update(): void {
-        // Update paddle position
-        this.paddles.forEach(paddle => {
-            if (this.keys[paddle.keys.up]) {
-                this.movePaddle(paddle, -paddle.speed);
+    // Simulation for updating game locally 
+    // TODO Implement real time socker listener in backend
+    private setupSocketListeners(): void {
+        this.socket.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                if (data.type === 'gameState') {
+                    this.gameState = data.state;
+                }
+            } catch (error) {
+                console.error('Error parsing game state:', error);
             }
-            if (this.keys[paddle.keys.down]) {
-                this.movePaddle(paddle, paddle.speed);
-            }
-        });
-        // update ball position
-        this.ball.x += this.ball.dx;
-        this.ball.y += this.ball.dy;
-        // Ball collision with paddles
-        this.paddles.forEach(paddle => {
-            if (this.checkPaddleCollision(paddle)) {
-                this.handlePaddleCollision(paddle);
-            }
-        });
-        // Ball wall colision and scoring
-        if (this.ball.x - this.ball.radius <= 0) { // player 2 scores
-            this.score.player2++;
-            this.resetBall();
-        } else if (this.ball.x + this.ball.radius >= this.canvas.width) { //player 4 scores
-            this.score.player4++;
-            this.resetBall();
-        }
-        if (this.ball.y - this.ball.radius <= 0) { // player 3 scores
-            this.score.player3++;
-            this.resetBall();
-        } else if (this.ball.y + this.ball.radius >= this.canvas.height) { // player 1 scores
-            this.score.player1++;
-            this.resetBall();
-        }
-        if (this.isGameOver()) // game ending first to 5
-            this.endGame();
+        };
+        setInterval(() => {
+            this.simulateGameUpdate();
+        }, 16); // ~60fps
     }
 
-    private movePaddle(paddle: MultiplayerPaddle, delta: number): void {
-        if (paddle.playerId === 1 || paddle.playerId === 3) { // Horizontal
-            paddle.x = Math.max(0, Math.min(this.canvas.width - paddle.width, paddle.x + delta));
-        } else { // Vertical
-            paddle.y = Math.max(0, Math.min(this.canvas.height - paddle.height, paddle.y + delta));
-        }
-    }
-
-    private checkPaddleCollision(paddle: MultiplayerPaddle): boolean {
-        const closestX = Math.max(paddle.x, Math.min(this.ball.x, paddle.x + paddle.width));
-        const closestY = Math.max(paddle.y, Math.min(this.ball.y, paddle.y + paddle.height));
-
-        const distanceX = this.ball.x - closestX;
-        const distanceY = this.ball.y - closestY;
-
-        return (distanceX * distanceX + distanceY * distanceY) <= (this.ball.radius * this.ball.radius);
-    }
-
-    private handlePaddleCollision(paddle: MultiplayerPaddle): void {
-        const paddleCenterX = paddle.x + paddle.width / 2;
-        const paddleCenterY = paddle.y + paddle.height / 2;
-
-        let hitRatio: number;
-
-        if (paddle.playerId === 1 || paddle.playerId === 3) {
-            hitRatio = (this.ball.x - paddleCenterX) / (paddle.width / 2);
-            this.ball.dy = -this.ball.dy;
-            this.ball.dx = hitRatio * 8;
-
-            if (paddle.playerId === 1) {
-                this.ball.y = paddle.y + paddle.height + this.ball.radius;
-            } else {
-                this.ball.y = paddle.y - this.ball.radius;
-            }
-        } else {
-            // Vertical paddles
-            hitRatio = (this.ball.y - paddleCenterY) / (paddle.height / 2);
-            this.ball.dx = -this.ball.dx;
-            this.ball.dy = hitRatio * 8;
-            
-            // Adjust ball position
-            if (paddle.playerId === 2) {
-                this.ball.x = paddle.x - this.ball.radius;
-            } else {
-                this.ball.x = paddle.x + paddle.width + this.ball.radius;
-            }
-        }
-
-        // increase speed
-        const speed = Math.sqrt(this.ball.dx * this.ball.dx + this.ball.dy * this.ball.dy);
-        const newSpeed = Math.min(speed * 1.05, 12);
-        const ratio = newSpeed / speed;
-
-        this.ball.dx *= ratio;
-        this.ball.dy *= ratio;
-    }
-
-    private resetBall(): void {
-        this.ball.x = this.canvas.width / 2;
-        this.ball.y = this.canvas.height / 2;
-
-        const angle = Math.random() * Math.PI * 2;
-        const speed = 4;
-
-        this.ball.dx = Math.cos(angle) * speed;
-        this.ball.dy = Math.sin(angle) * speed;
-    }
-
-    private isGameOver(): boolean {
-        return this.score.player1 >= 5 || this.score.player2 >= 5 || this.score.player3 >= 5 || this.score.player4 >= 5;
-    }
-
-    private getWinner(): number {
-        const scores = [
-            { player: 1, score: this.score.player1 },
-            { player: 2, score: this.score.player2 },
-            { player: 3, score: this.score.player3 },
-            { player: 4, score: this.score.player4 }
-        ];
-        return scores.reduce((max, current) => current.score > max.score ? current : max).player;
-    }
+    
 
     private draw(): void {
         this.ctx.fillStyle = '#0f172a';
