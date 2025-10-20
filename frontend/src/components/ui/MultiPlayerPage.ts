@@ -3,6 +3,10 @@ import { MultiplayerPongGame } from '../game/MultiPlayerPongGame';
 export class MultiplayerPage {
     private game: MultiplayerPongGame | null = null;
     private container: HTMLElement | null = null;
+    private socket: WebSocket | null = null;
+    private playerId: string | null = null;
+    private roomId: string | null = null;
+    private status: 'disconnected' | 'connecting' | 'waiting' | 'playing' = 'disconnected';
 
     public render(): HTMLElement {
         this.container = document.createElement('div');
@@ -120,11 +124,22 @@ export class MultiplayerPage {
         
         return this.container;
     }
-    
-    public cleanup(): void {
+
+    private disconnect(): void {
+        if (this.socket) {
+            this.socket.close();
+        }
         if (this.game) {
             this.game.destroy();
             this.game = null;
         }
+        this.status = 'disconnected';
+        this.playerId = null;
+        this.roomId = null;
+        this.renderConnectionScreen();
+    }
+
+    public cleanup(): void {
+        this.disconnect();
     }
 }
