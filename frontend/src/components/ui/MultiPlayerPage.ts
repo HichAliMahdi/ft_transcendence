@@ -1,4 +1,4 @@
-import { Onli, OnlinePongGame } from '../game/OnlinePongGame';
+import { OnlinePongGame } from '../game/OnlinePongGame';
 
 export class MultiplayerPage {
     private game: OnlinePongGame | null = null;
@@ -157,7 +157,6 @@ export class MultiplayerPage {
 
             // Simulate finding a match after 2-5 seconds
             setTimeout(() => {
-                this.playerId = 'player_' + Math.random().toString(36).substr(2, 9);
                 this.roomId = 'room_' + Math.random().toString(36).substr(2, 9);
                 this.status = 'playing';
                 this.renderGameScreen();
