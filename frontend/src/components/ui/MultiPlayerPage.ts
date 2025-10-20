@@ -75,7 +75,7 @@ export class MultiplayerPage {
             'First to 5 points wins the match',
             'Game runs in real-time with your opponent'
         ];
-        
+
         points.forEach(point => {
             const li = document.createElement('li');
             li.className = 'flex items-start';
@@ -96,6 +96,54 @@ export class MultiplayerPage {
         this.container.appendChild(connectionCard);
         this.container.appendChild(instructions);
     }
+
+    private renderGameScreen(): void {
+        if (!this.container) return;
+
+        this.container.innerHTML = '';
+
+        const title = document.createElement('h1');
+        title.textContent = 'Online Match';
+        title.className = 'text-3xl font-bold text-white text-center mb-4 gradient-text';
+
+        const gameInfo = document.createElement('div');
+        gameInfo.className = 'text-center mb-6 glass-effect p-4 rounded-xl';
+        
+        const roomInfo = document.createElement('p');
+        roomInfo.textContent = `Room: ${this.roomId}`;
+        roomInfo.className = 'text-gray-300 mb-2';
+
+        const opponentInfo = document.createElement('p');
+        opponentInfo.textContent = 'Opponent: Connected';
+        opponentInfo.className = 'text-green-400 mb-2';
+
+        const controlsInfo = document.createElement('p');
+        controlsInfo.textContent = 'Controls: W (up) / S (down)';
+        controlsInfo.className = 'text-gray-300';
+
+        gameInfo.appendChild(roomInfo);
+        gameInfo.appendChild(opponentInfo);
+        gameInfo.appendChild(controlsInfo);
+
+        const canvas = document.createElement('canvas');
+        canvas.id = 'onlineGameCanvas';
+        canvas.width = 800;
+        canvas.height = 600;
+        canvas.className = 'border-2 border-game-dark bg-black mx-auto my-6 rounded-xl block';
+
+        const disconnectButton = document.createElement('button');
+        disconnectButton.textContent = 'Leave Game';
+        disconnectButton.className = 'bg-game-red hover:bg-red-600 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-300 mt-4';
+        disconnectButton.onclick = () => this.disconnect();
+
+        this.container.appendChild(title);
+        this.container.appendChild(gameInfo);
+        this.container.appendChild(canvas);
+        this.container.appendChild(disconnectButton);
+        this.game = new OnlinePongGame(canvas, this.socket!);
+    }
+
+    
 
     private disconnect(): void {
         if (this.socket) {
