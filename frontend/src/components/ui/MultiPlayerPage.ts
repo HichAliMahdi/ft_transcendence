@@ -1,4 +1,4 @@
-import { MultiplayerPongGame } from '../game/MultiPlayerPongGame';
+import { MultiplayerPongGame } from '../game/OnlinePongGame';
 
 export class MultiplayerPage {
     private game: MultiplayerPongGame | null = null;
