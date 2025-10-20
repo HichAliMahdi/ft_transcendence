@@ -4,87 +4,32 @@ interface OnlineGameState {
     score: { player1: number; player2: number };
 }
 
-export class MultiplayerPongGame {
+export class OnlinePongGame {
     private canvas: HTMLCanvasElement;
     private ctx: CanvasRenderingContext2D;
-    private ball: MultiplayerBall;
-    private paddles: MultiplayerPaddle[];
-    private score: MultiplayerScore;
+    private socket: WebSocket;
+    private gameState: OnlineGameState;
     private keys: { [key: string]: boolean } = {};
     private animationId: number | null = null;
     private isRunning: boolean = false;
-    private lastTime: number = 0;
-    private readonly FRAME_TIME: number = 1000 / 60;
     private keyHandler: ((e: KeyboardEvent) => void) | null = null;
 
-    constructor(canvas: HTMLCanvasElement) {
+    constructor(canvas: HTMLCanvasElement, socket: WebSocket) {
         this.canvas = canvas;
         const context = canvas.getContext('2d');
         if (!context){
             throw new Error('Could not get canvas context');
         }
         this.ctx = context;
+        this.socket = socket;
 
-        // Initializing ball in the center of the game
-        this.ball = {
-            x: canvas.width / 2,
-            y: canvas.height / 2,
-            dx: 4,
-            dy: 4,
-            radius: 8
+        // initializing gameStates
+        this.gameState = {
+            ball: { x : canvas.width / 2, y: canvas.height / 2, dx:5, dy:5 },
+            paddles: { player1: canvas.height / 2 - 50, player2: canvas.height / 2 - 50 },
+            score: { player1:0, player2: 0 }
         };
 
-        // initialize the paddles
-        this.paddles = [
-            {
-                // Top paddle
-                x: canvas.width / 2 - 50,
-                y: 20,
-                width: 100,
-                height: 10,
-                speed: 8,
-                playerId: 1,
-                keys: { up: 'a', down: 'd' }
-            },
-            {
-                // Right paddle
-                x: canvas.width - 30,
-                y: canvas.height / 2 - 50,
-                width: 10,
-                height: 100,
-                speed: 8,
-                playerId: 2,
-                keys: { up: 'ArrowUp', down: 'ArrowDown' }
-            },
-            {
-                // Bottom paddle
-                x: canvas.width / 2 - 50,
-                y: canvas.height - 30,
-                width: 100,
-                height: 10,
-                speed: 8,
-                playerId: 3,
-                keys: { up: 'j', down: 'l' }
-            },
-            {
-                // Left paddle
-                x: 20,
-                y: canvas.height / 2 - 50,
-                width: 10,
-                height: 100,
-                speed: 8,
-                playerId: 4,
-                keys: { up: 'w', down: 's' }
-            },
-        ];
-        this.score = {
-            player1: 0,
-            player2: 0,
-            player3: 0,
-            player4: 0
-        };
-        this.setupControls();
-        this.resizeCanvas();
     }
 
     private setupControls(): void {
