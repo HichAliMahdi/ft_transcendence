@@ -26,15 +26,68 @@ export class MultiplayerPage {
         connectionCard.className = 'glass-effect p-8 rounded-2xl max-w-md mx-auto';
 
         if (this.status === 'disconnected') {
-            const connectButton = document.createElement('button');
-            connectButton.textContent = 'Find Online Match';
-            connectButton.className = 'btn-primary w-full text-lg py-4';
-            connectButton.onclick = () => this.connectToServer();
-            connectionCard.appendChild(connectButton);
+            // Quick Match Button
+            const quickMatchButton = document.createElement('button');
+            quickMatchButton.textContent = '🎮 Find Online Match';
+            quickMatchButton.className = 'btn-primary w-full text-lg py-4 mb-4';
+            quickMatchButton.onclick = () => this.connectToServer();
 
+            // Divider
+            const divider = document.createElement('div');
+            divider.className = 'flex items-center my-6';
+            const dividerLine1 = document.createElement('div');
+            dividerLine1.className = 'flex-1 h-px bg-gray-600';
+            const dividerText = document.createElement('span');
+            dividerText.className = 'px-4 text-gray-400 text-sm';
+            dividerText.textContent = 'OR';
+            const dividerLine2 = document.createElement('div');
+            dividerLine2.className = 'flex-1 h-px bg-gray-600';
+            divider.appendChild(dividerLine1);
+            divider.appendChild(dividerText);
+            divider.appendChild(dividerLine2);
+
+            // Create Room Button
             const createRoomButton = document.createElement('button');
-            createRoomButton.textContent = 'Create room';
-            createRoomButton.className = 'btn-primary w-full text-lg py-4';
+            createRoomButton.textContent = '🏠 Create Private Room';
+            createRoomButton.className = 'btn-primary w-full text-lg py-4 mb-3';
+            createRoomButton.onclick = () => this.createPrivateRoom();
+
+            // Join Room Section
+            const joinRoomContainer = document.createElement('div');
+            joinRoomContainer.className = 'mt-4';
+
+            const joinRoomTitle = document.createElement('p');
+            joinRoomTitle.className = 'text-gray-300 text-sm mb-2 text-center';
+            joinRoomTitle.textContent = 'Have a room code?';
+
+            const joinRoomInputContainer = document.createElement('div');
+            joinRoomInputContainer.className = 'flex gap-2';
+
+            const roomCodeInput = document.createElement('input');
+            roomCodeInput.type = 'text';
+            roomCodeInput.placeholder = 'Enter room code';
+            roomCodeInput.className = 'flex-1 px-4 py-2 rounded-lg bg-game-dark text-white border-2 border-gray-600 focus:border-accent-pink focus:outline-none';
+            roomCodeInput.maxLength = 9;
+
+            const joinButton = document.createElement('button');
+            joinButton.textContent = 'Join';
+            joinButton.className = 'bg-accent-purple hover:bg-purple-600 text-white font-bold px-6 py-2 rounded-lg transition-colors duration-300';
+            joinButton.onclick = () => {
+                const code = roomCodeInput.value.trim();
+                if (code) {
+                    this.joinPrivateRoom(code);
+                }
+            };
+
+            joinRoomInputContainer.appendChild(roomCodeInput);
+            joinRoomInputContainer.appendChild(joinButton);
+            joinRoomContainer.appendChild(joinRoomTitle);
+            joinRoomContainer.appendChild(joinRoomInputContainer);
+
+            connectionCard.appendChild(quickMatchButton);
+            connectionCard.appendChild(divider);
+            connectionCard.appendChild(createRoomButton);
+            connectionCard.appendChild(joinRoomContainer);
 
         } else if (this.status === 'connecting') {
             const statusText = document.createElement('p');
@@ -46,23 +99,61 @@ export class MultiplayerPage {
 
             connectionCard.appendChild(statusText);
             connectionCard.appendChild(spinner);
+            
         } else if (this.status === 'waiting') {
             const statusText = document.createElement('p');
-            statusText.textContent = 'Looking for opponent...';
-            statusText.className = 'text-white text-center text-lg';
-
-            const spinner = document.createElement('div');
-            spinner.className = 'loader mx-auto my-4';
+            statusText.className = 'text-white text-center text-lg mb-4';
+            
+            if (this.isHost) {
+                statusText.textContent = 'Waiting for opponent to join...';
+                
+                // Show room code
+                const roomCodeDisplay = document.createElement('div');
+                roomCodeDisplay.className = 'bg-game-dark p-6 rounded-xl my-6';
+                
+                const codeLabel = document.createElement('p');
+                codeLabel.className = 'text-gray-400 text-sm mb-2 text-center';
+                codeLabel.textContent = 'Share this code with your friend:';
+                
+                const codeValue = document.createElement('p');
+                codeValue.className = 'text-3xl font-bold text-accent-pink text-center tracking-wider';
+                codeValue.textContent = this.roomId || '';
+                
+                const copyButton = document.createElement('button');
+                copyButton.textContent = '📋 Copy Code';
+                copyButton.className = 'bg-accent-purple hover:bg-purple-600 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-300 mt-4 mx-auto block';
+                copyButton.onclick = () => {
+                    navigator.clipboard.writeText(this.roomId || '');
+                    copyButton.textContent = '✓ Copied!';
+                    setTimeout(() => {
+                        copyButton.textContent = '📋 Copy Code';
+                    }, 2000);
+                };
+                
+                roomCodeDisplay.appendChild(codeLabel);
+                roomCodeDisplay.appendChild(codeValue);
+                roomCodeDisplay.appendChild(copyButton);
+                
+                connectionCard.appendChild(statusText);
+                connectionCard.appendChild(roomCodeDisplay);
+            } else {
+                statusText.textContent = 'Looking for opponent...';
+                
+                const spinner = document.createElement('div');
+                spinner.className = 'loader mx-auto my-4';
+                
+                connectionCard.appendChild(statusText);
+                connectionCard.appendChild(spinner);
+            }
 
             const cancelButton = document.createElement('button');
             cancelButton.textContent = 'Cancel';
             cancelButton.className = 'bg-game-red hover:bg-red-600 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-300 mt-4';
-
             cancelButton.onclick = () => this.disconnect();
-            connectionCard.appendChild(statusText);
-            connectionCard.appendChild(spinner);
+            
             connectionCard.appendChild(cancelButton);
         }
+
         const instructions = document.createElement('div');
         instructions.className = 'glass-effect p-6 rounded-2xl mt-8 max-w-2xl mx-auto';
 
@@ -74,11 +165,11 @@ export class MultiplayerPage {
         instructionsList.className = 'text-gray-300 space-y-2';
 
         const points = [
-            'Click "Find Online Match" to search for a random opponent',
-            'You will be automatically paired with another player',
+            'Quick Match: Get paired with a random opponent automatically',
+            'Private Room: Create a room and share the code with a friend',
+            'Join Room: Enter a room code to join a friend\'s game',
             'Control your paddle using W (up) and S (down) keys',
-            'First to 5 points wins the match',
-            'Game runs in real-time with your opponent'
+            'First to 5 points wins the match'
         ];
 
         points.forEach(point => {
