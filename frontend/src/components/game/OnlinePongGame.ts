@@ -1,3 +1,5 @@
+// To update after properly creating the online mode in the backend
+
 interface OnlineGameState {
     ball: { x: number; y: number; dx: number; dy: number };
     paddles: { player1: number; player2: number };
