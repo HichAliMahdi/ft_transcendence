@@ -1,10 +1,9 @@
-import { MultiplayerPongGame } from '../game/OnlinePongGame';
+import { Onli, OnlinePongGame } from '../game/OnlinePongGame';
 
 export class MultiplayerPage {
-    private game: MultiplayerPongGame | null = null;
+    private game: OnlinePongGame | null = null;
     private container: HTMLElement | null = null;
     private socket: WebSocket | null = null;
-    private playerId: string | null = null;
     private roomId: string | null = null;
     private status: 'disconnected' | 'connecting' | 'waiting' | 'playing' = 'disconnected';
 
