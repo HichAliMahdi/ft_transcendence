@@ -31,6 +31,11 @@ export class MultiplayerPage {
             connectButton.className = 'btn-primary w-full text-lg py-4';
             connectButton.onclick = () => this.connectToServer();
             connectionCard.appendChild(connectButton);
+
+            const createRoomButton = document.createElement('button');
+            createRoomButton.textContent = 'Create room';
+            createRoomButton.className = 'btn-primary w-full text-lg py-4';
+
         } else if (this.status === 'connecting') {
             const statusText = document.createElement('p');
             statusText.textContent = 'Connecting to server...';
@@ -69,7 +74,7 @@ export class MultiplayerPage {
         instructionsList.className = 'text-gray-300 space-y-2';
 
         const points = [
-            'Click "Find Online Match" to search for an opponent',
+            'Click "Find Online Match" to search for a random opponent',
             'You will be automatically paired with another player',
             'Control your paddle using W (up) and S (down) keys',
             'First to 5 points wins the match',
