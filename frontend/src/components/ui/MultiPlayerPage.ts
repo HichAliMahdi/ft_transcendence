@@ -347,3 +347,5 @@ export class MultiplayerPage {
         this.disconnect();
     }
 }
+
+// What is needed to be done: Creating proper websocket for connection online
