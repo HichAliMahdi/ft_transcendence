@@ -152,97 +152,67 @@ export class OnlinePongGame {
     }
 
     private draw(): void {
-        this.ctx.fillStyle = '#0f172a';
+
+        this.ctx.fillStyle = '#000';
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
-        this.ctx.strokeStyle = '#334155';
+        this.ctx.strokeStyle = '#444';
         this.ctx.lineWidth = 2;
-        this.ctx.setLineDash([5, 5]);
-
+        this.ctx.setLineDash([10, 10]);
         this.ctx.beginPath();
         this.ctx.moveTo(this.canvas.width / 2, 0);
         this.ctx.lineTo(this.canvas.width / 2, this.canvas.height);
-        this.ctx.moveTo(0, this.canvas.height / 2);
-        this.ctx.lineTo(this.canvas.width, this.canvas.height / 2);
         this.ctx.stroke();
         this.ctx.setLineDash([]);
 
-        const paddleColors = ['#e94560', '#7873f5', '#ff6ec4', '#0f3460'];
-        this.paddles.forEach((paddle, index) => {
-            this.ctx.fillStyle = paddleColors[index];
-            this.ctx.fillRect(paddle.x, paddle.y, paddle.width, paddle.height);
-            
-            this.ctx.fillStyle = '#fff';
-            this.ctx.font = '12px Arial';
-            this.ctx.textAlign = 'center';
-            this.ctx.textBaseline = 'middle';
-            
-            if (paddle.playerId === 1 || paddle.playerId === 3) {
-                this.ctx.fillText(
-                    `P${paddle.playerId}`,
-                    paddle.x + paddle.width / 2,
-                    paddle.y + paddle.height / 2
-                );
-            } else {
-                this.ctx.save();
-                this.ctx.translate(paddle.x + paddle.width / 2, paddle.y + paddle.height / 2);
-                this.ctx.rotate(Math.PI / 2);
-                this.ctx.fillText(`P${paddle.playerId}`, 0, 0);
-                this.ctx.restore();
-            }
-        });
-        this.ctx.fillStyle = '#f8fafc';
+        this.ctx.fillStyle = '#0f3460';
+        this.ctx.fillRect(20, this.gameState.paddles.player1, 10, 100);
+        this.ctx.fillRect(this.canvas.width - 30, this.gameState.paddles.player2, 10, 100);
+
+        this.ctx.fillStyle = '#e94560';
         this.ctx.beginPath();
-        this.ctx.arc(this.ball.x, this.ball.y, this.ball.radius, 0, Math.PI * 2);
+        this.ctx.arc(this.gameState.ball.x, this.gameState.ball.y, 8, 0, Math.PI * 2);
         this.ctx.fill();
 
-        this.ctx.fillStyle = '#e2e8f0';
-        this.ctx.font = '24px Arial';
+        this.ctx.fillStyle = '#eee';
+        this.ctx.font = '32px Arial';
         this.ctx.textAlign = 'center';
-        
+        this.ctx.fillText(this.gameState.score.player1.toString(), this.canvas.width / 4, 50);
+        this.ctx.fillText(this.gameState.score.player2.toString(), (3 * this.canvas.width) / 4, 50);
 
-        this.ctx.fillText(this.score.player1.toString(), this.canvas.width / 2, 60);
+        this.ctx.font = '14px Arial';
+        this.ctx.fillStyle = '#888';
+        this.ctx.textAlign = 'left';
+        this.ctx.fillText('W/S to move', 20, this.canvas.height - 20);
 
-        this.ctx.fillText(this.score.player2.toString(), this.canvas.width - 60, this.canvas.height / 2);
-
-        this.ctx.fillText(this.score.player3.toString(), this.canvas.width / 2, this.canvas.height - 40);
-
-        this.ctx.fillText(this.score.player4.toString(), 60, this.canvas.height / 2);
-
-
-        this.ctx.font = '12px Arial';
-        this.ctx.fillStyle = '#64748b';
-        
-
-        this.ctx.textAlign = 'center';
-        this.ctx.fillText('P1: A/D', this.canvas.width / 2, 30);
-
-        this.ctx.save();
-        this.ctx.translate(this.canvas.width - 20, this.canvas.height / 2);
-        this.ctx.rotate(Math.PI / 2);
-        this.ctx.fillText('P2: ↑/↓', 0, 0);
-        this.ctx.restore();
- 
-        this.ctx.fillText('P3: J/L', this.canvas.width / 2, this.canvas.height - 15);
-
-        this.ctx.save();
-        this.ctx.translate(20, this.canvas.height / 2);
-        this.ctx.rotate(-Math.PI / 2);
-        this.ctx.fillText('P4: W/S', 0, 0);
-        this.ctx.restore();
+        // Draw game over if someone won
+        if (this.gameState.score.player1 >= 5 || this.gameState.score.player2 >= 5) {
+            this.drawGameOver();
+        }
     }
 
-    private gameLoop = (timestamp: number): void => {
-        if (!this.isRunning) return;
-
-        const deltaTime = timestamp - this.lastTime;
+    private drawGameOver(): void {
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
         
-        if (deltaTime >= this.FRAME_TIME) {
-            this.update();
-            this.draw();
-            this.lastTime = timestamp - (deltaTime % this.FRAME_TIME);
-        }
+        this.ctx.fillStyle = '#e94560';
+        this.ctx.font = '48px Arial';
+        this.ctx.textAlign = 'center';
+        this.ctx.fillText('GAME OVER', this.canvas.width / 2, this.canvas.height / 2 - 40);
+        
+        const winner = this.gameState.score.player1 >= 5 ? 'Player 1' : 'Player 2';
+        this.ctx.fillStyle = '#eee';
+        this.ctx.font = '32px Arial';
+        this.ctx.fillText(`${winner} Wins!`, this.canvas.width / 2, this.canvas.height / 2 + 20);
+        
+        this.ctx.font = '18px Arial';
+        this.ctx.fillStyle = '#888';
+        this.ctx.fillText('Refresh page to play again', this.canvas.width / 2, this.canvas.height / 2 + 60);
+    }
 
+    private gameLoop = (): void => {
+        if (!this.isRunning) return;
+        this.draw();
         this.animationId = requestAnimationFrame(this.gameLoop);
     };
 
@@ -250,7 +220,6 @@ export class OnlinePongGame {
         if (this.isRunning) return;
         
         this.isRunning = true;
-        this.lastTime = performance.now();
         this.animationId = requestAnimationFrame(this.gameLoop);
     }
 
@@ -262,48 +231,11 @@ export class OnlinePongGame {
         }
     }
 
-    private endGame(): void {
-        this.stop();
-        const winner = this.getWinner();
-        
-        this.ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
-        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-        
-        this.ctx.fillStyle = '#e94560';
-        this.ctx.font = '48px Arial';
-        this.ctx.textAlign = 'center';
-        this.ctx.fillText('GAME OVER', this.canvas.width / 2, this.canvas.height / 2 - 60);
-        
-        this.ctx.fillStyle = '#f8fafc';
-        this.ctx.font = '32px Arial';
-        this.ctx.fillText(`Player ${winner} Wins!`, this.canvas.width / 2, this.canvas.height / 2);
-        
-        this.ctx.font = '18px Arial';
-        this.ctx.fillStyle = '#94a3b8';
-        this.ctx.fillText('Press SPACE to play again', this.canvas.width / 2, this.canvas.height / 2 + 60);
-    }
-
-    private removeEventListeners(): void {
-        if (this.keyHandler) {
-            window.removeEventListener('keydown', this.keyHandler);
-            window.removeEventListener('keyup', this.keyHandler);
-            this.keyHandler = null;
-        }
-    }
-    
     public destroy(): void {
         this.stop();
         this.removeEventListeners();
-        window.removeEventListener('resize', () => this.resizeCanvas());
-    }
-
-    public resetGame(): void {
-        this.score = { player1: 0, player2: 0, player3: 0, player4: 0 };
-        this.resetBall();
-        this.resetPaddlePositions();
-        this.keys = {};
-        this.isRunning = true;
+        if (this.socket) {
+            this.socket.close();
+        }
     }
 }
-
-//TODO Change logic
