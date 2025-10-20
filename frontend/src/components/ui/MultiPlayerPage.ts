@@ -6,6 +6,7 @@ export class MultiplayerPage {
     private socket: WebSocket | null = null;
     private roomId: string | null = null;
     private status: 'disconnected' | 'connecting' | 'waiting' | 'playing' = 'disconnected';
+    private isHost: boolean = false;
 
     public render(): HTMLElement {
         this.container = document.createElement('div');
@@ -260,6 +261,58 @@ export class MultiplayerPage {
         }, 1000);
     }
 
+    private createPrivateRoom(): void {
+        this.isHost = true;
+        this.status = 'connecting';
+        this.renderConnectionScreen();
+
+        setTimeout(() => {
+            this.socket = this.createMockWebSocket();
+            // Generate a shorter, more user-friendly room code
+            this.roomId = this.generateRoomCode();
+            this.status = 'waiting';
+            this.renderConnectionScreen();
+
+            // Simulate someone joining after 5-10 seconds
+            setTimeout(() => {
+                this.status = 'playing';
+                this.renderGameScreen();
+            }, 5000 + Math.random() * 5000);
+        }, 1000);
+    }
+
+    private generateRoomCode(): string {
+        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Exclude similar looking chars
+        let code = '';
+        for (let i = 0; i < 6; i++) {
+            code += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        return code;
+    }
+
+    private joinPrivateRoom(roomCode: string): void {
+        this.isHost = false;
+        this.status = 'connecting';
+        this.renderConnectionScreen();
+
+        setTimeout(() => {
+            // Simulate checking if room exists
+            const roomExists = Math.random() > 0.3; // 70% success rate for demo
+            
+            if (roomExists) {
+                this.socket = this.createMockWebSocket();
+                this.roomId = roomCode;
+                this.status = 'playing';
+                this.renderGameScreen();
+            } else {
+                // Room not found
+                alert('Room not found! Please check the code and try again.');
+                this.status = 'disconnected';
+                this.renderConnectionScreen();
+            }
+        }, 1000);
+    }
+
     // This is a mock WebSocket for demonstration
     // In a real implementation, ze zill use actual WebSocket connection
     private createMockWebSocket(): WebSocket {
@@ -269,7 +322,8 @@ export class MultiplayerPage {
             },
             close: () => {
                 console.log('Connection closed');
-            }
+            },
+            onmessage: null
         } as any;
 
         return mockSocket;
@@ -285,6 +339,7 @@ export class MultiplayerPage {
         }
         this.status = 'disconnected';
         this.roomId = null;
+        this.isHost = false;
         this.renderConnectionScreen();
     }
 
