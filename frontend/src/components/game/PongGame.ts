@@ -30,8 +30,12 @@ interface GameConfig {
 export class PongGame {
     private canvas: HTMLCanvasElement;
     private ctx: CanvasRenderingContext2D;
+
+    // added fields for responsive sizing
     private cssWidth: number;
     private cssHeight: number;
+    private aspectRatio = 4 / 3;
+    private resizeObserver: ResizeObserver | null = null;
 
     private ball: Ball;
     private paddle1: Paddle;
@@ -63,10 +67,20 @@ export class PongGame {
         this.gameMode = config.mode;
         this.aiDifficulty = config.aiDifficulty ?? 'medium';
 
-        // store CSS size and scale for DPR
-        this.cssWidth = canvas.width;
-        this.cssHeight = canvas.height;
-        this.scaleCanvasForDPR();
+        // initialize css sizes and create DPR-backed buffer
+        this.cssWidth = 800;
+        this.cssHeight = Math.round(this.cssWidth / this.aspectRatio);
+        this.updateCanvasSize();
+
+        // Observe size changes of the canvas container and update backing buffer
+        try {
+            this.resizeObserver = new ResizeObserver(() => this.updateCanvasSize());
+            if (this.canvas.parentElement) this.resizeObserver.observe(this.canvas.parentElement);
+            else this.resizeObserver.observe(this.canvas);
+        } catch (e) {
+            // fallback: window resize
+            window.addEventListener('resize', this.updateCanvasSize.bind(this));
+        }
 
         // init state based on CSS sizes
         this.ball = {
@@ -113,15 +127,24 @@ export class PongGame {
         window.addEventListener('resize', this.resizeHandler);
     }
 
-    private scaleCanvasForDPR(): void {
+    // new: compute CSS size and set high-DPR canvas backing store
+    private updateCanvasSize(): void {
+        const rect = this.canvas.getBoundingClientRect();
+        const computedWidth = Math.max(
+            1,
+            Math.round(rect.width || parseFloat(getComputedStyle(this.canvas).width) || this.cssWidth)
+        );
+        const computedHeight = Math.max(1, Math.round(rect.height || Math.round(computedWidth / this.aspectRatio)));
+
+        this.cssWidth = computedWidth;
+        this.cssHeight = computedHeight;
+
         const dpr = Math.max(1, window.devicePixelRatio || 1);
-        const cssW = this.cssWidth;
-        const cssH = this.cssHeight;
-        this.canvas.style.width = `${cssW}px`;
-        this.canvas.style.height = `${cssH}px`;
-        this.canvas.width = Math.floor(cssW * dpr);
-        this.canvas.height = Math.floor(cssH * dpr);
-        this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0); // draw in CSS pixels
+        this.canvas.style.width = `${this.cssWidth}px`;
+        this.canvas.style.height = `${this.cssHeight}px`;
+        this.canvas.width = Math.floor(this.cssWidth * dpr);
+        this.canvas.height = Math.floor(this.cssHeight * dpr);
+        this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     }
 
     private setupControls(): void {
@@ -396,9 +419,16 @@ export class PongGame {
             document.removeEventListener('visibilitychange', this.visibilityHandler);
             this.visibilityHandler = null;
         }
-        if (this.resizeHandler) {
-            window.removeEventListener('resize', this.resizeHandler);
-            this.resizeHandler = null;
+        // cleanup ResizeObserver or fallback listener
+        if (this.resizeObserver) {
+            try {
+                if (this.canvas.parentElement) this.resizeObserver.unobserve(this.canvas.parentElement);
+                else this.resizeObserver.unobserve(this.canvas);
+            } catch (e) {}
+            this.resizeObserver.disconnect();
+            this.resizeObserver = null;
+        } else {
+            window.removeEventListener('resize', this.updateCanvasSize as any);
         }
     }
 

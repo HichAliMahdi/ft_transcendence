@@ -165,125 +165,132 @@ export class TournamentPage {
     }
 
     private renderMatch(): void {
-        if (!this.container) return;
+		if (!this.container) return;
 
-        const match = this.tournament.getCurrentMatch();
-        if (!match) return;
+		const match = this.tournament.getCurrentMatch();
+		if (!match) return;
 
-        // Clean up any existing game first
-        this.cleanupCurrentGame();
+		// Clean up any existing game first
+		this.cleanupCurrentGame();
 
-        const title = document.createElement('h1');
-        title.textContent = `Round ${match.round} - Match ${match.matchNumber}`;
-        title.className = 'text-3xl font-bold text-white mb-6 gradient-text';
-        
-        const matchInfo = document.createElement('div');
-        matchInfo.className = 'glass-effect p-8 rounded-2xl my-8 text-center';
+		const title = document.createElement('h1');
+		title.textContent = `Round ${match.round} - Match ${match.matchNumber}`;
+		title.className = 'text-3xl font-bold text-white mb-6 gradient-text';
+		
+		const matchInfo = document.createElement('div');
+		matchInfo.className = 'glass-effect p-8 rounded-2xl my-8 text-center';
 
-        const vs = document.createElement('h2');
-        vs.className = 'text-4xl my-4';
+		const vs = document.createElement('h2');
+		vs.className = 'text-4xl my-4';
 
-        const player1Span = document.createElement('span');
-        player1Span.className = 'text-blue-400 font-bold';
-        player1Span.textContent = match.player1?.alias || 'BYE';
+		const player1Span = document.createElement('span');
+		player1Span.className = 'text-blue-400 font-bold';
+		player1Span.textContent = match.player1?.alias || 'BYE';
 
-        const vsText = document.createElement('span');
-        vsText.className = 'text-gray-500 mx-6';
-        vsText.textContent = 'VS';
+		const vsText = document.createElement('span');
+		vsText.className = 'text-gray-500 mx-6';
+		vsText.textContent = 'VS';
 
-        const player2Span = document.createElement('span');
-        player2Span.className = 'text-game-red font-bold';
-        player2Span.textContent = match.player2?.alias || 'BYE';
-    
-        vs.appendChild(player1Span);
-        vs.appendChild(vsText);
-        vs.appendChild(player2Span);
-        matchInfo.appendChild(vs);
-        
-        const instructions = document.createElement('div');
-        instructions.className = 'mt-6';
+		const player2Span = document.createElement('span');
+		player2Span.className = 'text-game-red font-bold';
+		player2Span.textContent = match.player2?.alias || 'BYE';
+	
+		vs.appendChild(player1Span);
+		vs.appendChild(vsText);
+		vs.appendChild(player2Span);
+		matchInfo.appendChild(vs);
+		
+		const instructions = document.createElement('div');
+		instructions.className = 'mt-6';
 
-        const controlsTitle = document.createElement('p');
-        controlsTitle.className = 'font-semibold text-white mb-3';
-        controlsTitle.textContent = 'Controls:';
+		const controlsTitle = document.createElement('p');
+		controlsTitle.className = 'font-semibold text-white mb-3';
+		controlsTitle.textContent = 'Controls:';
 
-        const player1Controls = document.createElement('p');
-        player1Controls.className = 'text-gray-300';
-        player1Controls.textContent = `${match.player1?.alias}: W (up) / S (down)`;
+		const player1Controls = document.createElement('p');
+		player1Controls.className = 'text-gray-300';
+		player1Controls.textContent = `${match.player1?.alias}: W (up) / S (down)`;
 
-        const player2Controls = document.createElement('p');
-        player2Controls.className = 'text-gray-300';
-        player2Controls.textContent = `${match.player2?.alias}: Arrow Up / Arrow Down`;
+		const player2Controls = document.createElement('p');
+		player2Controls.className = 'text-gray-300';
+		player2Controls.textContent = `${match.player2?.alias}: Arrow Up / Arrow Down`;
 
-        const winCondition = document.createElement('p');
-        winCondition.className = 'mt-4 text-game-red font-bold text-lg';
-        winCondition.textContent = 'First to 5 points wins!';
+		const winCondition = document.createElement('p');
+		winCondition.className = 'mt-4 text-game-red font-bold text-lg';
+		winCondition.textContent = 'First to 5 points wins!';
 
-        instructions.appendChild(controlsTitle);
-        instructions.appendChild(player1Controls);
-        instructions.appendChild(player2Controls);
-        instructions.appendChild(winCondition);
-        matchInfo.appendChild(instructions);
-        
-        const canvas = document.createElement('canvas');
-        canvas.id = 'gameCanvas';
-        canvas.width = 800;
-        canvas.height = 600;
-        canvas.className = 'border-2 border-game-dark bg-black mx-auto my-8 rounded-xl block';
-        
-        const buttonContainer = document.createElement('div');
-        buttonContainer.className = 'text-center mt-6';
-        
-        const startButton = document.createElement('button');
-        startButton.textContent = 'Start Match';
-        startButton.className = 'bg-game-red hover:bg-red-600 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-200';
-        startButton.onclick = () => {
-            // Create the game instance only when button is clicked
-            this.currentGame = new PongGame(canvas);
-            this.setupGameEndHandler(match.id, match.player1!.id, match.player2!.id);
-            this.currentGame.start();
-            startButton.disabled = true;
-        };
-        
-        buttonContainer.appendChild(startButton);
-        
-        const bracket = this.renderBracket();
-        
-        this.container.appendChild(title);
-        this.container.appendChild(matchInfo);
-        this.container.appendChild(canvas);
-        this.container.appendChild(buttonContainer);
-        this.container.appendChild(bracket);
-        
-        // Don't auto-start the game - removed the setTimeout
-    }
+		instructions.appendChild(controlsTitle);
+		instructions.appendChild(player1Controls);
+		instructions.appendChild(player2Controls);
+		instructions.appendChild(winCondition);
+		matchInfo.appendChild(instructions);
+		
+		const canvas = document.createElement('canvas');
+		canvas.id = 'gameCanvas';
+		canvas.className = 'border-2 border-game-dark bg-black mx-auto my-8 rounded-xl block';
+		canvas.style.width = '100%';
+		canvas.style.maxWidth = '800px';
+		canvas.style.height = 'auto';
 
-    private setupGameEndHandler(matchId: string, player1Id: string, player2Id: string): void {
-        // Clear any existing interval
-        if (this.gameCheckInterval !== null) {
-            clearInterval(this.gameCheckInterval);
-        }
+		const buttonContainer = document.createElement('div');
+		buttonContainer.className = 'text-center mt-6';
+		
+		const startButton = document.createElement('button');
+		startButton.textContent = 'Start Match';
+		startButton.className = 'bg-game-red hover:bg-red-600 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-200';
+		startButton.onclick = () => {
+			// Create the game instance only when button is clicked
+			this.currentGame = new PongGame(canvas);
+			this.setupGameEndHandler(match.id, match.player1!.id, match.player2!.id);
+			this.currentGame.start();
+			startButton.disabled = true;
+		};
+		
+		buttonContainer.appendChild(startButton);
+		
+		const bracket = this.renderBracket();
+		
+		this.container.appendChild(title);
+		this.container.appendChild(matchInfo);
+		this.container.appendChild(canvas);
+		this.container.appendChild(buttonContainer);
+		this.container.appendChild(bracket);
+	}
 
-        // Use setInterval instead of recursive setTimeout for better reliability
-        this.gameCheckInterval = window.setInterval(() => {
-            if (!this.currentGame) {
-                if (this.gameCheckInterval !== null) {
-                    clearInterval(this.gameCheckInterval);
-                    this.gameCheckInterval = null;
-                }
-                return;
-            }
-            
-            const score = (this.currentGame as any).score;
-            if (score.player1 >= 5) {
-                this.handleMatchEnd(matchId, player1Id);
-            } else if (score.player2 >= 5) {
-                this.handleMatchEnd(matchId, player2Id);
-            }
-        }, 100);
-    }
+	private setupGameEndHandler(matchId: string, player1Id: string, player2Id: string): void {
+		// Clear any existing interval
+		if (this.gameCheckInterval !== null) {
+			clearInterval(this.gameCheckInterval);
+		}
 
-    private handleMatchEnd(matchId: string, winnerId: string): void {
+		this.gameCheckInterval = window.setInterval(() => {
+			if (!this.currentGame) {
+				if (this.gameCheckInterval !== null) {
+					clearInterval(this.gameCheckInterval);
+					this.gameCheckInterval = null;
+				}
+				return;
+			}
+
+			// Use public getter to obtain score (PongGame.getScore)
+			try {
+				const score = (this.currentGame as any).getScore ? (this.currentGame as any).getScore() : (this.currentGame as any).score;
+				if (score.player1 >= 5) {
+					this.handleMatchEnd(matchId, player1Id);
+				} else if (score.player2 >= 5) {
+					this.handleMatchEnd(matchId, player2Id);
+				}
+			} catch (err) {
+				// if something unexpected happens, stop checking
+				if (this.gameCheckInterval !== null) {
+					clearInterval(this.gameCheckInterval);
+					this.gameCheckInterval = null;
+				}
+			}
+		}, 100);
+	}
+
+	private handleMatchEnd(matchId: string, winnerId: string): void {
         // Clear the game check interval
         if (this.gameCheckInterval !== null) {
             clearInterval(this.gameCheckInterval);
