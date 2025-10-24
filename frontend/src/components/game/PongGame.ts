@@ -32,42 +32,43 @@ export class PongGame {
     private ctx: CanvasRenderingContext2D;
     private cssWidth: number;
     private cssHeight: number;
+
     private ball: Ball;
     private paddle1: Paddle;
     private paddle2: Paddle;
     private score: Score;
+
     private keys: { [key: string]: boolean } = {};
     private animationId: number | null = null;
-    private isRunning: boolean = false;
-    private lastTime: number = 0;
-    private readonly FRAME_TIME: number = 1000 / 60;
+    private isRunning = false;
+    private lastTime = 0;
+    private readonly FRAME_TIME = 1000 / 60;
+
     private keyHandler: ((e: KeyboardEvent) => void) | null = null;
     private visibilityHandler: (() => void) | null = null;
     private resizeHandler: (() => void) | null = null;
-    
-    // AI properties
+
+    // AI
     private gameMode: GameMode;
     private aiDifficulty: AIDifficulty;
-    private aiTarget: number = 0;
-    private aiLastUpdate: number = 0;
+    private aiTarget = 0;
+    private aiLastUpdate = 0;
 
     constructor(canvas: HTMLCanvasElement, config: GameConfig = { mode: 'pvp' }) {
         this.canvas = canvas;
-        const context = canvas.getContext('2d');
-        if (!context) {
-            throw new Error('Could not get canvas context');
-        }
-        this.ctx = context;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) throw new Error('Could not get canvas context');
+        this.ctx = ctx;
 
         this.gameMode = config.mode;
-        this.aiDifficulty = config.aiDifficulty || 'medium';
+        this.aiDifficulty = config.aiDifficulty ?? 'medium';
 
-        // store CSS size then scale canvas for DPR; drawing uses CSS pixels coordinates
+        // store CSS size and scale for DPR
         this.cssWidth = canvas.width;
         this.cssHeight = canvas.height;
         this.scaleCanvasForDPR();
 
-        // Initialize properties (use css sizes)
+        // init state based on CSS sizes
         this.ball = {
             x: this.cssWidth / 2,
             y: this.cssHeight / 2,
@@ -92,39 +93,32 @@ export class PongGame {
             speed: 8
         };
 
-        this.score = {
-            player1: 0,
-            player2: 0
-        };
+        this.score = { player1: 0, player2: 0 };
 
         this.setupControls();
-        // Pause/resume on visibility change
+
         this.visibilityHandler = () => {
             if (document.hidden) {
                 this.stop();
             } else if (this.isRunning) {
-                // When returning, reset timing to avoid huge delta
                 this.lastTime = performance.now();
                 this.start();
             }
         };
         document.addEventListener('visibilitychange', this.visibilityHandler);
 
-        // handle resize (re-scale only when CSS size changes)
         this.resizeHandler = () => {
-            // no-op placeholder for responsive resizing if needed
+            // no-op for now; keep canvas size fixed unless explicit responsive behavior is desired
         };
         window.addEventListener('resize', this.resizeHandler);
     }
 
     private scaleCanvasForDPR(): void {
         const dpr = Math.max(1, window.devicePixelRatio || 1);
-        // CSS pixels
         const cssW = this.cssWidth;
         const cssH = this.cssHeight;
         this.canvas.style.width = `${cssW}px`;
         this.canvas.style.height = `${cssH}px`;
-        // backing buffer
         this.canvas.width = Math.floor(cssW * dpr);
         this.canvas.height = Math.floor(cssH * dpr);
         this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0); // draw in CSS pixels
@@ -137,7 +131,6 @@ export class PongGame {
             if (['w', 's', 'ArrowUp', 'ArrowDown', ' '].includes(e.key)) {
                 e.preventDefault();
             }
-            
             if (e.key === ' ') {
                 if (!this.isRunning && (this.score.player1 >= 5 || this.score.player2 >= 5)) {
                     this.resetGame();
@@ -145,8 +138,7 @@ export class PongGame {
                 }
                 return;
             }
-            
-            this.keys[e.key] = (e.type === 'keydown');
+            this.keys[e.key] = e.type === 'keydown';
         };
 
         window.addEventListener('keydown', this.keyHandler);
@@ -161,122 +153,81 @@ export class PongGame {
         }
     }
 
-    private getAISettings(): { speed: number, error: number, reactionDelay: number } {
+    private getAISettings(): { speed: number; error: number; reactionDelay: number } {
         switch (this.aiDifficulty) {
-            case 'easy':
-                return { 
-                    speed: 0.5,
-                    error: 80,
-                    reactionDelay: 200
-                };
-            case 'medium':
-                return { 
-                    speed: 0.75, 
-                    error: 40,
-                    reactionDelay: 100
-                };
-            case 'hard':
-                return { 
-                    speed: 0.95, 
-                    error: 15,
-                    reactionDelay: 30
-                };
-            default:
-                return { speed: 0.75, error: 40, reactionDelay: 100 };
+            case 'easy': return { speed: 0.5, error: 80, reactionDelay: 200 };
+            case 'medium': return { speed: 0.75, error: 40, reactionDelay: 100 };
+            case 'hard': return { speed: 0.95, error: 15, reactionDelay: 30 };
+            default: return { speed: 0.75, error: 40, reactionDelay: 100 };
         }
     }
 
     private predictBallY(): number {
         const distanceX = this.paddle2.x - this.ball.x;
-        const timeToReach = distanceX / Math.abs(this.ball.dx);
+        const timeToReach = Math.abs(this.ball.dx) < 0.0001 ? 0 : distanceX / Math.abs(this.ball.dx);
         let predictedY = this.ball.y + (this.ball.dy * timeToReach);
-        
-        // Account for wall bounces
-        const bounces = Math.floor(Math.abs(predictedY) / this.canvas.height);
-        predictedY = predictedY % this.canvas.height;
-        
-        if (predictedY < 0) {
-            predictedY = Math.abs(predictedY);
-        }
-        if (bounces % 2 === 1) {
-            predictedY = this.canvas.height - predictedY;
-        }
-        
+
+        // wrap/bounce prediction on CSS height
+        const h = this.cssHeight;
+        predictedY = ((predictedY % h) + h) % h;
+        const bounceCount = Math.floor(Math.abs((this.ball.y + this.ball.dy * timeToReach) / h));
+        if (bounceCount % 2 === 1) predictedY = h - predictedY;
         return predictedY;
     }
 
     private updateAIPaddle(): void {
-        const currentTime = performance.now();
-        const settings = this.getAISettings();
-        
-        // Update AI target with reaction delay
-        if (currentTime - this.aiLastUpdate > settings.reactionDelay) {
+        const now = performance.now();
+        const s = this.getAISettings();
+
+        if (now - this.aiLastUpdate > s.reactionDelay) {
             if (this.ball.dx > 0) {
-                // Ball moving toward AI
-                this.aiTarget = this.predictBallY();
-                // Add error based on difficulty
-                this.aiTarget += (Math.random() - 0.5) * settings.error * 2;
+                this.aiTarget = this.predictBallY() + (Math.random() - 0.5) * s.error * 2;
             } else {
-                // Ball moving away, return to center
                 this.aiTarget = this.cssHeight / 2;
             }
-            this.aiLastUpdate = currentTime;
+            this.aiLastUpdate = now;
         }
-        
-        // Move AI paddle toward target
+
         const paddleCenter = this.paddle2.y + this.paddle2.height / 2;
-        const distance = this.aiTarget - paddleCenter;
-        
-        if (Math.abs(distance) > 5) {
-            const moveSpeed = this.paddle2.speed * settings.speed;
-            if (distance > 0) {
-                this.paddle2.y = Math.min(
-                    this.cssHeight - this.paddle2.height,
-                    this.paddle2.y + moveSpeed
-                );
-            } else {
-                this.paddle2.y = Math.max(0, this.paddle2.y - moveSpeed);
-            }
+        const dist = this.aiTarget - paddleCenter;
+        if (Math.abs(dist) > 5) {
+            const move = this.paddle2.speed * s.speed;
+            this.paddle2.y = Math.max(0, Math.min(this.cssHeight - this.paddle2.height, this.paddle2.y + Math.sign(dist) * move));
         }
     }
 
-    private adjustBallAngle(paddle: Paddle): void {
-        const hitPos = (this.ball.y - (paddle.y + paddle.height / 2)) / (paddle.height / 2);
+    private checkPaddleCollision(p: Paddle): boolean {
+        const closestX = Math.max(p.x, Math.min(this.ball.x, p.x + p.width));
+        const closestY = Math.max(p.y, Math.min(this.ball.y, p.y + p.height));
+        const dx = this.ball.x - closestX;
+        const dy = this.ball.y - closestY;
+        return (dx * dx + dy * dy) <= (this.ball.radius * this.ball.radius);
+    }
+
+    private adjustBallAngle(p: Paddle): void {
+        const hitPos = (this.ball.y - (p.y + p.height / 2)) / (p.height / 2);
         const maxAngle = Math.PI / 4;
         const angle = hitPos * maxAngle;
         const speed = Math.sqrt(this.ball.dx * this.ball.dx + this.ball.dy * this.ball.dy);
-        const direction = this.ball.dx > 0 ? 1 : -1;
-        
-        this.ball.dx = direction * speed * Math.cos(angle);
+        const dir = this.ball.dx > 0 ? 1 : -1;
+
+        this.ball.dx = dir * speed * Math.cos(angle);
         this.ball.dy = speed * Math.sin(angle);
-        
+
         const newSpeed = Math.min(speed * 1.05, 15);
-        const currentSpeed = Math.sqrt(this.ball.dx * this.ball.dx + this.ball.dy * this.ball.dy);
-        const ratio = newSpeed / currentSpeed;
-        
+        const curSpeed = Math.sqrt(this.ball.dx * this.ball.dx + this.ball.dy * this.ball.dy);
+        const ratio = newSpeed / curSpeed;
         this.ball.dx *= ratio;
         this.ball.dy *= ratio;
-    }
-
-    private checkPaddleCollision(paddle: Paddle): boolean {
-        const closestX = Math.max(paddle.x, Math.min(this.ball.x, paddle.x + paddle.width));
-        const closestY = Math.max(paddle.y, Math.min(this.ball.y, paddle.y + paddle.height));
-        
-        const distanceX = this.ball.x - closestX;
-        const distanceY = this.ball.y - closestY;
-        
-        return (distanceX * distanceX + distanceY * distanceY) <= (this.ball.radius * this.ball.radius);
     }
 
     private resetBall(): void {
         this.ball.x = this.cssWidth / 2;
         this.ball.y = this.cssHeight / 2;
-        
         const angle = (Math.random() * Math.PI / 2) - Math.PI / 4;
         const speed = 5;
-        const direction = Math.random() > 0.5 ? 1 : -1;
-        
-        this.ball.dx = direction * speed * Math.cos(angle);
+        const dir = Math.random() > 0.5 ? 1 : -1;
+        this.ball.dx = dir * speed * Math.cos(angle);
         this.ball.dy = speed * Math.sin(angle);
     }
 
@@ -290,11 +241,11 @@ export class PongGame {
     }
 
     private draw(): void {
-        // Clear canvas (draw in CSS pixel coords)
+        // background
         this.ctx.fillStyle = '#000';
         this.ctx.fillRect(0, 0, this.cssWidth, this.cssHeight);
 
-        // Draw center line (subtle white)
+        // center dashed line
         this.ctx.strokeStyle = 'rgba(255,255,255,0.25)';
         this.ctx.lineWidth = 2;
         this.ctx.setLineDash([10, 10]);
@@ -304,25 +255,25 @@ export class PongGame {
         this.ctx.stroke();
         this.ctx.setLineDash([]);
 
-        // Draw paddles (white)
+        // paddles
         this.ctx.fillStyle = '#fff';
         this.ctx.fillRect(this.paddle1.x, this.paddle1.y, this.paddle1.width, this.paddle1.height);
         this.ctx.fillRect(this.paddle2.x, this.paddle2.y, this.paddle2.width, this.paddle2.height);
 
-        // Draw ball (white)
+        // ball
         this.ctx.fillStyle = '#fff';
         this.ctx.beginPath();
         this.ctx.arc(this.ball.x, this.ball.y, this.ball.radius, 0, Math.PI * 2);
         this.ctx.fill();
 
-        // Draw score (white)
+        // score
         this.ctx.fillStyle = '#fff';
         this.ctx.font = '32px Arial';
         this.ctx.textAlign = 'center';
-        this.ctx.fillText(this.score.player1.toString(), this.cssWidth / 4, 50);
-        this.ctx.fillText(this.score.player2.toString(), (3 * this.cssWidth) / 4, 50);
+        this.ctx.fillText(String(this.score.player1), this.cssWidth / 4, 50);
+        this.ctx.fillText(String(this.score.player2), (3 * this.cssWidth) / 4, 50);
 
-        // Draw controls hint (subtle white)
+        // hints
         this.ctx.font = '14px Arial';
         this.ctx.fillStyle = 'rgba(255,255,255,0.8)';
         this.ctx.textAlign = 'left';
@@ -335,13 +286,34 @@ export class PongGame {
         }
     }
 
+    private endGame(): void {
+        this.stop();
+        const winner = this.score.player1 >= 5 ? 'Player 1' : (this.gameMode === 'pvp' ? 'Player 2' : 'AI');
+
+        this.ctx.fillStyle = 'rgba(0,0,0,0.8)';
+        this.ctx.fillRect(0, 0, this.cssWidth, this.cssHeight);
+
+        this.ctx.fillStyle = '#fff';
+        this.ctx.font = '48px Arial';
+        this.ctx.textAlign = 'center';
+        this.ctx.fillText('GAME OVER', this.cssWidth / 2, this.cssHeight / 2 - 40);
+
+        this.ctx.fillStyle = '#fff';
+        this.ctx.font = '32px Arial';
+        this.ctx.fillText(`${winner} Wins!`, this.cssWidth / 2, this.cssHeight / 2 + 20);
+
+        this.ctx.font = '18px Arial';
+        this.ctx.fillStyle = 'rgba(255,255,255,0.8)';
+        this.ctx.fillText('Press SPACE to play again', this.cssWidth / 2, this.cssHeight / 2 + 60);
+    }
+
     private gameLoop = (timestamp: number): void => {
         if (!this.isRunning) return;
 
-        const deltaTime = Math.min(100, timestamp - this.lastTime || this.FRAME_TIME);
-        const factor = deltaTime / this.FRAME_TIME;
+        const delta = Math.min(100, (timestamp - this.lastTime) || this.FRAME_TIME);
+        const factor = delta / this.FRAME_TIME;
 
-        // Player movement scaled by delta-time
+        // player 1
         if (this.keys['w']) {
             this.paddle1.y = Math.max(0, this.paddle1.y - this.paddle1.speed * factor);
         }
@@ -349,7 +321,7 @@ export class PongGame {
             this.paddle1.y = Math.min(this.cssHeight - this.paddle1.height, this.paddle1.y + this.paddle1.speed * factor);
         }
 
-        // Move player 2 / AI
+        // player 2 / AI
         if (this.gameMode === 'pvp') {
             if (this.keys['ArrowUp']) {
                 this.paddle2.y = Math.max(0, this.paddle2.y - this.paddle2.speed * factor);
@@ -361,12 +333,11 @@ export class PongGame {
             this.updateAIPaddle();
         }
 
-        // Move ball scaled by delta-time
+        // ball movement
         this.ball.x += this.ball.dx * factor;
         this.ball.y += this.ball.dy * factor;
 
-        // Collisions & scoring (use css dims)
-        // Ball collision with top/bottom walls
+        // collisions
         if (this.ball.y - this.ball.radius <= 0) {
             this.ball.y = this.ball.radius;
             this.ball.dy *= -1;
@@ -375,7 +346,6 @@ export class PongGame {
             this.ball.dy *= -1;
         }
 
-        // Ball collision with paddles
         if (this.checkPaddleCollision(this.paddle1)) {
             this.ball.x = this.paddle1.x + this.paddle1.width + this.ball.radius;
             this.ball.dx = Math.abs(this.ball.dx);
@@ -386,7 +356,7 @@ export class PongGame {
             this.adjustBallAngle(this.paddle2);
         }
 
-        // Ball out of bounds (scoring)
+        // scoring
         if (this.ball.x - this.ball.radius <= 0) {
             this.score.player2++;
             this.resetBall();
@@ -395,20 +365,17 @@ export class PongGame {
             this.resetBall();
         }
 
-        // Check for game end
         if (this.score.player1 >= 5 || this.score.player2 >= 5) {
             this.endGame();
         } else {
             this.draw();
+            this.lastTime = timestamp;
+            this.animationId = requestAnimationFrame(this.gameLoop);
         }
-
-        this.lastTime = timestamp;
-        this.animationId = requestAnimationFrame(this.gameLoop);
     };
 
     public start(): void {
         if (this.isRunning) return;
-        
         this.isRunning = true;
         this.lastTime = performance.now();
         this.animationId = requestAnimationFrame(this.gameLoop);
@@ -416,33 +383,10 @@ export class PongGame {
 
     public stop(): void {
         this.isRunning = false;
-        if this.animationId !== null) {
+        if (this.animationId !== null) {
             cancelAnimationFrame(this.animationId);
             this.animationId = null;
         }
-    }
-
-    private endGame(): void {
-        this.stop();
-        const winner = this.score.player1 >= 5 
-            ? 'Player 1' 
-            : this.gameMode === 'pvp' ? 'Player 2' : 'AI';
-        
-        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
-        this.ctx.fillRect(0, 0, this.cssWidth, this.cssHeight);
-        
-        this.ctx.fillStyle = '#fff';
-        this.ctx.font = '48px Arial';
-        this.ctx.textAlign = 'center';
-        this.ctx.fillText('GAME OVER', this.cssWidth / 2, this.cssHeight / 2 - 40);
-        
-        this.ctx.fillStyle = '#fff';
-        this.ctx.font = '32px Arial';
-        this.ctx.fillText(`${winner} Wins!`, this.cssWidth / 2, this.cssHeight / 2 + 20);
-        
-        this.ctx.font = '18px Arial';
-        this.ctx.fillStyle = 'rgba(255,255,255,0.8)';
-        this.ctx.fillText('Press SPACE to play again', this.cssWidth / 2, this.cssHeight / 2 + 60);
     }
 
     public destroy(): void {
@@ -486,7 +430,7 @@ export class PongGame {
         this.score.player1 = 0;
         this.score.player2 = 0;
     }
-    
+
     public getScore(): Score {
         return { ...this.score };
     }
