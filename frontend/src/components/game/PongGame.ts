@@ -30,6 +30,7 @@ interface GameConfig {
 export class PongGame {
     private canvas: HTMLCanvasElement;
     private ctx: CanvasRenderingContext2D;
+    private isPaused: boolean = false;
 
     // added fields for responsive sizing
     private cssWidth: number;
@@ -327,11 +328,24 @@ export class PongGame {
 
         this.ctx.font = '18px Arial';
         this.ctx.fillStyle = 'rgba(255,255,255,0.8)';
-        this.ctx.fillText('Press SPACE to play again', this.cssWidth / 2, this.cssHeight / 2 + 60);
+    }
+
+    public togglePause(): boolean {
+        this.isPaused = !this.isPaused;
+        if (this.isPaused) {
+            this.stop();
+        } else {
+            this.start();
+        }
+        return this.isPaused;
+    }
+
+    public isPauseActive(): boolean {
+        return this.isPaused;
     }
 
     private gameLoop = (timestamp: number): void => {
-        if (!this.isRunning) return;
+        if (!this.isRunning || this.isPaused) return;
 
         const delta = Math.min(100, (timestamp - this.lastTime) || this.FRAME_TIME);
         const factor = delta / this.FRAME_TIME;
@@ -398,7 +412,7 @@ export class PongGame {
     };
 
     public start(): void {
-        if (this.isRunning) return;
+        if (this.isRunning || this.isPaused) return;
         this.isRunning = true;
         this.lastTime = performance.now();
         this.animationId = requestAnimationFrame(this.gameLoop);

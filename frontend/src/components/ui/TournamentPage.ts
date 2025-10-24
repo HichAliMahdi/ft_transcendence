@@ -233,20 +233,39 @@ export class TournamentPage {
 		canvas.style.height = 'auto';
 
 		const buttonContainer = document.createElement('div');
-		buttonContainer.className = 'text-center mt-6';
+		buttonContainer.className = 'text-center mt-6 flex justify-center gap-4';
 		
 		const startButton = document.createElement('button');
 		startButton.textContent = 'Start Match';
 		startButton.className = 'bg-game-red hover:bg-red-600 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-200';
+		
+		const pauseButton = document.createElement('button');
+		pauseButton.textContent = 'Pause';
+		pauseButton.className = 'bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-200 hidden';
+		
 		startButton.onclick = () => {
-			// Create the game instance only when button is clicked
 			this.currentGame = new PongGame(canvas);
 			this.setupGameEndHandler(match.id, match.player1!.id, match.player2!.id);
 			this.currentGame.start();
 			startButton.disabled = true;
+			startButton.classList.add('opacity-50', 'cursor-not-allowed');
+			pauseButton.classList.remove('hidden');
+		};
+		
+		pauseButton.onclick = () => {
+			if (this.currentGame) {
+				const isPaused = this.currentGame.togglePause();
+				pauseButton.textContent = isPaused ? 'Resume' : 'Pause';
+				pauseButton.className = `font-bold py-3 px-6 rounded-lg transition-colors duration-200 ${
+					isPaused 
+						? 'bg-green-600 hover:bg-green-700 text-white' 
+						: 'bg-blue-600 hover:bg-blue-700 text-white'
+				}`;
+			}
 		};
 		
 		buttonContainer.appendChild(startButton);
+		buttonContainer.appendChild(pauseButton);
 		
 		const bracket = this.renderBracket();
 		
@@ -312,6 +331,9 @@ export class TournamentPage {
 
     private cleanupCurrentGame(): void {
         if (this.currentGame) {
+            if (this.currentGame.isPauseActive()) {
+                this.currentGame.togglePause(); // Ensure game is unpaused before destroying
+            }
             this.currentGame.destroy();
             this.currentGame = null;
         }
