@@ -30,6 +30,8 @@ interface GameConfig {
 export class PongGame {
     private canvas: HTMLCanvasElement;
     private ctx: CanvasRenderingContext2D;
+    private cssWidth: number;
+    private cssHeight: number;
     private ball: Ball;
     private paddle1: Paddle;
     private paddle2: Paddle;
@@ -40,6 +42,8 @@ export class PongGame {
     private lastTime: number = 0;
     private readonly FRAME_TIME: number = 1000 / 60;
     private keyHandler: ((e: KeyboardEvent) => void) | null = null;
+    private visibilityHandler: (() => void) | null = null;
+    private resizeHandler: (() => void) | null = null;
     
     // AI properties
     private gameMode: GameMode;
@@ -58,10 +62,15 @@ export class PongGame {
         this.gameMode = config.mode;
         this.aiDifficulty = config.aiDifficulty || 'medium';
 
-        // Initialize properties
+        // store CSS size then scale canvas for DPR; drawing uses CSS pixels coordinates
+        this.cssWidth = canvas.width;
+        this.cssHeight = canvas.height;
+        this.scaleCanvasForDPR();
+
+        // Initialize properties (use css sizes)
         this.ball = {
-            x: canvas.width / 2,
-            y: canvas.height / 2,
+            x: this.cssWidth / 2,
+            y: this.cssHeight / 2,
             dx: 5,
             dy: 5,
             radius: 8
@@ -69,15 +78,15 @@ export class PongGame {
 
         this.paddle1 = {
             x: 20,
-            y: canvas.height / 2 - 50,
+            y: this.cssHeight / 2 - 50,
             width: 10,
             height: 100,
             speed: 8
         };
 
         this.paddle2 = {
-            x: canvas.width - 30,
-            y: canvas.height / 2 - 50,
+            x: this.cssWidth - 30,
+            y: this.cssHeight / 2 - 50,
             width: 10,
             height: 100,
             speed: 8
@@ -89,6 +98,37 @@ export class PongGame {
         };
 
         this.setupControls();
+        // Pause/resume on visibility change
+        this.visibilityHandler = () => {
+            if (document.hidden) {
+                this.stop();
+            } else if (this.isRunning) {
+                // When returning, reset timing to avoid huge delta
+                this.lastTime = performance.now();
+                this.start();
+            }
+        };
+        document.addEventListener('visibilitychange', this.visibilityHandler);
+
+        // handle resize (re-scale only when CSS size changes)
+        this.resizeHandler = () => {
+            const cw = this.canvas.width;
+            // nothing; keep CSS sizes stable; if you want responsive resizing implement here
+        };
+        window.addEventListener('resize', this.resizeHandler);
+    }
+
+    private scaleCanvasForDPR(): void {
+        const dpr = Math.max(1, window.devicePixelRatio || 1);
+        // CSS pixels
+        const cssW = this.cssWidth;
+        const cssH = this.cssHeight;
+        this.canvas.style.width = `${cssW}px`;
+        this.canvas.style.height = `${cssH}px`;
+        // backing buffer
+        this.canvas.width = Math.floor(cssW * dpr);
+        this.canvas.height = Math.floor(cssH * dpr);
+        this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0); // draw in CSS pixels
     }
 
     private setupControls(): void {
@@ -179,7 +219,7 @@ export class PongGame {
                 this.aiTarget += (Math.random() - 0.5) * settings.error * 2;
             } else {
                 // Ball moving away, return to center
-                this.aiTarget = this.canvas.height / 2;
+                this.aiTarget = this.cssHeight / 2;
             }
             this.aiLastUpdate = currentTime;
         }
@@ -192,7 +232,7 @@ export class PongGame {
             const moveSpeed = this.paddle2.speed * settings.speed;
             if (distance > 0) {
                 this.paddle2.y = Math.min(
-                    this.canvas.height - this.paddle2.height,
+                    this.cssHeight - this.paddle2.height,
                     this.paddle2.y + moveSpeed
                 );
             } else {
@@ -202,63 +242,8 @@ export class PongGame {
     }
 
     private update(): void {
-        // Move player 1 paddle (always human controlled)
-        if (this.keys['w']) {
-            this.paddle1.y = Math.max(0, this.paddle1.y - this.paddle1.speed);
-        }
-        if (this.keys['s']) {
-            this.paddle1.y = Math.min(this.canvas.height - this.paddle1.height, this.paddle1.y + this.paddle1.speed);
-        }
-
-        // Move player 2 paddle based on game mode
-        if (this.gameMode === 'pvp') {
-            if (this.keys['ArrowUp']) {
-                this.paddle2.y = Math.max(0, this.paddle2.y - this.paddle2.speed);
-            }
-            if (this.keys['ArrowDown']) {
-                this.paddle2.y = Math.min(this.canvas.height - this.paddle2.height, this.paddle2.y + this.paddle2.speed);
-            }
-        } else {
-            this.updateAIPaddle();
-        }
-
-        // Move ball
-        this.ball.x += this.ball.dx;
-        this.ball.y += this.ball.dy;
-
-        // Ball collision with top/bottom walls
-        if (this.ball.y - this.ball.radius <= 0) {
-            this.ball.y = this.ball.radius;
-            this.ball.dy *= -1;
-        } else if (this.ball.y + this.ball.radius >= this.canvas.height) {
-            this.ball.y = this.canvas.height - this.ball.radius;
-            this.ball.dy *= -1;
-        }
-
-        // Ball collision with paddles
-        if (this.checkPaddleCollision(this.paddle1)) {
-            this.ball.x = this.paddle1.x + this.paddle1.width + this.ball.radius;
-            this.ball.dx = Math.abs(this.ball.dx);
-            this.adjustBallAngle(this.paddle1);
-        } else if (this.checkPaddleCollision(this.paddle2)) {
-            this.ball.x = this.paddle2.x - this.ball.radius;
-            this.ball.dx = -Math.abs(this.ball.dx);
-            this.adjustBallAngle(this.paddle2);
-        }
-
-        // Ball out of bounds (scoring)
-        if (this.ball.x - this.ball.radius <= 0) {
-            this.score.player2++;
-            this.resetBall();
-        } else if (this.ball.x + this.ball.radius >= this.canvas.width) {
-            this.score.player1++;
-            this.resetBall();
-        }
-
-        // Check for game end
-        if (this.score.player1 >= 5 || this.score.player2 >= 5) {
-            this.endGame();
-        }
+        // Note: movement is handled in gameLoop with delta-time scaling.
+        // placeholder: kept for compatibility if called independently.
     }
 
     private adjustBallAngle(paddle: Paddle): void {
@@ -290,8 +275,8 @@ export class PongGame {
     }
 
     private resetBall(): void {
-        this.ball.x = this.canvas.width / 2;
-        this.ball.y = this.canvas.height / 2;
+        this.ball.x = this.cssWidth / 2;
+        this.ball.y = this.cssHeight / 2;
         
         const angle = (Math.random() * Math.PI / 2) - Math.PI / 4;
         const speed = 5;
@@ -305,15 +290,15 @@ export class PongGame {
         this.score.player1 = 0;
         this.score.player2 = 0;
         this.resetBall();
-        this.paddle1.y = this.canvas.height / 2 - 50;
-        this.paddle2.y = this.canvas.height / 2 - 50;
+        this.paddle1.y = this.cssHeight / 2 - 50;
+        this.paddle2.y = this.cssHeight / 2 - 50;
         this.isRunning = true;
     }
 
     private draw(): void {
-        // Clear canvas
+        // Clear canvas (draw in CSS pixel coords)
         this.ctx.fillStyle = '#000';
-        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        this.ctx.fillRect(0, 0, this.cssWidth, this.cssHeight);
 
         // Draw center line
         this.ctx.strokeStyle = '#444';
@@ -321,7 +306,7 @@ export class PongGame {
         this.ctx.setLineDash([10, 10]);
         this.ctx.beginPath();
         this.ctx.moveTo(this.canvas.width / 2, 0);
-        this.ctx.lineTo(this.canvas.width / 2, this.canvas.height);
+        this.ctx.lineTo(this.cssWidth / 2, this.cssHeight);
         this.ctx.stroke();
         this.ctx.setLineDash([]);
 
@@ -340,33 +325,90 @@ export class PongGame {
         this.ctx.fillStyle = '#eee';
         this.ctx.font = '32px Arial';
         this.ctx.textAlign = 'center';
-        this.ctx.fillText(this.score.player1.toString(), this.canvas.width / 4, 50);
-        this.ctx.fillText(this.score.player2.toString(), (3 * this.canvas.width) / 4, 50);
+        this.ctx.fillText(this.score.player1.toString(), this.cssWidth / 4, 50);
+        this.ctx.fillText(this.score.player2.toString(), (3 * this.cssWidth) / 4, 50);
 
         // Draw controls hint
         this.ctx.font = '14px Arial';
         this.ctx.fillStyle = '#888';
         this.ctx.textAlign = 'left';
-        this.ctx.fillText('W/S', 20, this.canvas.height - 20);
+        this.ctx.fillText('W/S', 20, this.cssHeight - 20);
         this.ctx.textAlign = 'right';
         if (this.gameMode === 'pvp') {
-            this.ctx.fillText('↑/↓', this.canvas.width - 20, this.canvas.height - 20);
+            this.ctx.fillText('↑/↓', this.cssWidth - 20, this.cssHeight - 20);
         } else {
-            this.ctx.fillText(`AI (${this.aiDifficulty})`, this.canvas.width - 20, this.canvas.height - 20);
+            this.ctx.fillText(`AI (${this.aiDifficulty})`, this.cssWidth - 20, this.cssHeight - 20);
         }
     }
 
     private gameLoop = (timestamp: number): void => {
         if (!this.isRunning) return;
 
-        const deltaTime = timestamp - this.lastTime;
-        
-        if (deltaTime >= this.FRAME_TIME) {
-            this.update();
-            this.draw();
-            this.lastTime = timestamp - (deltaTime % this.FRAME_TIME);
+        const deltaTime = Math.min(100, timestamp - this.lastTime || this.FRAME_TIME);
+        const factor = deltaTime / this.FRAME_TIME;
+
+        // Player movement scaled by delta-time
+        if (this.keys['w']) {
+            this.paddle1.y = Math.max(0, this.paddle1.y - this.paddle1.speed * factor);
+        }
+        if (this.keys['s']) {
+            this.paddle1.y = Math.min(this.cssHeight - this.paddle1.height, this.paddle1.y + this.paddle1.speed * factor);
         }
 
+        // Move player 2 / AI
+        if (this.gameMode === 'pvp') {
+            if (this.keys['ArrowUp']) {
+                this.paddle2.y = Math.max(0, this.paddle2.y - this.paddle2.speed * factor);
+            }
+            if (this.keys['ArrowDown']) {
+                this.paddle2.y = Math.min(this.cssHeight - this.paddle2.height, this.paddle2.y + this.paddle2.speed * factor);
+            }
+        } else {
+            this.updateAIPaddle();
+        }
+
+        // Move ball scaled by delta-time
+        this.ball.x += this.ball.dx * factor;
+        this.ball.y += this.ball.dy * factor;
+
+        // Collisions & scoring (use css dims)
+        // Ball collision with top/bottom walls
+        if (this.ball.y - this.ball.radius <= 0) {
+            this.ball.y = this.ball.radius;
+            this.ball.dy *= -1;
+        } else if (this.ball.y + this.ball.radius >= this.cssHeight) {
+            this.ball.y = this.cssHeight - this.ball.radius;
+            this.ball.dy *= -1;
+        }
+
+        // Ball collision with paddles
+        if (this.checkPaddleCollision(this.paddle1)) {
+            this.ball.x = this.paddle1.x + this.paddle1.width + this.ball.radius;
+            this.ball.dx = Math.abs(this.ball.dx);
+            this.adjustBallAngle(this.paddle1);
+        } else if (this.checkPaddleCollision(this.paddle2)) {
+            this.ball.x = this.paddle2.x - this.ball.radius;
+            this.ball.dx = -Math.abs(this.ball.dx);
+            this.adjustBallAngle(this.paddle2);
+        }
+
+        // Ball out of bounds (scoring)
+        if (this.ball.x - this.ball.radius <= 0) {
+            this.score.player2++;
+            this.resetBall();
+        } else if (this.ball.x + this.ball.radius >= this.cssWidth) {
+            this.score.player1++;
+            this.resetBall();
+        }
+
+        // Check for game end
+        if (this.score.player1 >= 5 || this.score.player2 >= 5) {
+            this.endGame();
+        } else {
+            this.draw();
+        }
+
+        this.lastTime = timestamp;
         this.animationId = requestAnimationFrame(this.gameLoop);
     };
 
@@ -393,7 +435,7 @@ export class PongGame {
             : this.gameMode === 'pvp' ? 'Player 2' : 'AI';
         
         this.ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
-        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        this.ctx.fillRect(0, 0, this.cssWidth, this.cssHeight);
         
         this.ctx.fillStyle = '#e94560';
         this.ctx.font = '48px Arial';
@@ -412,6 +454,14 @@ export class PongGame {
     public destroy(): void {
         this.stop();
         this.removeEventListeners();
+        if (this.visibilityHandler) {
+            document.removeEventListener('visibilitychange', this.visibilityHandler);
+            this.visibilityHandler = null;
+        }
+        if (this.resizeHandler) {
+            window.removeEventListener('resize', this.resizeHandler);
+            this.resizeHandler = null;
+        }
     }
 
     public resetForNewMatch(): void {
@@ -421,20 +471,20 @@ export class PongGame {
     }
 
     private resetGameState(): void {
-        this.ball.x = this.canvas.width / 2;
-        this.ball.y = this.canvas.height / 2;
+        this.ball.x = this.cssWidth / 2;
+        this.ball.y = this.cssHeight / 2;
         this.ball.dx = 5;
         this.ball.dy = 5;
         this.ball.radius = 8;
 
         this.paddle1.x = 20;
-        this.paddle1.y = this.canvas.height / 2 - 50;
+        this.paddle1.y = this.cssHeight / 2 - 50;
         this.paddle1.width = 10;
         this.paddle1.height = 100;
         this.paddle1.speed = 8;
 
-        this.paddle2.x = this.canvas.width - 30;
-        this.paddle2.y = this.canvas.height / 2 - 50;
+        this.paddle2.x = this.cssWidth - 30;
+        this.paddle2.y = this.cssHeight / 2 - 50;
         this.paddle2.width = 10;
         this.paddle2.height = 100;
         this.paddle2.speed = 8;

@@ -15,6 +15,8 @@ export class OnlinePongGame {
     private animationId: number | null = null;
     private isRunning: boolean = false;
     private keyHandler: ((e: KeyboardEvent) => void) | null = null;
+    private lastTime: number = 0;
+    private visibilityHandler: (() => void) | null = null;
 
     constructor(canvas: HTMLCanvasElement, socket: WebSocket) {
         this.canvas = canvas;
@@ -34,6 +36,18 @@ export class OnlinePongGame {
 
         this.setupControls();
         this.setupSocketListeners();
+        // Pause/resume on tab visibility
+        this.visibilityHandler = () => {
+            if (document.hidden) {
+                this.stop();
+            } else if (this.isRunning) {
+                this.lastTime = performance.now();
+                this.start();
+            }
+        };
+        document.addEventListener('visibilitychange', this.visibilityHandler);
+
+        this.lastTime = performance.now();
         this.start();
 
     }
@@ -80,21 +94,24 @@ export class OnlinePongGame {
                 console.error('Error parsing game state:', error);
             }
         };
-        setInterval(() => {
-            this.simulateGameUpdate();
-        }, 16); // ~60fps
+        // we used to run a setInterval here. simulation is now integrated into game loop (gameLoop).
     }
 
     // This is just for demonstration - in real implementation, server handles game logic
-    private simulateGameUpdate(): void {
+    // Integrated simulation step uses delta time.
+    private simulateStep(deltaFactor: number): void {
         const ball = this.gameState.ball;
-        
-        // Update ball position
-        ball.x += ball.dx;
-        ball.y += ball.dy;
+
+        // Update ball position (scale by factor)
+        ball.x += ball.dx * deltaFactor;
+        ball.y += ball.dy * deltaFactor;
 
         // Wall collision
-        if (ball.y <= 0 || ball.y >= this.canvas.height) {
+        if (ball.y <= 0) {
+            ball.y = 0;
+            ball.dy *= -1;
+        } else if (ball.y >= this.canvas.height) {
+            ball.y = this.canvas.height;
             ball.dy *= -1;
         }
 
@@ -103,7 +120,6 @@ export class OnlinePongGame {
             const paddle1 = this.gameState.paddles.player1;
             if (ball.y >= paddle1 && ball.y <= paddle1 + 100) {
                 ball.dx = Math.abs(ball.dx);
-                // Adjust angle based on where ball hit paddle
                 const hitPos = (ball.y - (paddle1 + 50)) / 50;
                 ball.dy = hitPos * 8;
             }
@@ -113,7 +129,6 @@ export class OnlinePongGame {
             const paddle2 = this.gameState.paddles.player2;
             if (ball.y >= paddle2 && ball.y <= paddle2 + 100) {
                 ball.dx = -Math.abs(ball.dx);
-                // Adjust angle based on where ball hit paddle
                 const hitPos = (ball.y - (paddle2 + 50)) / 50;
                 ball.dy = hitPos * 8;
             }
@@ -128,21 +143,22 @@ export class OnlinePongGame {
             this.resetBall();
         }
 
-        // Move paddles based on key input
+        // Move paddles based on key input (scale by factor)
+        const move = 8 * deltaFactor;
         if (this.keys['w']) {
-            this.gameState.paddles.player1 = Math.max(0, this.gameState.paddles.player1 - 8);
+            this.gameState.paddles.player1 = Math.max(0, this.gameState.paddles.player1 - move);
         }
         if (this.keys['s']) {
-            this.gameState.paddles.player1 = Math.min(this.canvas.height - 100, this.gameState.paddles.player1 + 8);
+            this.gameState.paddles.player1 = Math.min(this.canvas.height - 100, this.gameState.paddles.player1 + move);
         }
 
-        // Simulate opponent movement (in real implementation, this comes from server)
+        // Simulate opponent movement (temporary)
         const ballCenter = this.gameState.ball.y;
         const paddle2Center = this.gameState.paddles.player2 + 50;
         if (paddle2Center < ballCenter - 10) {
-            this.gameState.paddles.player2 = Math.min(this.canvas.height - 100, this.gameState.paddles.player2 + 5);
+            this.gameState.paddles.player2 = Math.min(this.canvas.height - 100, this.gameState.paddles.player2 + 5 * deltaFactor);
         } else if (paddle2Center > ballCenter + 10) {
-            this.gameState.paddles.player2 = Math.max(0, this.gameState.paddles.player2 - 5);
+            this.gameState.paddles.player2 = Math.max(0, this.gameState.paddles.player2 - 5 * deltaFactor);
         }
     }
 
@@ -212,9 +228,17 @@ export class OnlinePongGame {
         this.ctx.fillText('Refresh page to play again', this.canvas.width / 2, this.canvas.height / 2 + 60);
     }
 
-    private gameLoop = (): void => {
+    private gameLoop = (timestamp?: number): void => {
         if (!this.isRunning) return;
+        const now = timestamp || performance.now();
+        const delta = Math.min(100, now - this.lastTime || 16);
+        const factor = delta / (1000 / 60); // relative to 60fps baseline
+
+        // simulate (local demo) and draw
+        this.simulateStep(factor);
         this.draw();
+
+        this.lastTime = now;
         this.animationId = requestAnimationFrame(this.gameLoop);
     };
 
@@ -222,6 +246,7 @@ export class OnlinePongGame {
         if (this.isRunning) return;
         
         this.isRunning = true;
+        this.lastTime = performance.now();
         this.animationId = requestAnimationFrame(this.gameLoop);
     }
 
@@ -238,6 +263,10 @@ export class OnlinePongGame {
         this.removeEventListeners();
         if (this.socket) {
             this.socket.close();
+        }
+        if (this.visibilityHandler) {
+            document.removeEventListener('visibilitychange', this.visibilityHandler);
+            this.visibilityHandler = null;
         }
     }
 }

@@ -11,9 +11,10 @@ class App {
 
     private init(): void {
 
+        // Use closest() so clicks on children inside anchors still navigate.
         document.addEventListener('click', (e: MouseEvent) => {
-            const target = e.target as HTMLElement;
-            if (target.matches('[data-link]')) {
+            const target = (e.target as HTMLElement).closest('[data-link]') as HTMLElement | null;
+            if (target) {
                 e.preventDefault();
                 const href = target.getAttribute('href');
                 if (href) {
@@ -38,15 +39,24 @@ class App {
 
         const nav = document.getElementById('main-nav');
         if (nav){
+            // Throttle scroll updates with rAF to avoid many style/layout updates per frame.
             let lastScrollY = window.scrollY;
+            let ticking = false;
             window.addEventListener('scroll', () => {
-                if (window.scrollY > lastScrollY) {
-                    nav.style.transform = 'translateY(-100%)';
-                } else {
-                    nav.style.transform = 'translateY(0)';
+                if (!ticking) {
+                    ticking = true;
+                    requestAnimationFrame(() => {
+                        if (window.scrollY > lastScrollY) {
+                            nav.style.transform = 'translateY(-100%)';
+                        } else {
+                            nav.style.transform = 'translateY(0)';
+                        }
+                        lastScrollY = window.scrollY;
+                        ticking = false;
+                    });
                 }
-                lastScrollY = window.scrollY;
-            });
+            }, { passive: true });
+
             document.addEventListener('mousemove', (e) => {
                 if (e.clientY < 80) {
                     nav.style.transform = 'translateY(0)';
