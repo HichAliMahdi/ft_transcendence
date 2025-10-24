@@ -223,15 +223,11 @@ export class Tournament {
                 this.state.isActive = false;
                 this.state.currentMatch = null;
             } else if (winners.length > 1) {
-                // advance round index (note: matches for next round already exist; winners will be assigned by recordMatchWinner propagation)
+                // advance round index (next-round matches are prebuilt in generateMatches)
                 this.state.currentRound++;
                 this.setNextMatch();
             }
         }
-    }
-    private advanceToNextRound(winners: Player[]): void {
-        // kept for compatibility — not used with prebuilt bracket
-        // ...existing code...
     }
 
     public recordMatchWinner(matchId: string, winnerId: string): boolean {
