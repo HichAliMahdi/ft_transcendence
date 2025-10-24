@@ -217,7 +217,7 @@ export class GamePage {
         };
 
         const stopButton = document.createElement('button');
-        stopButton.textContent = 'Stop Game';
+        stopButton.textContent = 'Pause Game';
         stopButton.disabled = true;
         stopButton.className = 'bg-red-700 hover:bg-red-800 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-300 disabled:opacity-50 disabled:cursor-not-allowed';
         stopButton.onclick = () => {

@@ -243,6 +243,10 @@ export class TournamentPage {
 		pauseButton.textContent = 'Pause';
 		pauseButton.className = 'bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-200 hidden';
 		
+		const leaveButton = document.createElement('button');
+		leaveButton.textContent = 'Leave Tournament';
+		leaveButton.className = 'bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-200';
+		
 		startButton.onclick = () => {
 			this.currentGame = new PongGame(canvas);
 			this.setupGameEndHandler(match.id, match.player1!.id, match.player2!.id);
@@ -264,8 +268,17 @@ export class TournamentPage {
 			}
 		};
 		
+		leaveButton.onclick = () => {
+			if (confirm('Are you sure you want to leave the tournament? This action cannot be undone.')) {
+				this.cleanupCurrentGame();
+				this.tournament.reset();
+				window.location.href = '/';
+			}
+		};
+		
 		buttonContainer.appendChild(startButton);
 		buttonContainer.appendChild(pauseButton);
+		buttonContainer.appendChild(leaveButton);
 		
 		const bracket = this.renderBracket();
 		
@@ -424,8 +437,19 @@ export class TournamentPage {
         message.textContent = 'Please wait while the next match is being set up.';
         message.className = 'text-xl text-gray-300 text-center mt-8';
         
+        const leaveButton = document.createElement('button');
+        leaveButton.textContent = 'Leave Tournament';
+        leaveButton.className = 'bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-200 mt-8';
+        leaveButton.onclick = () => {
+            if (confirm('Are you sure you want to leave the tournament? This action cannot be undone.')) {
+                this.tournament.reset();
+                window.location.href = '/';
+            }
+        };
+        
         this.container.appendChild(title);
         this.container.appendChild(message);
+        this.container.appendChild(leaveButton);
     }
 
     private renderWinner(): void {
