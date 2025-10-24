@@ -20,7 +20,8 @@ export default {
         }
       },
       fontFamily: {
-        sans: ['Poppins', 'sans-serif'],
+        // Use system font stack — rely on Tailwind defaults / system fonts
+        sans: ['ui-sans-serif', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial'],
       },
     },
   },
