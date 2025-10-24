@@ -112,8 +112,7 @@ export class PongGame {
 
         // handle resize (re-scale only when CSS size changes)
         this.resizeHandler = () => {
-            const cw = this.canvas.width;
-            // nothing; keep CSS sizes stable; if you want responsive resizing implement here
+            // no-op placeholder for responsive resizing if needed
         };
         window.addEventListener('resize', this.resizeHandler);
     }
@@ -239,11 +238,6 @@ export class PongGame {
                 this.paddle2.y = Math.max(0, this.paddle2.y - moveSpeed);
             }
         }
-    }
-
-    private update(): void {
-        // Note: movement is handled in gameLoop with delta-time scaling.
-        // placeholder: kept for compatibility if called independently.
     }
 
     private adjustBallAngle(paddle: Paddle): void {
