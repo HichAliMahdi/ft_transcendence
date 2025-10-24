@@ -8,6 +8,7 @@ interface Match {
     player1: Player | null;
     player2: Player | null;
     winner: Player | null;
+    loser?: Player | null;
     round: number;
     matchNumber: number;
     sourceMatch1?: string;
@@ -21,6 +22,7 @@ interface TournamentState {
     currentRound: number;
     isActive: boolean;
     isComplete: boolean;
+    losers: Player[]; // added losers pool
 }
 
 export class Tournament {
@@ -34,12 +36,13 @@ export class Tournament {
             currentMatch: null,
             currentRound: 1,
             isActive: false,
-            isComplete: false
+            isComplete: false,
+            losers: [] // initialize pool
         };
     }
 
     public getState(): TournamentState {
-        return { ...this.state };
+        return { ...this.state, players: [...this.state.players], matches: [...this.state.matches], losers: [...this.state.losers] };
     }
 
     public setStateChangeCallback(callback: () => void): void {
@@ -238,10 +241,17 @@ export class Tournament {
 
         if (match.player1?.id === winnerId) {
             match.winner = match.player1;
+            match.loser = match.player2 || null;
         } else if (match.player2?.id === winnerId) {
             match.winner = match.player2;
+            match.loser = match.player1 || null;
         } else {
             return false;
+        }
+
+        // If there is a real loser (non-bye), add to losers pool
+        if (match.loser) {
+            this.state.losers.push(match.loser);
         }
 
         // propagate winner into the next round match slots (if any)
@@ -292,13 +302,18 @@ export class Tournament {
             currentMatch: null,
             currentRound: 1,
             isActive: false,
-            isComplete: false
+            isComplete: false,
+            losers: []
         };
         this.notifyStateChange();
     }
 
     public getPlayers(): Player[] {
         return [...this.state.players];
+    }
+
+    public getLosers(): Player[] {
+        return [...this.state.losers];
     }
 
     public isActive(): boolean {
