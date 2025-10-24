@@ -171,10 +171,12 @@ export class OnlinePongGame {
 
     private draw(): void {
 
+        // bg
         this.ctx.fillStyle = '#000';
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
-        this.ctx.strokeStyle = '#444';
+        // center line subtle white
+        this.ctx.strokeStyle = 'rgba(255,255,255,0.25)';
         this.ctx.lineWidth = 2;
         this.ctx.setLineDash([10, 10]);
         this.ctx.beginPath();
@@ -183,23 +185,27 @@ export class OnlinePongGame {
         this.ctx.stroke();
         this.ctx.setLineDash([]);
 
-        this.ctx.fillStyle = '#0f3460';
+        // paddles (white)
+        this.ctx.fillStyle = '#fff';
         this.ctx.fillRect(20, this.gameState.paddles.player1, 10, 100);
         this.ctx.fillRect(this.canvas.width - 30, this.gameState.paddles.player2, 10, 100);
 
-        this.ctx.fillStyle = '#e94560';
+        // ball (white)
+        this.ctx.fillStyle = '#fff';
         this.ctx.beginPath();
         this.ctx.arc(this.gameState.ball.x, this.gameState.ball.y, 8, 0, Math.PI * 2);
         this.ctx.fill();
 
-        this.ctx.fillStyle = '#eee';
+        // score (white)
+        this.ctx.fillStyle = '#fff';
         this.ctx.font = '32px Arial';
         this.ctx.textAlign = 'center';
         this.ctx.fillText(this.gameState.score.player1.toString(), this.canvas.width / 4, 50);
         this.ctx.fillText(this.gameState.score.player2.toString(), (3 * this.canvas.width) / 4, 50);
 
+        // hint
         this.ctx.font = '14px Arial';
-        this.ctx.fillStyle = '#888';
+        this.ctx.fillStyle = 'rgba(255,255,255,0.8)';
         this.ctx.textAlign = 'left';
         this.ctx.fillText('W/S to move', 20, this.canvas.height - 20);
 
@@ -213,18 +219,18 @@ export class OnlinePongGame {
         this.ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
         
-        this.ctx.fillStyle = '#e94560';
+        this.ctx.fillStyle = '#fff';
         this.ctx.font = '48px Arial';
         this.ctx.textAlign = 'center';
         this.ctx.fillText('GAME OVER', this.canvas.width / 2, this.canvas.height / 2 - 40);
         
         const winner = this.gameState.score.player1 >= 5 ? 'Player 1' : 'Player 2';
-        this.ctx.fillStyle = '#eee';
+        this.ctx.fillStyle = '#fff';
         this.ctx.font = '32px Arial';
         this.ctx.fillText(`${winner} Wins!`, this.canvas.width / 2, this.canvas.height / 2 + 20);
         
         this.ctx.font = '18px Arial';
-        this.ctx.fillStyle = '#888';
+        this.ctx.fillStyle = 'rgba(255,255,255,0.8)';
         this.ctx.fillText('Refresh page to play again', this.canvas.width / 2, this.canvas.height / 2 + 60);
     }
 

@@ -294,37 +294,37 @@ export class PongGame {
         this.ctx.fillStyle = '#000';
         this.ctx.fillRect(0, 0, this.cssWidth, this.cssHeight);
 
-        // Draw center line
-        this.ctx.strokeStyle = '#444';
+        // Draw center line (subtle white)
+        this.ctx.strokeStyle = 'rgba(255,255,255,0.25)';
         this.ctx.lineWidth = 2;
         this.ctx.setLineDash([10, 10]);
         this.ctx.beginPath();
-        this.ctx.moveTo(this.canvas.width / 2, 0);
+        this.ctx.moveTo(this.cssWidth / 2, 0);
         this.ctx.lineTo(this.cssWidth / 2, this.cssHeight);
         this.ctx.stroke();
         this.ctx.setLineDash([]);
 
-        // Draw paddles
-        this.ctx.fillStyle = '#0f3460';
+        // Draw paddles (white)
+        this.ctx.fillStyle = '#fff';
         this.ctx.fillRect(this.paddle1.x, this.paddle1.y, this.paddle1.width, this.paddle1.height);
         this.ctx.fillRect(this.paddle2.x, this.paddle2.y, this.paddle2.width, this.paddle2.height);
 
-        // Draw ball
-        this.ctx.fillStyle = '#e94560';
+        // Draw ball (white)
+        this.ctx.fillStyle = '#fff';
         this.ctx.beginPath();
         this.ctx.arc(this.ball.x, this.ball.y, this.ball.radius, 0, Math.PI * 2);
         this.ctx.fill();
 
-        // Draw score
-        this.ctx.fillStyle = '#eee';
+        // Draw score (white)
+        this.ctx.fillStyle = '#fff';
         this.ctx.font = '32px Arial';
         this.ctx.textAlign = 'center';
         this.ctx.fillText(this.score.player1.toString(), this.cssWidth / 4, 50);
         this.ctx.fillText(this.score.player2.toString(), (3 * this.cssWidth) / 4, 50);
 
-        // Draw controls hint
+        // Draw controls hint (subtle white)
         this.ctx.font = '14px Arial';
-        this.ctx.fillStyle = '#888';
+        this.ctx.fillStyle = 'rgba(255,255,255,0.8)';
         this.ctx.textAlign = 'left';
         this.ctx.fillText('W/S', 20, this.cssHeight - 20);
         this.ctx.textAlign = 'right';
@@ -416,7 +416,7 @@ export class PongGame {
 
     public stop(): void {
         this.isRunning = false;
-        if (this.animationId !== null) {
+        if this.animationId !== null) {
             cancelAnimationFrame(this.animationId);
             this.animationId = null;
         }
@@ -431,18 +431,18 @@ export class PongGame {
         this.ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
         this.ctx.fillRect(0, 0, this.cssWidth, this.cssHeight);
         
-        this.ctx.fillStyle = '#e94560';
+        this.ctx.fillStyle = '#fff';
         this.ctx.font = '48px Arial';
         this.ctx.textAlign = 'center';
-        this.ctx.fillText('GAME OVER', this.canvas.width / 2, this.canvas.height / 2 - 40);
+        this.ctx.fillText('GAME OVER', this.cssWidth / 2, this.cssHeight / 2 - 40);
         
-        this.ctx.fillStyle = '#eee';
+        this.ctx.fillStyle = '#fff';
         this.ctx.font = '32px Arial';
-        this.ctx.fillText(`${winner} Wins!`, this.canvas.width / 2, this.canvas.height / 2 + 20);
+        this.ctx.fillText(`${winner} Wins!`, this.cssWidth / 2, this.cssHeight / 2 + 20);
         
         this.ctx.font = '18px Arial';
-        this.ctx.fillStyle = '#888';
-        this.ctx.fillText('Press SPACE to play again', this.canvas.width / 2, this.canvas.height / 2 + 60);
+        this.ctx.fillStyle = 'rgba(255,255,255,0.8)';
+        this.ctx.fillText('Press SPACE to play again', this.cssWidth / 2, this.cssHeight / 2 + 60);
     }
 
     public destroy(): void {
