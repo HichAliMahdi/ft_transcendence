@@ -10,6 +10,8 @@ interface Match {
     winner: Player | null;
     round: number;
     matchNumber: number;
+    sourceMatch1?: string;
+    sourceMatch2?: string;
 }
 
 interface TournamentState {
@@ -111,36 +113,79 @@ export class Tournament {
     }
 
     private generateMatches(): void {
+        // create a bracket tree for all rounds up to final
         const players = [...this.state.players];
         this.shufflePlayers(players);
         const numPlayers = players.length;
-        const isPowerOfTwo = (numPlayers & (numPlayers - 1)) === 0;
-        if (!isPowerOfTwo) {
-            const nextPowerOfTwo = Math.pow(2, Math.ceil(Math.log2(numPlayers)));
-            const byes = nextPowerOfTwo - numPlayers;
-            
-            for (let i = 0; i < byes; i++) {
-                players.push(null as any);
-            }
+        const nextPowerOfTwo = Math.pow(2, Math.ceil(Math.log2(numPlayers)));
+        const byes = nextPowerOfTwo - numPlayers;
+        for (let i = 0; i < byes; i++) {
+            players.push(null as any);
         }
-        this.state.matches = [];
+
+        const totalRounds = Math.log2(players.length);
+        const rounds: Match[][] = [];
+
+        // Round 1
+        const round1: Match[] = [];
         let matchNumber = 1;
         for (let i = 0; i < players.length; i += 2) {
-            const match: Match = {
-                id: `match_${this.state.currentRound}_${matchNumber}`,
+            const m: Match = {
+                id: `match_1_${matchNumber}`,
                 player1: players[i] || null,
                 player2: players[i + 1] || null,
                 winner: null,
-                round: this.state.currentRound,
+                round: 1,
                 matchNumber: matchNumber++
             };
-            if (match.player1 && !match.player2) {
-                match.winner = match.player1;
-            } else if (!match.player1 && match.player2) {
-                match.winner = match.player2;
+            // auto-advance byes
+            if (m.player1 && !m.player2) {
+                m.winner = m.player1;
+            } else if (!m.player1 && m.player2) {
+                m.winner = m.player2;
             }
-            this.state.matches.push(match);
+            round1.push(m);
         }
+        rounds.push(round1);
+
+        // build higher rounds with source references
+        for (let r = 2; r <= totalRounds; r++) {
+            const prev = rounds[r - 2];
+            const matchesThisRound: Match[] = [];
+            let numMatches = Math.ceil(prev.length / 2);
+            for (let j = 0; j < numMatches; j++) {
+                const source1 = prev[j * 2] ? prev[j * 2].id : undefined;
+                const source2 = prev[j * 2 + 1] ? prev[j * 2 + 1].id : undefined;
+                const m: Match = {
+                    id: `match_${r}_${j + 1}`,
+                    player1: null,
+                    player2: null,
+                    winner: null,
+                    round: r,
+                    matchNumber: j + 1,
+                    sourceMatch1: source1,
+                    sourceMatch2: source2
+                };
+                matchesThisRound.push(m);
+            }
+            rounds.push(matchesThisRound);
+        }
+
+        // flatten rounds into state.matches (round order)
+        this.state.matches = rounds.flat();
+
+        // propagate any byes from round 1 into next rounds (if a round1 match already has a winner)
+        this.state.matches.forEach(m => {
+            if (m.sourceMatch1) {
+                const src = this.state.matches.find(x => x.id === m.sourceMatch1);
+                if (src && src.winner) m.player1 = src.winner;
+            }
+            if (m.sourceMatch2) {
+                const src2 = this.state.matches.find(x => x.id === m.sourceMatch2);
+                if (src2 && src2.winner) m.player2 = src2.winner;
+            }
+        });
+
         this.setNextMatch();
     }
     private shufflePlayers(players: Player[]): void {
@@ -151,7 +196,7 @@ export class Tournament {
     }
     private setNextMatch(): void {
         const currentRoundMatches = this.state.matches.filter(
-            m => m.round === this.state.currentRound && !m.winner
+            m => m.round === this.state.currentRound && !m.winner && (m.player1 !== null || m.player2 !== null)
         );
 
         if (currentRoundMatches.length > 0) {
@@ -178,32 +223,15 @@ export class Tournament {
                 this.state.isActive = false;
                 this.state.currentMatch = null;
             } else if (winners.length > 1) {
-                this.advanceToNextRound(winners);
+                // advance round index (note: matches for next round already exist; winners will be assigned by recordMatchWinner propagation)
+                this.state.currentRound++;
+                this.setNextMatch();
             }
         }
     }
     private advanceToNextRound(winners: Player[]): void {
-        this.state.currentRound++;
-        let matchNumber = 1;
-
-        for (let i = 0; i < winners.length; i += 2) {
-            const match: Match = {
-                id: `match_${this.state.currentRound}_${matchNumber}`,
-                player1: winners[i],
-                player2: winners[i + 1] || null,
-                winner: null,
-                round: this.state.currentRound,
-                matchNumber: matchNumber++
-            };
-
-            if (!match.player2) {
-                match.winner = match.player1;
-            }
-
-            this.state.matches.push(match);
-        }
-
-        this.setNextMatch();
+        // kept for compatibility — not used with prebuilt bracket
+        // ...existing code...
     }
 
     public recordMatchWinner(matchId: string, winnerId: string): boolean {
@@ -218,6 +246,18 @@ export class Tournament {
             match.winner = match.player2;
         } else {
             return false;
+        }
+
+        // propagate winner into the next round match slots (if any)
+        const nextMatch = this.state.matches.find(m => m.sourceMatch1 === matchId || m.sourceMatch2 === matchId);
+        if (nextMatch) {
+            if (nextMatch.sourceMatch1 === matchId) {
+                nextMatch.player1 = match.winner;
+            } else if (nextMatch.sourceMatch2 === matchId) {
+                nextMatch.player2 = match.winner;
+            }
+            // If the next match has both players and one is null due to a bye, the winner will be set and available.
+            // If the other source already had a bye winner, it will have been propagated earlier.
         }
 
         this.setNextMatch();

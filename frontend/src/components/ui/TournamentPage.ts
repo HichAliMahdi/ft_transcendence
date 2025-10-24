@@ -323,49 +323,71 @@ export class TournamentPage {
 
     private renderBracket(): HTMLElement {
         const bracket = document.createElement('div');
-        bracket.className = 'bg-game-dark p-8 rounded-lg mt-8';
-        
+        bracket.className = 'bg-game-dark p-8 rounded-lg mt-8 overflow-x-auto';
+
         const title = document.createElement('h3');
         title.textContent = 'Tournament Bracket';
         title.className = 'text-2xl font-semibold text-white mb-6';
         bracket.appendChild(title);
-        
+
         const rounds = this.tournament.getAllRounds();
-        
+
+        // Create a horizontal flex container where each round is a column
+        const roundsContainer = document.createElement('div');
+        roundsContainer.className = 'flex gap-6 items-start';
+
+        const formatSourceLabel = (sourceId?: string) => {
+            if (!sourceId) return 'TBD';
+            const parts = sourceId.split('_'); // expected match_{round}_{num}
+            if (parts.length >= 3) {
+                return `Winner (R${parts[1]} M${parts[2]})`;
+            }
+            return `Winner (${sourceId})`;
+        };
+
         rounds.forEach(round => {
             const roundDiv = document.createElement('div');
-            roundDiv.className = 'mb-6';
-            
+            roundDiv.className = 'min-w-[220px]';
+
             const roundTitle = document.createElement('h4');
             roundTitle.textContent = `Round ${round}`;
             roundTitle.className = 'text-game-red text-xl mb-4 font-bold';
             roundDiv.appendChild(roundTitle);
-            
+
             const matches = this.tournament.getMatchesByRound(round);
-            const matchesGrid = document.createElement('div');
-            matchesGrid.className = 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4';
-            
+
+            const matchesCol = document.createElement('div');
+            matchesCol.className = 'flex flex-col gap-4';
+
             matches.forEach(match => {
                 const matchDiv = document.createElement('div');
-                matchDiv.className = `bg-game-dark p-4 rounded-lg transition-all duration-300 ${match.winner ? 'opacity-70' : 'hover:bg-blue-700'}`;
-                
+                matchDiv.className = `bg-game-dark p-3 rounded-lg transition-all duration-300 ${match.winner ? 'opacity-70' : 'hover:bg-blue-700'}`;
+
                 const p1 = document.createElement('div');
-                p1.textContent = match.player1?.alias || 'BYE';
-                p1.className = `px-3 py-2 rounded ${match.winner?.id === match.player1?.id ? 'bg-game-red font-bold' : ''}`;
-                
+                const p1Text = match.player1?.alias || (match.sourceMatch1 ? formatSourceLabel(match.sourceMatch1) : 'BYE');
+                p1.textContent = p1Text;
+                p1.className = `px-3 py-1 rounded ${match.winner?.id === match.player1?.id ? 'bg-game-red font-bold' : ''}`;
+
                 const p2 = document.createElement('div');
-                p2.textContent = match.player2?.alias || 'BYE';
-                p2.className = `px-3 py-2 rounded mt-2 ${match.winner?.id === match.player2?.id ? 'bg-game-red font-bold' : ''}`;
-                
+                const p2Text = match.player2?.alias || (match.sourceMatch2 ? formatSourceLabel(match.sourceMatch2) : 'BYE');
+                p2.textContent = p2Text;
+                p2.className = `px-3 py-1 rounded mt-2 ${match.winner?.id === match.player2?.id ? 'bg-game-red font-bold' : ''}`;
+
+                const meta = document.createElement('div');
+                meta.className = 'text-xs text-gray-400 mt-2';
+                meta.textContent = `Match ${match.matchNumber}`;
+
                 matchDiv.appendChild(p1);
                 matchDiv.appendChild(p2);
-                matchesGrid.appendChild(matchDiv);
+                matchDiv.appendChild(meta);
+                matchesCol.appendChild(matchDiv);
             });
-            
-            roundDiv.appendChild(matchesGrid);
-            bracket.appendChild(roundDiv);
+
+            roundDiv.appendChild(matchesCol);
+            roundsContainer.appendChild(roundDiv);
         });
-        
+
+        bracket.appendChild(roundsContainer);
         return bracket;
     }
 
