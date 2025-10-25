@@ -9,7 +9,6 @@ interface Match {
     player2: Player | null;
     winner: Player | null;
     loser?: Player | null;
-    // new: store scores for both sides (may be undefined until recorded)
     score1?: number | null;
     score2?: number | null;
     round: number;
@@ -33,8 +32,11 @@ interface TournamentState {
     currentRound: number;
     isActive: boolean;
     isComplete: boolean;
-    losers: LoserEntry[]; // now store losers with score and round
+    losers: LoserEntry[];
+    maxPlayers: number;
 }
+
+export type TournamentSize = 4 | 8 | 16;
 
 export class Tournament {
     private state: TournamentState;
@@ -48,12 +50,26 @@ export class Tournament {
             currentRound: 1,
             isActive: false,
             isComplete: false,
-            losers: [] // initialize pool
+            losers: [],
+            maxPlayers: 0
         };
     }
 
+    public setTournamentSize(size: TournamentSize): boolean{
+        if (this.state.isActive || this.state.players.length > 0) {
+            return false;
+        }
+        this.state.maxPlayers = size;
+        this.notifyStateChange();
+        return true;
+    }
+
+    public getRemainingSlots(): number {
+        if (this.state.maxPlayers === 0) return Infinity;
+        return Math.max(0, this.state.maxPlayers - this.state.players.length);
+    }
+
     public getState(): TournamentState {
-        // shallow clones (losers cloned as well)
         return { 
             ...this.state, 
             players: [...this.state.players], 
@@ -73,36 +89,41 @@ export class Tournament {
     }
 
     public addPlayer(alias: string): boolean {
-    if (this.state.isActive) {
-        return false;
-    }
+        if (this.state.isActive) {
+            return false;
+        }
 
-    const trimmedAlias = alias.trim();
-    
-    if (!trimmedAlias || trimmedAlias.length === 0) {
-        return false;
-    }
-    
-    if (trimmedAlias.length > 20) {
-        return false;
-    }
-    
-    if (!/^[a-zA-Z0-9\s_-]+$/.test(trimmedAlias)) {
-        return false;
-    }
+        // NEW: Check if tournament is full
+        if (this.isFull()) {
+            return false;
+        }
 
-    if (this.state.players.some(p => p.alias.toLowerCase() === trimmedAlias.toLowerCase())) {
-        return false;
-    }
+        const trimmedAlias = alias.trim();
+        
+        if (!trimmedAlias || trimmedAlias.length === 0) {
+            return false;
+        }
+        
+        if (trimmedAlias.length > 20) {
+            return false;
+        }
+        
+        if (!/^[a-zA-Z0-9\s_-]+$/.test(trimmedAlias)) {
+            return false;
+        }
 
-    const player: Player = {
-        id: `player_${Date.now()}_${Math.random()}`,
-        alias: trimmedAlias
-    };
+        if (this.state.players.some(p => p.alias.toLowerCase() === trimmedAlias.toLowerCase())) {
+            return false;
+        }
 
-    this.state.players.push(player);
-    this.notifyStateChange();
-    return true;
+        const player: Player = {
+            id: `player_${Date.now()}_${Math.random()}`,
+            alias: trimmedAlias
+        };
+
+        this.state.players.push(player);
+        this.notifyStateChange();
+        return true;
     }
 
     public removePlayer(playerId: string): boolean {
