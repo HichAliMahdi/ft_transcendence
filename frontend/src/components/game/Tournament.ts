@@ -345,6 +345,63 @@ export class Tournament {
         // A match is playable only when both players are present (no BYE)
         return !!(m.player1 && m.player2);
     }
+    private resolveByesForRound(round: number): void {
+        // First try filling repechage gaps from explicit loser logic
+        this.fillRepechageWithLosers();
+
+        // Collect matches in this round that have exactly one player (singletons)
+        const singletons = this.state.matches
+            .filter(m => m.round === round && !m.winner)
+            .map(m => {
+                const p = m.player1 && !m.player2 ? m.player1
+                        : m.player2 && !m.player1 ? m.player2
+                        : null;
+                return p ? { match: m, player: p } : null;
+            })
+            .filter(Boolean) as { match: Match; player: Player }[];
+
+        // Pair up singleton players into new repechage matches so they actually play
+        while (singletons.length >= 2) {
+            const a = singletons.shift()!;
+            const b = singletons.shift()!;
+
+            // Remove players from their original placeholder matches (they are moved into a new match)
+            if (a.match.player1 && a.match.player1.id === a.player.id) a.match.player1 = null;
+            if (a.match.player2 && a.match.player2.id === a.player.id) a.match.player2 = null;
+            if (b.match.player1 && b.match.player1.id === b.player.id) b.match.player1 = null;
+            if (b.match.player2 && b.match.player2.id === b.player.id) b.match.player2 = null;
+
+            const newMatch: Match = {
+                id: `repechage_pair_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+                player1: a.player,
+                player2: b.player,
+                winner: null,
+                loser: null,
+                round: round,
+                matchNumber: this.state.matches.length + 1,
+                isRepechage: true,
+                repechageRound: round
+            };
+            this.state.matches.push(newMatch);
+        }
+
+        // If one singleton remains, try to fill it from any available loser (any round)
+        if (singletons.length === 1) {
+            const remaining = singletons[0];
+            // find a loser not equal to the singleton
+            const idx = this.state.losers.findIndex(l => l.player.id !== remaining.player.id);
+            if (idx !== -1) {
+                const chosen = this.state.losers.splice(idx, 1)[0];
+                // assign to the empty slot of the original match
+                if (!remaining.match.player1) remaining.match.player1 = chosen.player;
+                else if (!remaining.match.player2) remaining.match.player2 = chosen.player;
+            }
+        }
+
+        // notify if we changed anything
+        this.notifyStateChange();
+    }
+
     private setNextMatch(): void {
         // Prefer matches in current round that have both players present
         const playableMatches = this.state.matches.filter(
@@ -360,7 +417,7 @@ export class Tournament {
         this.fillRepechageWithLosers();
 
         // Recompute playable matches after attempting to fill repechage
-        const playableAfterFill = this.state.matches.filter(
+        let playableAfterFill = this.state.matches.filter(
             m => m.round === this.state.currentRound && !m.winner && this.isMatchPlayable(m)
         );
         if (playableAfterFill.length > 0) {
@@ -369,12 +426,25 @@ export class Tournament {
         }
 
         // If there are still matches without winners in this round but they are waiting for opponents (BYE),
-        // do not select a BYE match; wait until repechage fills or other matches finish.
+        // attempt to resolve BYEs by pairing singleton players or pulling from losers
         const pendingMatches = this.state.matches.filter(
             m => m.round === this.state.currentRound && !m.winner
         );
         if (pendingMatches.length > 0) {
-            this.state.currentMatch = null; // waiting for opponents / repechage fill
+            // try to resolve BYEs for this round to unblock progression
+            this.resolveByesForRound(this.state.currentRound);
+
+            // recompute playable matches after attempting to resolve
+            playableAfterFill = this.state.matches.filter(
+                m => m.round === this.state.currentRound && !m.winner && this.isMatchPlayable(m)
+            );
+            if (playableAfterFill.length > 0) {
+                this.state.currentMatch = playableAfterFill[0];
+                return;
+            }
+
+            // still waiting: no playable matches yet (maybe waiting on future losers) — keep waiting
+            this.state.currentMatch = null;
             return;
         }
 
