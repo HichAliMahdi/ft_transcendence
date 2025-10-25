@@ -308,9 +308,9 @@ export class TournamentPage {
 			try {
 				const score = (this.currentGame as any).getScore ? (this.currentGame as any).getScore() : (this.currentGame as any).score;
 				if (score.player1 >= 5) {
-					this.handleMatchEnd(matchId, player1Id);
+					this.handleMatchEnd(matchId, player1Id, score.player1, score.player2);
 				} else if (score.player2 >= 5) {
-					this.handleMatchEnd(matchId, player2Id);
+					this.handleMatchEnd(matchId, player2Id, score.player1, score.player2);
 				}
 			} catch (err) {
 				// if something unexpected happens, stop checking
@@ -322,7 +322,7 @@ export class TournamentPage {
 		}, 100);
 	}
 
-	private handleMatchEnd(matchId: string, winnerId: string): void {
+    private handleMatchEnd(matchId: string, winnerId: string, score1?: number, score2?: number): void {
         // Clear the game check interval
         if (this.gameCheckInterval !== null) {
             clearInterval(this.gameCheckInterval);
@@ -331,9 +331,21 @@ export class TournamentPage {
 
         if (this.currentGame) {
             setTimeout(() => {
+                // get final scores if not provided
+                let finalScore1 = score1;
+                let finalScore2 = score2;
+                try {
+                    const s = (this.currentGame as any).getScore ? (this.currentGame as any).getScore() : (this.currentGame as any).score;
+                    finalScore1 = finalScore1 ?? s.player1;
+                    finalScore2 = finalScore2 ?? s.player2;
+                } catch (e) {
+                    // ignore, use provided or defaults
+                }
+
                 this.cleanupCurrentGame();
                 
-                this.tournament.recordMatchWinner(matchId, winnerId);
+                // pass scores into the tournament so losers pool can be ranked
+                this.tournament.recordMatchWinner(matchId, winnerId, finalScore1, finalScore2);
                 
                 setTimeout(() => {
                     this.updateUI();
