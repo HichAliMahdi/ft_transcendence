@@ -288,6 +288,22 @@ export class Tournament {
             };
 
             this.state.matches.push(newMatch);
+
+            // IMPORTANT: if topA/topB came from specific original matches, update any higher-round
+            // matches that referenced those original match IDs so that the new repechage match will feed correctly.
+            const affectedSourceIds = new Set<string>();
+            // try to find the original match IDs for these players (best-effort)
+            const origA = this.state.matches.find(m => (m.player1?.id === topA.player.id || m.player2?.id === topA.player.id) && m.round === round);
+            const origB = this.state.matches.find(m => (m.player1?.id === topB.player.id || m.player2?.id === topB.player.id) && m.round === round);
+            if (origA) affectedSourceIds.add(origA.id);
+            if (origB) affectedSourceIds.add(origB.id);
+
+            if (affectedSourceIds.size > 0) {
+                for (const mm of this.state.matches) {
+                    if (mm.sourceMatch1 && affectedSourceIds.has(mm.sourceMatch1)) mm.sourceMatch1 = newMatch.id;
+                    if (mm.sourceMatch2 && affectedSourceIds.has(mm.sourceMatch2)) mm.sourceMatch2 = newMatch.id;
+                }
+            }
             // after pushing a new match, we can try to fill other empty slots too
         }
 
@@ -365,6 +381,10 @@ export class Tournament {
             const a = singletons.shift()!;
             const b = singletons.shift()!;
 
+            // Record original match ids before we vacate them
+            const origAId = a.match.id;
+            const origBId = b.match.id;
+
             // Remove players from their original placeholder matches (they are moved into a new match)
             if (a.match.player1 && a.match.player1.id === a.player.id) a.match.player1 = null;
             if (a.match.player2 && a.match.player2.id === a.player.id) a.match.player2 = null;
@@ -383,6 +403,12 @@ export class Tournament {
                 repechageRound: round
             };
             this.state.matches.push(newMatch);
+
+            // Update higher-round source references that previously pointed to the original matches
+            for (const mm of this.state.matches) {
+                if (mm.sourceMatch1 === origAId || mm.sourceMatch1 === origBId) mm.sourceMatch1 = newMatch.id;
+                if (mm.sourceMatch2 === origAId || mm.sourceMatch2 === origBId) mm.sourceMatch2 = newMatch.id;
+            }
         }
 
         // If one singleton remains, try to fill it from any available loser (any round)
@@ -395,6 +421,8 @@ export class Tournament {
                 // assign to the empty slot of the original match
                 if (!remaining.match.player1) remaining.match.player1 = chosen.player;
                 else if (!remaining.match.player2) remaining.match.player2 = chosen.player;
+
+                // If we filled a slot in the original match, no source remapping needed.
             }
         }
 
