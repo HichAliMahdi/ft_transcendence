@@ -308,7 +308,129 @@ export class TournamentPage {
     }
 
     private renderMatch(): void {
-        // Implementation of match UI
+        if (!this.container || !this.currentMatch) return;
+
+        this.cleanupCurrentGame();
+
+        const player1 = TournamentAPI.getPlayerFromMatch(this.currentMatch, this.participants, 1);
+        const player2 = TournamentAPI.getPlayerFromMatch(this.currentMatch, this.participants, 2);
+
+        const title = document.createElement('h1');
+        title.textContent = `Round ${this.currentMatch.round} - Match ${this.currentMatch.match_number}`;
+        title.className = 'text-3xl font-bold text-white mb-6 gradient-text';
+        
+        const matchInfo = document.createElement('div');
+        matchInfo.className = 'glass-effect p-8 rounded-2xl my-8 text-center';
+
+        const vs = document.createElement('h2');
+        vs.className = 'text-4xl my-4';
+
+        const player1Span = document.createElement('span');
+        player1Span.className = 'text-blue-400 font-bold';
+        player1Span.textContent = player1?.alias || 'Unknown';
+
+        const vsText = document.createElement('span');
+        vsText.className = 'text-gray-500 mx-6';
+        vsText.textContent = 'VS';
+
+        const player2Span = document.createElement('span');
+        player2Span.className = 'text-game-red font-bold';
+        player2Span.textContent = player2?.alias || 'Unknown';
+    
+        vs.appendChild(player1Span);
+        vs.appendChild(vsText);
+        vs.appendChild(player2Span);
+        matchInfo.appendChild(vs);
+        
+        const instructions = document.createElement('div');
+        instructions.className = 'mt-6';
+
+        const controlsTitle = document.createElement('p');
+        controlsTitle.className = 'font-semibold text-white mb-3';
+        controlsTitle.textContent = 'Controls:';
+
+        const player1Controls = document.createElement('p');
+        player1Controls.className = 'text-gray-300';
+        player1Controls.textContent = `${player1?.alias}: W (up) / S (down)`;
+
+        const player2Controls = document.createElement('p');
+        player2Controls.className = 'text-gray-300';
+        player2Controls.textContent = `${player2?.alias}: Arrow Up / Arrow Down`;
+
+        const winCondition = document.createElement('p');
+        winCondition.className = 'mt-4 text-game-red font-bold text-lg';
+        winCondition.textContent = 'First to 5 points wins!';
+
+        instructions.appendChild(controlsTitle);
+        instructions.appendChild(player1Controls);
+        instructions.appendChild(player2Controls);
+        instructions.appendChild(winCondition);
+        matchInfo.appendChild(instructions);
+        
+        const canvas = document.createElement('canvas');
+        canvas.id = 'gameCanvas';
+        canvas.className = 'border-2 border-game-dark bg-black mx-auto my-8 rounded-xl block';
+        canvas.style.width = '100%';
+        canvas.style.maxWidth = '800px';
+        canvas.style.height = 'auto';
+
+        const buttonContainer = document.createElement('div');
+        buttonContainer.className = 'text-center mt-6 flex justify-center gap-4';
+        
+        const startButton = document.createElement('button');
+        startButton.textContent = 'Start Match';
+        startButton.className = 'bg-game-red hover:bg-red-600 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-200';
+        
+        const pauseButton = document.createElement('button');
+        pauseButton.textContent = 'Pause';
+        pauseButton.className = 'bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-200 hidden';
+        
+        const leaveButton = document.createElement('button');
+        leaveButton.textContent = 'Leave Tournament';
+        leaveButton.className = 'bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-200';
+        
+        startButton.onclick = () => {
+            this.currentGame = new PongGame(canvas);
+            this.setupGameEndHandler(this.currentMatch!.id, player1!.id, player2!.id);
+            this.currentGame.start();
+            startButton.disabled = true;
+            startButton.classList.add('opacity-50', 'cursor-not-allowed');
+            pauseButton.classList.remove('hidden');
+        };
+        
+        pauseButton.onclick = () => {
+            if (this.currentGame) {
+                const isPaused = this.currentGame.togglePause();
+                pauseButton.textContent = isPaused ? 'Resume' : 'Pause';
+                pauseButton.className = `font-bold py-3 px-6 rounded-lg transition-colors duration-200 ${
+                    isPaused 
+                        ? 'bg-green-600 hover:bg-green-700 text-white' 
+                        : 'bg-blue-600 hover:bg-blue-700 text-white'
+                }`;
+            }
+        };
+        
+        leaveButton.onclick = () => {
+            if (confirm('Are you sure you want to leave the tournament? This action cannot be undone.')) {
+                this.cleanupCurrentGame();
+                this.tournament = null;
+                this.participants = [];
+                this.matches = [];
+                window.location.href = '/';
+            }
+        };
+        
+        buttonContainer.appendChild(startButton);
+        buttonContainer.appendChild(pauseButton);
+        buttonContainer.appendChild(leaveButton);
+        
+        const bracket = this.renderBracket();
+        
+        this.container.appendChild(title);
+        this.container.appendChild(matchInfo);
+        this.container.appendChild(canvas);
+        this.container.appendChild(buttonContainer);
+        this.container.appendChild(bracket);
     }
 
     private setupGameEndHandler(): void {
