@@ -1,4 +1,4 @@
-import { Tournament } from '../game/Tournament';
+import { Tournament, TournamentSize } from '../game/Tournament';
 import { PongGame } from '../game/PongGame';
 
 export class TournamentPage {
@@ -26,7 +26,9 @@ export class TournamentPage {
         
         const state = this.tournament.getState();
 
-        if (!state.isActive && !state.isComplete) {
+        if (state.maxPlayers === 0) {
+            this.renderSizeSelection();
+        } else if (!state.isActive && !state.isComplete) {
             this.renderRegistration();
         } else if (state.isActive && state.currentMatch) {
             this.renderMatch();
@@ -36,36 +38,135 @@ export class TournamentPage {
             this.renderWaitingScreen();
         }
     }
+
+    private renderSizeSelection(): void {
+        if (!this.container) return;
+
+        const title = document.createElement('h1');
+        title.textContent = 'Tournament Setup';
+        title.className = 'text-4xl font-bold text-white text-center mb-4 gradient-text';
+        
+        const subtitle = document.createElement('p');
+        subtitle.textContent = 'Select tournament size';
+        subtitle.className = 'text-gray-300 text-lg mb-12 text-center';
+        
+        const sizeSection = document.createElement('div');
+        sizeSection.className = 'grid grid-cols-1 md:grid-cols-3 gap-8 max-w-4xl mx-auto';
+        
+        const sizes: { size: TournamentSize; emoji: string; description: string }[] = [
+            { size: 4, emoji: '🎮', description: 'Quick tournament - 2 rounds, 3 matches total' },
+            { size: 8, emoji: '🏆', description: 'Standard tournament - 3 rounds, 7 matches total' },
+            { size: 16, emoji: '👑', description: 'Championship - 4 rounds, 15 matches total' }
+        ];
+        
+        sizes.forEach(({ size, emoji, description }) => {
+            const card = document.createElement('div');
+            card.className = 'glass-effect p-8 rounded-2xl cursor-pointer transition-all duration-300 border-2 border-transparent hover:border-accent-pink hover:-translate-y-2 flex flex-col items-center';
+            card.onclick = () => {
+                this.tournament.setTournamentSize(size);
+            };
+            
+            const emojiDiv = document.createElement('div');
+            emojiDiv.className = 'text-7xl mb-4';
+            emojiDiv.textContent = emoji;
+
+            const sizeTitle = document.createElement('h3');
+            sizeTitle.className = 'text-3xl font-bold text-white mb-3';
+            sizeTitle.textContent = `${size} Players`;
+
+            const desc = document.createElement('p');
+            desc.className = 'text-sm text-gray-300 text-center leading-relaxed';
+            desc.textContent = description;
+
+            card.appendChild(emojiDiv);
+            card.appendChild(sizeTitle);
+            card.appendChild(desc);
+            
+            sizeSection.appendChild(card);
+        });
+        
+        const infoBox = document.createElement('div');
+        infoBox.className = 'glass-effect p-6 rounded-2xl mt-12 max-w-2xl mx-auto';
+        
+        const infoTitle = document.createElement('h3');
+        infoTitle.className = 'text-xl font-semibold text-white mb-3 text-center';
+        infoTitle.textContent = 'How it works';
+        
+        const infoList = document.createElement('ul');
+        infoList.className = 'text-gray-300 space-y-2';
+        
+        const infoItems = [
+            'Choose your tournament size (4, 8, or 16 players)',
+            'Register players - you can start with fewer players than the maximum',
+            'Players without opponents get automatic BYEs to the next round',
+            'Single elimination format - lose once and you\'re out!',
+            'First to 5 points wins each match'
+        ];
+        
+        infoItems.forEach(item => {
+            const li = document.createElement('li');
+            li.className = 'flex items-start';
+            
+            const bullet = document.createElement('span');
+            bullet.textContent = '•';
+            bullet.className = 'mr-2 text-accent-pink';
+            
+            li.appendChild(bullet);
+            li.appendChild(document.createTextNode(item));
+            infoList.appendChild(li);
+        });
+        
+        infoBox.appendChild(infoTitle);
+        infoBox.appendChild(infoList);
+        
+        this.container.appendChild(title);
+        this.container.appendChild(subtitle);
+        this.container.appendChild(sizeSection);
+        this.container.appendChild(infoBox);
+    }
+
     private renderRegistration(): void {
         if (!this.container) return;
+
+        const maxPlayers = this.tournament.getTournamentSize();
+        const currentPlayers = this.tournament.getPlayers().length;
+        const remaining = this.tournament.getRemainingSlots();
+        const isFull = this.tournament.isFull();
 
         const title = document.createElement('h1');
         title.textContent = 'Tournament Registration';
         title.className = 'text-4xl font-bold text-white mb-4 gradient-text';
         
         const subtitle = document.createElement('p');
-        subtitle.textContent = 'Register players for the tournament (minimum 2 players)';
-        subtitle.className = 'text-gray-300 text-lg mb-8';
+        subtitle.textContent = `${maxPlayers}-Player Tournament`;
+        subtitle.className = 'text-gray-300 text-lg mb-2 text-center';
+        
+        const playerCount = document.createElement('p');
+        playerCount.className = 'text-2xl font-bold text-center mb-8';
+        playerCount.innerHTML = `<span class="text-accent-pink">${currentPlayers}</span> / <span class="text-accent-purple">${maxPlayers}</span> Players`;
         
         const registrationForm = document.createElement('div');
         registrationForm.className = 'glass-effect p-8 rounded-2xl mb-8';
         
         const input = document.createElement('input');
         input.type = 'text';
-        input.placeholder = 'Enter player alias';
+        input.placeholder = isFull ? 'Tournament is full!' : 'Enter player alias';
         input.maxLength = 20;
-        input.className = 'px-4 py-3 text-lg border-2 border-blue-800 rounded-xl bg-primary-dark text-white w-full md:w-80 focus:outline-none focus:border-accent-pink transition-colors duration-300';
+        input.disabled = isFull;
+        input.className = `px-4 py-3 text-lg border-2 border-blue-800 rounded-xl bg-primary-dark text-white w-full md:w-80 focus:outline-none focus:border-accent-pink transition-colors duration-300 ${isFull ? 'opacity-50 cursor-not-allowed' : ''}`;
 
         const errorMsg = document.createElement('p');
         errorMsg.className = 'text-red-500 text-sm mt-2 hidden';
         errorMsg.id = 'alias-error';
 
         const addButton = document.createElement('button');
-        addButton.textContent = 'Add Player';
-        addButton.className = 'btn-primary ml-4';
+        addButton.textContent = isFull ? 'Full' : `Add Player (${remaining} slots left)`;
+        addButton.disabled = isFull;
+        addButton.className = `btn-primary ml-4 ${isFull ? 'opacity-50 cursor-not-allowed' : ''}`;
         addButton.onclick = () => {
             const alias = input.value.trim();
             errorMsg.classList.add('hidden');
+            
             if (!alias) {
                 errorMsg.textContent = 'Please enter a player alias';
                 errorMsg.classList.remove('hidden');
@@ -81,18 +182,23 @@ export class TournamentPage {
                 errorMsg.classList.remove('hidden');
                 return;
             }
+            
             const success = this.tournament.addPlayer(alias);
             if (success) {
                 input.value = '';
                 input.focus();
             } else {
-                errorMsg.textContent = 'This alias is already taken!';
+                if (this.tournament.isFull()) {
+                    errorMsg.textContent = 'Tournament is full!';
+                } else {
+                    errorMsg.textContent = 'This alias is already taken!';
+                }
                 errorMsg.classList.remove('hidden');
             }
         };
 
         input.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
+            if (e.key === 'Enter' && !isFull) {
                 addButton.click();
             }
         });
@@ -101,14 +207,15 @@ export class TournamentPage {
         formContainer.className = 'flex flex-col sm:flex-row gap-4 items-center justify-center';
         formContainer.appendChild(input);
         formContainer.appendChild(addButton);
-        formContainer.appendChild(errorMsg);
+        
         registrationForm.appendChild(formContainer);
+        registrationForm.appendChild(errorMsg);
         
         const playersList = document.createElement('div');
         playersList.className = 'glass-effect p-6 rounded-2xl mb-8';
         
         const playersTitle = document.createElement('h3');
-        playersTitle.textContent = `Registered Players (${this.tournament.getPlayers().length})`;
+        playersTitle.textContent = `Registered Players (${currentPlayers})`;
         playersTitle.className = 'text-2xl font-semibold text-white mb-4';
         playersList.appendChild(playersTitle);
         
@@ -116,7 +223,7 @@ export class TournamentPage {
         if (players.length === 0) {
             const emptyMsg = document.createElement('p');
             emptyMsg.textContent = 'No players registered yet';
-            emptyMsg.className = 'text-white-500 text-center py-4';
+            emptyMsg.className = 'text-gray-400 text-center py-4';
             playersList.appendChild(emptyMsg);
         } else {
             const ul = document.createElement('ul');
@@ -145,6 +252,9 @@ export class TournamentPage {
             playersList.appendChild(ul);
         }
         
+        const buttonContainer = document.createElement('div');
+        buttonContainer.className = 'flex flex-col sm:flex-row gap-4 justify-center items-center';
+        
         const startButton = document.createElement('button');
         startButton.textContent = 'Start Tournament';
         startButton.disabled = players.length < 2;
@@ -157,173 +267,179 @@ export class TournamentPage {
             this.tournament.startTournament();
         };
         
+        const backButton = document.createElement('button');
+        backButton.textContent = '← Change Size';
+        backButton.className = 'bg-game-dark hover:bg-blue-800 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-300';
+        backButton.onclick = () => {
+            this.tournament.reset();
+        };
+        
+        buttonContainer.appendChild(startButton);
+        buttonContainer.appendChild(backButton);
+        
         this.container.appendChild(title);
         this.container.appendChild(subtitle);
+        this.container.appendChild(playerCount);
         this.container.appendChild(registrationForm);
         this.container.appendChild(playersList);
-        this.container.appendChild(startButton);
+        this.container.appendChild(buttonContainer);
     }
 
     private renderMatch(): void {
-		if (!this.container) return;
+        if (!this.container) return;
 
-		const match = this.tournament.getCurrentMatch();
-		if (!match) return;
+        const match = this.tournament.getCurrentMatch();
+        if (!match) return;
 
-		// Clean up any existing game first
-		this.cleanupCurrentGame();
+        this.cleanupCurrentGame();
 
-		const title = document.createElement('h1');
-		title.textContent = `Round ${match.round} - Match ${match.matchNumber}`;
-		title.className = 'text-3xl font-bold text-white mb-6 gradient-text';
-		
-		const matchInfo = document.createElement('div');
-		matchInfo.className = 'glass-effect p-8 rounded-2xl my-8 text-center';
+        const title = document.createElement('h1');
+        title.textContent = `Round ${match.round} - Match ${match.matchNumber}`;
+        title.className = 'text-3xl font-bold text-white mb-6 gradient-text';
+        
+        const matchInfo = document.createElement('div');
+        matchInfo.className = 'glass-effect p-8 rounded-2xl my-8 text-center';
 
-		const vs = document.createElement('h2');
-		vs.className = 'text-4xl my-4';
+        const vs = document.createElement('h2');
+        vs.className = 'text-4xl my-4';
 
-		const player1Span = document.createElement('span');
-		player1Span.className = 'text-blue-400 font-bold';
-		player1Span.textContent = match.player1?.alias || 'BYE';
+        const player1Span = document.createElement('span');
+        player1Span.className = 'text-blue-400 font-bold';
+        player1Span.textContent = match.player1?.alias || 'BYE';
 
-		const vsText = document.createElement('span');
-		vsText.className = 'text-gray-500 mx-6';
-		vsText.textContent = 'VS';
+        const vsText = document.createElement('span');
+        vsText.className = 'text-gray-500 mx-6';
+        vsText.textContent = 'VS';
 
-		const player2Span = document.createElement('span');
-		player2Span.className = 'text-game-red font-bold';
-		player2Span.textContent = match.player2?.alias || 'BYE';
-	
-		vs.appendChild(player1Span);
-		vs.appendChild(vsText);
-		vs.appendChild(player2Span);
-		matchInfo.appendChild(vs);
-		
-		const instructions = document.createElement('div');
-		instructions.className = 'mt-6';
+        const player2Span = document.createElement('span');
+        player2Span.className = 'text-game-red font-bold';
+        player2Span.textContent = match.player2?.alias || 'BYE';
+    
+        vs.appendChild(player1Span);
+        vs.appendChild(vsText);
+        vs.appendChild(player2Span);
+        matchInfo.appendChild(vs);
+        
+        const instructions = document.createElement('div');
+        instructions.className = 'mt-6';
 
-		const controlsTitle = document.createElement('p');
-		controlsTitle.className = 'font-semibold text-white mb-3';
-		controlsTitle.textContent = 'Controls:';
+        const controlsTitle = document.createElement('p');
+        controlsTitle.className = 'font-semibold text-white mb-3';
+        controlsTitle.textContent = 'Controls:';
 
-		const player1Controls = document.createElement('p');
-		player1Controls.className = 'text-gray-300';
-		player1Controls.textContent = `${match.player1?.alias}: W (up) / S (down)`;
+        const player1Controls = document.createElement('p');
+        player1Controls.className = 'text-gray-300';
+        player1Controls.textContent = `${match.player1?.alias}: W (up) / S (down)`;
 
-		const player2Controls = document.createElement('p');
-		player2Controls.className = 'text-gray-300';
-		player2Controls.textContent = `${match.player2?.alias}: Arrow Up / Arrow Down`;
+        const player2Controls = document.createElement('p');
+        player2Controls.className = 'text-gray-300';
+        player2Controls.textContent = `${match.player2?.alias}: Arrow Up / Arrow Down`;
 
-		const winCondition = document.createElement('p');
-		winCondition.className = 'mt-4 text-game-red font-bold text-lg';
-		winCondition.textContent = 'First to 5 points wins!';
+        const winCondition = document.createElement('p');
+        winCondition.className = 'mt-4 text-game-red font-bold text-lg';
+        winCondition.textContent = 'First to 5 points wins!';
 
-		instructions.appendChild(controlsTitle);
-		instructions.appendChild(player1Controls);
-		instructions.appendChild(player2Controls);
-		instructions.appendChild(winCondition);
-		matchInfo.appendChild(instructions);
-		
-		const canvas = document.createElement('canvas');
-		canvas.id = 'gameCanvas';
-		canvas.className = 'border-2 border-game-dark bg-black mx-auto my-8 rounded-xl block';
-		canvas.style.width = '100%';
-		canvas.style.maxWidth = '800px';
-		canvas.style.height = 'auto';
+        instructions.appendChild(controlsTitle);
+        instructions.appendChild(player1Controls);
+        instructions.appendChild(player2Controls);
+        instructions.appendChild(winCondition);
+        matchInfo.appendChild(instructions);
+        
+        const canvas = document.createElement('canvas');
+        canvas.id = 'gameCanvas';
+        canvas.className = 'border-2 border-game-dark bg-black mx-auto my-8 rounded-xl block';
+        canvas.style.width = '100%';
+        canvas.style.maxWidth = '800px';
+        canvas.style.height = 'auto';
 
-		const buttonContainer = document.createElement('div');
-		buttonContainer.className = 'text-center mt-6 flex justify-center gap-4';
-		
-		const startButton = document.createElement('button');
-		startButton.textContent = 'Start Match';
-		startButton.className = 'bg-game-red hover:bg-red-600 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-200';
-		
-		const pauseButton = document.createElement('button');
-		pauseButton.textContent = 'Pause';
-		pauseButton.className = 'bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-200 hidden';
-		
-		const leaveButton = document.createElement('button');
-		leaveButton.textContent = 'Leave Tournament';
-		leaveButton.className = 'bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-200';
-		
-		startButton.onclick = () => {
-			this.currentGame = new PongGame(canvas);
-			this.setupGameEndHandler(match.id, match.player1!.id, match.player2!.id);
-			this.currentGame.start();
-			startButton.disabled = true;
-			startButton.classList.add('opacity-50', 'cursor-not-allowed');
-			pauseButton.classList.remove('hidden');
-		};
-		
-		pauseButton.onclick = () => {
-			if (this.currentGame) {
-				const isPaused = this.currentGame.togglePause();
-				pauseButton.textContent = isPaused ? 'Resume' : 'Pause';
-				pauseButton.className = `font-bold py-3 px-6 rounded-lg transition-colors duration-200 ${
-					isPaused 
-						? 'bg-green-600 hover:bg-green-700 text-white' 
-						: 'bg-blue-600 hover:bg-blue-700 text-white'
-				}`;
-			}
-		};
-		
-		leaveButton.onclick = () => {
-			if (confirm('Are you sure you want to leave the tournament? This action cannot be undone.')) {
-				this.cleanupCurrentGame();
-				this.tournament.reset();
-				window.location.href = '/';
-			}
-		};
-		
-		buttonContainer.appendChild(startButton);
-		buttonContainer.appendChild(pauseButton);
-		buttonContainer.appendChild(leaveButton);
-		
-		const bracket = this.renderBracket();
-		
-		this.container.appendChild(title);
-		this.container.appendChild(matchInfo);
-		this.container.appendChild(canvas);
-		this.container.appendChild(buttonContainer);
-		this.container.appendChild(bracket);
-	}
+        const buttonContainer = document.createElement('div');
+        buttonContainer.className = 'text-center mt-6 flex justify-center gap-4';
+        
+        const startButton = document.createElement('button');
+        startButton.textContent = 'Start Match';
+        startButton.className = 'bg-game-red hover:bg-red-600 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-200';
+        
+        const pauseButton = document.createElement('button');
+        pauseButton.textContent = 'Pause';
+        pauseButton.className = 'bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-200 hidden';
+        
+        const leaveButton = document.createElement('button');
+        leaveButton.textContent = 'Leave Tournament';
+        leaveButton.className = 'bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-200';
+        
+        startButton.onclick = () => {
+            this.currentGame = new PongGame(canvas);
+            this.setupGameEndHandler(match.id, match.player1!.id, match.player2!.id);
+            this.currentGame.start();
+            startButton.disabled = true;
+            startButton.classList.add('opacity-50', 'cursor-not-allowed');
+            pauseButton.classList.remove('hidden');
+        };
+        
+        pauseButton.onclick = () => {
+            if (this.currentGame) {
+                const isPaused = this.currentGame.togglePause();
+                pauseButton.textContent = isPaused ? 'Resume' : 'Pause';
+                pauseButton.className = `font-bold py-3 px-6 rounded-lg transition-colors duration-200 ${
+                    isPaused 
+                        ? 'bg-green-600 hover:bg-green-700 text-white' 
+                        : 'bg-blue-600 hover:bg-blue-700 text-white'
+                }`;
+            }
+        };
+        
+        leaveButton.onclick = () => {
+            if (confirm('Are you sure you want to leave the tournament? This action cannot be undone.')) {
+                this.cleanupCurrentGame();
+                this.tournament.reset();
+                window.location.href = '/';
+            }
+        };
+        
+        buttonContainer.appendChild(startButton);
+        buttonContainer.appendChild(pauseButton);
+        buttonContainer.appendChild(leaveButton);
+        
+        const bracket = this.renderBracket();
+        
+        this.container.appendChild(title);
+        this.container.appendChild(matchInfo);
+        this.container.appendChild(canvas);
+        this.container.appendChild(buttonContainer);
+        this.container.appendChild(bracket);
+    }
 
-	private setupGameEndHandler(matchId: string, player1Id: string, player2Id: string): void {
-		// Clear any existing interval
-		if (this.gameCheckInterval !== null) {
-			clearInterval(this.gameCheckInterval);
-		}
+    private setupGameEndHandler(matchId: string, player1Id: string, player2Id: string): void {
+        if (this.gameCheckInterval !== null) {
+            clearInterval(this.gameCheckInterval);
+        }
 
-		this.gameCheckInterval = window.setInterval(() => {
-			if (!this.currentGame) {
-				if (this.gameCheckInterval !== null) {
-					clearInterval(this.gameCheckInterval);
-					this.gameCheckInterval = null;
-				}
-				return;
-			}
+        this.gameCheckInterval = window.setInterval(() => {
+            if (!this.currentGame) {
+                if (this.gameCheckInterval !== null) {
+                    clearInterval(this.gameCheckInterval);
+                    this.gameCheckInterval = null;
+                }
+                return;
+            }
 
-			// Use public getter to obtain score (PongGame.getScore)
-			try {
-				const score = (this.currentGame as any).getScore ? (this.currentGame as any).getScore() : (this.currentGame as any).score;
-				if (score.player1 >= 5) {
-					this.handleMatchEnd(matchId, player1Id, score.player1, score.player2);
-				} else if (score.player2 >= 5) {
-					this.handleMatchEnd(matchId, player2Id, score.player1, score.player2);
-				}
-			} catch (err) {
-				// if something unexpected happens, stop checking
-				if (this.gameCheckInterval !== null) {
-					clearInterval(this.gameCheckInterval);
-					this.gameCheckInterval = null;
-				}
-			}
-		}, 100);
-	}
+            try {
+                const score = (this.currentGame as any).getScore ? (this.currentGame as any).getScore() : (this.currentGame as any).score;
+                if (score.player1 >= 5) {
+                    this.handleMatchEnd(matchId, player1Id, score.player1, score.player2);
+                } else if (score.player2 >= 5) {
+                    this.handleMatchEnd(matchId, player2Id, score.player1, score.player2);
+                }
+            } catch (err) {
+                if (this.gameCheckInterval !== null) {
+                    clearInterval(this.gameCheckInterval);
+                    this.gameCheckInterval = null;
+                }
+            }
+        }, 100);
+    }
 
     private handleMatchEnd(matchId: string, winnerId: string, score1?: number, score2?: number): void {
-        // Clear the game check interval
         if (this.gameCheckInterval !== null) {
             clearInterval(this.gameCheckInterval);
             this.gameCheckInterval = null;
@@ -331,7 +447,6 @@ export class TournamentPage {
 
         if (this.currentGame) {
             setTimeout(() => {
-                // get final scores if not provided
                 let finalScore1 = score1;
                 let finalScore2 = score2;
                 try {
@@ -339,12 +454,10 @@ export class TournamentPage {
                     finalScore1 = finalScore1 ?? s.player1;
                     finalScore2 = finalScore2 ?? s.player2;
                 } catch (e) {
-                    // ignore, use provided or defaults
+                    // ignore
                 }
 
                 this.cleanupCurrentGame();
-                
-                // pass scores into the tournament so losers pool can be ranked
                 this.tournament.recordMatchWinner(matchId, winnerId, finalScore1, finalScore2);
                 
                 setTimeout(() => {
@@ -357,7 +470,7 @@ export class TournamentPage {
     private cleanupCurrentGame(): void {
         if (this.currentGame) {
             if (this.currentGame.isPauseActive()) {
-                this.currentGame.togglePause(); // Ensure game is unpaused before destroying
+                this.currentGame.togglePause();
             }
             this.currentGame.destroy();
             this.currentGame = null;
@@ -379,15 +492,14 @@ export class TournamentPage {
 
         const rounds = this.tournament.getAllRounds();
 
-        // Create a horizontal flex container where each round is a column
         const roundsContainer = document.createElement('div');
         roundsContainer.className = 'flex gap-6 items-start';
 
         const formatSourceLabel = (sourceId?: string) => {
             if (!sourceId) return 'TBD';
-            const parts = sourceId.split('_'); // expected match_{round}_{num}
+            const parts = sourceId.split('_');
             if (parts.length >= 3) {
-                return `Winner (R${parts[1]} M${parts[2]})`;
+                return `Winner R${parts[1]} M${parts[2]}`;
             }
             return `Winner (${sourceId})`;
         };
