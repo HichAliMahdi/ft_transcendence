@@ -158,7 +158,6 @@ export class Tournament {
         this.shufflePlayers(players);
         
         const bracketSize = this.state.maxPlayers;
-        const numPlayers = players.length;
         
         const mainMatches: Match[] = [];
         let matchNumber = 1;
