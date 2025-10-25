@@ -142,7 +142,7 @@ export class Tournament {
             return false;
         }
 
-        if (this.state.players.length < 2) {
+        if (this.state.players.length !== this.state.maxPlayers) {
             return false;
         }
 

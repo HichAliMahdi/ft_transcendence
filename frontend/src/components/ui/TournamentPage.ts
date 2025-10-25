@@ -257,12 +257,13 @@ export class TournamentPage {
         
         const startButton = document.createElement('button');
         startButton.textContent = 'Start Tournament';
-        startButton.disabled = players.length < 2;
+        startButton.disabled = !isFull;
         startButton.className = `text-xl font-bold py-4 px-8 rounded-lg transition-colors duration-300 ${
-            players.length >= 2 
-                ? 'btn-primary' 
-                : 'bg-gray-600 text-gray-400 cursor-not-allowed'
+            isFull 
+            ? 'btn-primary' 
+            : 'bg-gray-600 text-gray-400 cursor-not-allowed'
         }`;
+        
         startButton.onclick = () => {
             this.tournament.startTournament();
         };
