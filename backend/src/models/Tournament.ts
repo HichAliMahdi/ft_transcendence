@@ -34,6 +34,7 @@ interface Tournament {
 
 export class TournamentService {
     
+    // Create a new tournament
     static createTournament(name: string, maxPlayers: TournamentSize): Tournament {
         const stmt = db.prepare(`
             INSERT INTO tournaments (name, status, max_players, current_round)
@@ -43,11 +44,19 @@ export class TournamentService {
         return this.getTournamentById(result.lastInsertRowid as number);
     }
 
+    // Get tournament by ID
     static getTournamentById(id: number): Tournament {
         const stmt = db.prepare(`SELECT * FROM tournaments WHERE id = ?`);
         return stmt.get(id) as Tournament;
     }
 
+    // Get all tournaments
+    static getAllTournaments(): Tournament[] {
+        const stmt = db.prepare(`SELECT * FROM tournaments ORDER BY created_at DESC`);
+        return stmt.all() as Tournament[];
+    }
+
+    // Add player to tournament
     static addPlayer(tournamentId: number, alias: string): boolean {
         const tournament = this.getTournamentById(tournamentId);
         
@@ -60,17 +69,20 @@ export class TournamentService {
             return false;
         }
 
+        // Check for duplicate alias
         if (currentPlayers.some(p => p.alias.toLowerCase() === alias.toLowerCase())) {
             return false;
         }
 
         try {
+            // Create a temporary user for this tournament
             const userStmt = db.prepare(`
                 INSERT INTO users (username) VALUES (?)
             `);
             const userResult = userStmt.run(`${alias}_${Date.now()}`);
             const userId = userResult.lastInsertRowid as number;
 
+            // Add to tournament participants
             const participantStmt = db.prepare(`
                 INSERT INTO tournament_participants (tournament_id, user_id, alias)
                 VALUES (?, ?, ?)
@@ -84,6 +96,7 @@ export class TournamentService {
         }
     }
 
+    // Remove player from tournament
     static removePlayer(tournamentId: number, userId: number): boolean {
         const tournament = this.getTournamentById(tournamentId);
         
@@ -103,6 +116,8 @@ export class TournamentService {
             return false;
         }
     }
+
+    // Get all participants
     static getParticipants(tournamentId: number): Player[] {
         const stmt = db.prepare(`
             SELECT u.id, tp.alias 
@@ -113,6 +128,7 @@ export class TournamentService {
         return stmt.all(tournamentId) as Player[];
     }
 
+    // Start tournament (generate bracket)
     static startTournament(tournamentId: number): boolean {
         const tournament = this.getTournamentById(tournamentId);
         
@@ -125,10 +141,13 @@ export class TournamentService {
             return false;
         }
 
+        // Shuffle players
         const shuffled = this.shuffleArray([...participants]);
         
+        // Generate bracket
         this.generateBracket(tournamentId, shuffled, tournament.max_players);
 
+        // Update tournament status
         const updateStmt = db.prepare(`
             UPDATE tournaments SET status = 'active' WHERE id = ?
         `);
@@ -137,6 +156,7 @@ export class TournamentService {
         return true;
     }
 
+    // Generate tournament bracket
     private static generateBracket(
         tournamentId: number, 
         players: Player[], 
@@ -144,6 +164,7 @@ export class TournamentService {
     ): void {
         const totalRounds = Math.log2(maxPlayers);
         
+        // Round 1: Create initial matches
         const round1Matches: number[] = [];
         for (let i = 0; i < players.length; i += 2) {
             const player1 = players[i];
@@ -164,6 +185,7 @@ export class TournamentService {
             round1Matches.push(result.lastInsertRowid as number);
         }
 
+        // Generate subsequent rounds
         let previousMatches = round1Matches;
         for (let round = 2; round <= totalRounds; round++) {
             const roundMatches: number[] = [];
@@ -188,6 +210,8 @@ export class TournamentService {
             previousMatches = roundMatches;
         }
     }
+
+    // Get current match
     static getCurrentMatch(tournamentId: number): Match | null {
         const stmt = db.prepare(`
             SELECT * FROM games 
@@ -201,6 +225,7 @@ export class TournamentService {
         return (stmt.get(tournamentId) as Match) || null;
     }
 
+    // Record match result
     static recordMatchResult(
         matchId: number, 
         winnerId: number, 
@@ -208,6 +233,7 @@ export class TournamentService {
         score2: number
     ): boolean {
         try {
+            // Update match
             const updateStmt = db.prepare(`
                 UPDATE games 
                 SET winner_id = ?, 
@@ -217,6 +243,8 @@ export class TournamentService {
                 WHERE id = ?
             `);
             updateStmt.run(winnerId, score1, score2, matchId);
+
+            // Find next match
             const nextMatchStmt = db.prepare(`
                 SELECT * FROM games 
                 WHERE source_match_id_1 = ? OR source_match_id_2 = ?
@@ -224,6 +252,7 @@ export class TournamentService {
             const nextMatch = nextMatchStmt.get(matchId, matchId) as Match | undefined;
 
             if (nextMatch) {
+                // Update next match with winner
                 if (nextMatch.source_match_id_1 === matchId) {
                     db.prepare(`UPDATE games SET player1_id = ? WHERE id = ?`)
                         .run(winnerId, nextMatch.id);
@@ -232,6 +261,7 @@ export class TournamentService {
                         .run(winnerId, nextMatch.id);
                 }
             } else {
+                // This was the final match
                 const match = db.prepare(`SELECT * FROM games WHERE id = ?`).get(matchId) as Match;
                 db.prepare(`UPDATE tournaments SET status = 'completed', winner_id = ? WHERE id = ?`)
                     .run(winnerId, match.tournament_id);
@@ -244,6 +274,7 @@ export class TournamentService {
         }
     }
 
+    // Get all matches for a tournament
     static getAllMatches(tournamentId: number): Match[] {
         const stmt = db.prepare(`
             SELECT * FROM games 
@@ -253,6 +284,7 @@ export class TournamentService {
         return stmt.all(tournamentId) as Match[];
     }
 
+    // Utility: Shuffle array
     private static shuffleArray<T>(array: T[]): T[] {
         const shuffled = [...array];
         for (let i = shuffled.length - 1; i > 0; i--) {
