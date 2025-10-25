@@ -433,26 +433,240 @@ export class TournamentPage {
         this.container.appendChild(bracket);
     }
 
-    private setupGameEndHandler(): void {
-        // Implementation of game end handler
+    private setupGameEndHandler(matchId: number, player1Id: number, player2Id: number): void {
+        if (this.gameCheckInterval !== null) {
+            clearInterval(this.gameCheckInterval);
+        }
+
+        this.gameCheckInterval = window.setInterval(() => {
+            if (!this.currentGame) {
+                if (this.gameCheckInterval !== null) {
+                    clearInterval(this.gameCheckInterval);
+                    this.gameCheckInterval = null;
+                }
+                return;
+            }
+
+            try {
+                const score = (this.currentGame as any).getScore ? (this.currentGame as any).getScore() : (this.currentGame as any).score;
+                if (score.player1 >= 5) {
+                    this.handleMatchEnd(matchId, player1Id, score.player1, score.player2);
+                } else if (score.player2 >= 5) {
+                    this.handleMatchEnd(matchId, player2Id, score.player1, score.player2);
+                }
+            } catch (err) {
+                if (this.gameCheckInterval !== null) {
+                    clearInterval(this.gameCheckInterval);
+                    this.gameCheckInterval = null;
+                }
+            }
+        }, 100);
     }
 
     private handleMatchEnd(matchId: number, winnerId: number, score1: number, score2: number): void {
-        // Implementation of match end handling
+        if (this.gameCheckInterval !== null) {
+            clearInterval(this.gameCheckInterval);
+            this.gameCheckInterval = null;
+        }
+
+        if (this.currentGame) {
+            setTimeout(async () => {
+                let finalScore1 = score1;
+                let finalScore2 = score2;
+                try {
+                    const s = (this.currentGame as any).getScore ? (this.currentGame as any).getScore() : (this.currentGame as any).score;
+                    finalScore1 = finalScore1 ?? s.player1;
+                    finalScore2 = finalScore2 ?? s.player2;
+                } catch (e) {
+                    // ignore
+                }
+
+                this.cleanupCurrentGame();
+                
+                try {
+                    await TournamentAPI.recordMatchResult(matchId, winnerId, finalScore1, finalScore2);
+                    await this.refreshTournamentData();
+                } catch (error: any) {
+                    alert(`Error recording match result: ${error.message}`);
+                }
+                
+                setTimeout(() => {
+                    this.updateUI();
+                }, 2000);
+            }, 3000);
+        }
     }
 
     private renderBracket(): HTMLElement {
-        // Implementation of bracket rendering
+        const bracket = document.createElement('div');
+        bracket.className = 'bg-game-dark p-8 rounded-lg mt-8 overflow-x-auto';
+
+        const title = document.createElement('h3');
+        title.textContent = 'Tournament Bracket';
+        title.className = 'text-2xl font-semibold text-white mb-6';
+        bracket.appendChild(title);
+
+        // Group matches by round
+        const rounds: { [round: number]: Match[] } = {};
+        this.matches.forEach(match => {
+            if (!rounds[match.round]) {
+                rounds[match.round] = [];
+            }
+            rounds[match.round].push(match);
+        });
+
+        const roundNumbers = Object.keys(rounds).map(Number).sort((a, b) => a - b);
+
+        const roundsContainer = document.createElement('div');
+        roundsContainer.className = 'flex gap-6 items-start';
+
+        const formatSourceLabel = (sourceId?: number | null) => {
+            if (!sourceId) return 'TBD';
+            const sourceMatch = this.matches.find(m => m.id === sourceId);
+            if (!sourceMatch) return 'TBD';
+            return `Winner R${sourceMatch.round} M${sourceMatch.match_number}`;
+        };
+
+        roundNumbers.forEach(round => {
+            const roundDiv = document.createElement('div');
+            roundDiv.className = 'min-w-[220px]';
+
+            const roundTitle = document.createElement('h4');
+            roundTitle.textContent = `Round ${round}`;
+            roundTitle.className = 'text-game-red text-xl mb-4 font-bold';
+            roundDiv.appendChild(roundTitle);
+
+            const matchesCol = document.createElement('div');
+            matchesCol.className = 'flex flex-col gap-4';
+
+            rounds[round].forEach(match => {
+                const matchDiv = document.createElement('div');
+                matchDiv.className = `bg-game-dark p-3 rounded-lg transition-all duration-300 ${match.winner_id ? 'opacity-70' : 'hover:bg-blue-700'}`;
+
+                const player1 = TournamentAPI.getPlayerFromMatch(match, this.participants, 1);
+                const player2 = TournamentAPI.getPlayerFromMatch(match, this.participants, 2);
+
+                const p1 = document.createElement('div');
+                const p1Text = player1?.alias || (match.source_match_id_1 ? formatSourceLabel(match.source_match_id_1) : 'BYE');
+                p1.textContent = p1Text;
+                p1.className = `px-3 py-1 rounded ${match.winner_id === match.player1_id ? 'bg-game-red font-bold' : ''}`;
+
+                const p2 = document.createElement('div');
+                const p2Text = player2?.alias || (match.source_match_id_2 ? formatSourceLabel(match.source_match_id_2) : 'BYE');
+                p2.textContent = p2Text;
+                p2.className = `px-3 py-1 rounded mt-2 ${match.winner_id === match.player2_id ? 'bg-game-red font-bold' : ''}`;
+
+                const meta = document.createElement('div');
+                meta.className = 'text-xs text-gray-400 mt-2';
+                meta.textContent = `Match ${match.match_number}`;
+
+                matchDiv.appendChild(p1);
+                matchDiv.appendChild(p2);
+                matchDiv.appendChild(meta);
+                matchesCol.appendChild(matchDiv);
+            });
+
+            roundDiv.appendChild(matchesCol);
+            roundsContainer.appendChild(roundDiv);
+        });
+
+        bracket.appendChild(roundsContainer);
+        return bracket;
     }
 
     private renderWaitingScreen(): void {
-        // Implementation of waiting screen UI
+        if (!this.container) return;
+
+        const title = document.createElement('h1');
+        title.textContent = 'Preparing Next Match...';
+        title.className = 'text-3xl font-bold text-white text-center gradient-text';
+        
+        const message = document.createElement('p');
+        message.textContent = 'Please wait while the next match is being set up.';
+        message.className = 'text-xl text-gray-300 text-center mt-8';
+        
+        const leaveButton = document.createElement('button');
+        leaveButton.textContent = 'Leave Tournament';
+        leaveButton.className = 'bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-200 mt-8';
+        leaveButton.onclick = () => {
+            if (confirm('Are you sure you want to leave the tournament? This action cannot be undone.')) {
+                this.tournament = null;
+                this.participants = [];
+                this.matches = [];
+                window.location.href = '/';
+            }
+        };
+        
+        this.container.appendChild(title);
+        this.container.appendChild(message);
+        this.container.appendChild(leaveButton);
     }
 
     private async renderWinner(): Promise<void> {
+        if (!this.container || !this.tournament) return;
+
+        const winner = this.participants.find(p => p.id === this.tournament!.winner_id);
+        
+        const title = document.createElement('h1');
+        title.textContent = 'Tournament Complete! 🏆';
+        title.className = 'text-4xl font-bold text-white text-center mb-8 gradient-text';
+        
+        const winnerCard = document.createElement('div');
+        winnerCard.className = 'glass-effect p-12 rounded-2xl mx-auto text-center max-w-2xl border-4 border-game-red';
+        
+        const winnerTitle = document.createElement('h2');
+        winnerTitle.textContent = 'Champion';
+        winnerTitle.className = 'text-game-red text-3xl mb-4 font-bold';
+        
+        const winnerName = document.createElement('h3');
+        winnerName.textContent = winner?.alias || 'Unknown';
+        winnerName.className = 'text-5xl text-blue-400 mb-8 font-bold gradient-text';
+        
+        const trophy = document.createElement('div');
+        trophy.textContent = '🏆';
+        trophy.className = 'text-8xl';
+        
+        winnerCard.appendChild(winnerTitle);
+        winnerCard.appendChild(winnerName);
+        winnerCard.appendChild(trophy);
+        
+        const bracket = this.renderBracket();
+        
+        const buttonContainer = document.createElement('div');
+        buttonContainer.className = 'text-center mt-8 flex flex-col sm:flex-row gap-4 justify-center';
+        
+        const newTournamentBtn = document.createElement('button');
+        newTournamentBtn.textContent = 'New Tournament';
+        newTournamentBtn.className = 'btn-primary text-lg px-8 py-4';
+        newTournamentBtn.onclick = () => {
+            this.tournament = null;
+            this.participants = [];
+            this.matches = [];
+            this.currentMatch = null;
+            this.updateUI();
+        };
+        
+        const homeBtn = document.createElement('button');
+        homeBtn.textContent = 'Back to Home';
+        homeBtn.className = 'bg-game-dark hover:bg-blue-800 text-white font-bold text-lg py-4 px-8 rounded-lg transition-colors duration-300';
+        homeBtn.onclick = () => {
+            window.location.href = '/';
+        };
+        
+        buttonContainer.appendChild(newTournamentBtn);
+        buttonContainer.appendChild(homeBtn);
+        
+        this.container.appendChild(title);
+        this.container.appendChild(winnerCard);
+        this.container.appendChild(bracket);
+        this.container.appendChild(buttonContainer);
     }
 
     public cleanup(): void {
+        this.cleanupCurrentGame();
+    }
+
+    private cleanupCurrentGame(): void {
         if (this.currentGame) {
             if (this.currentGame.isPauseActive()) {
                 this.currentGame.togglePause();
