@@ -55,6 +55,7 @@ fclean:
 	@docker compose -f $(COMPOSE) down -v --rmi all
 	@docker system prune -af --volumes
 	@rm -rf frontend/node_modules frontend/dist
+	@rm -rf data/pong.db
 	@echo "$(GREEN)✅ Full clean complete!$(RESET)"
 
 re: fclean up
