@@ -341,23 +341,53 @@ export class Tournament {
             [players[i], players[j]] = [players[j], players[i]];
         }
     }
+    private isMatchPlayable(m: Match): boolean {
+        // A match is playable only when both players are present (no BYE)
+        return !!(m.player1 && m.player2);
+    }
     private setNextMatch(): void {
-        const currentRoundMatches = this.state.matches.filter(
-            m => m.round === this.state.currentRound && !m.winner && (m.player1 !== null || m.player2 !== null)
+        // Prefer matches in current round that have both players present
+        const playableMatches = this.state.matches.filter(
+            m => m.round === this.state.currentRound && !m.winner && this.isMatchPlayable(m)
         );
 
-        if (currentRoundMatches.length > 0) {
-            this.state.currentMatch = currentRoundMatches[0];
-        } else {
-            this.state.currentMatch = null;
-            this.checkRoundCompletion();
+        if (playableMatches.length > 0) {
+            this.state.currentMatch = playableMatches[0];
+            return;
         }
+
+        // No immediately playable matches — try to fill repechage gaps from losers pool
+        this.fillRepechageWithLosers();
+
+        // Recompute playable matches after attempting to fill repechage
+        const playableAfterFill = this.state.matches.filter(
+            m => m.round === this.state.currentRound && !m.winner && this.isMatchPlayable(m)
+        );
+        if (playableAfterFill.length > 0) {
+            this.state.currentMatch = playableAfterFill[0];
+            return;
+        }
+
+        // If there are still matches without winners in this round but they are waiting for opponents (BYE),
+        // do not select a BYE match; wait until repechage fills or other matches finish.
+        const pendingMatches = this.state.matches.filter(
+            m => m.round === this.state.currentRound && !m.winner
+        );
+        if (pendingMatches.length > 0) {
+            this.state.currentMatch = null; // waiting for opponents / repechage fill
+            return;
+        }
+
+        // No pending matches left in this round -> check round completion and possibly advance
+        this.state.currentMatch = null;
+        this.checkRoundCompletion();
     }
     private checkRoundCompletion(): void {
         const currentRoundMatches = this.state.matches.filter(
             m => m.round === this.state.currentRound
         );
 
+        // If any match in this round has no winner, the round is not complete
         const allMatchesComplete = currentRoundMatches.every(m => m.winner !== null);
 
         if (allMatchesComplete) {
