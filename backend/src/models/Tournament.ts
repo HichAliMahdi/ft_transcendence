@@ -103,4 +103,162 @@ export class TournamentService {
             return false;
         }
     }
+    static getParticipants(tournamentId: number): Player[] {
+        const stmt = db.prepare(`
+            SELECT u.id, tp.alias 
+            FROM tournament_participants tp
+            JOIN users u ON tp.user_id = u.id
+            WHERE tp.tournament_id = ?
+        `);
+        return stmt.all(tournamentId) as Player[];
+    }
+
+    static startTournament(tournamentId: number): boolean {
+        const tournament = this.getTournamentById(tournamentId);
+        
+        if (!tournament || tournament.status !== 'pending') {
+            return false;
+        }
+
+        const participants = this.getParticipants(tournamentId);
+        if (participants.length !== tournament.max_players) {
+            return false;
+        }
+
+        const shuffled = this.shuffleArray([...participants]);
+        
+        this.generateBracket(tournamentId, shuffled, tournament.max_players);
+
+        const updateStmt = db.prepare(`
+            UPDATE tournaments SET status = 'active' WHERE id = ?
+        `);
+        updateStmt.run(tournamentId);
+
+        return true;
+    }
+
+    private static generateBracket(
+        tournamentId: number, 
+        players: Player[], 
+        maxPlayers: number
+    ): void {
+        const totalRounds = Math.log2(maxPlayers);
+        
+        const round1Matches: number[] = [];
+        for (let i = 0; i < players.length; i += 2) {
+            const player1 = players[i];
+            const player2 = players[i + 1] || null;
+
+            const stmt = db.prepare(`
+                INSERT INTO games (
+                    tournament_id, player1_id, player2_id, 
+                    round, match_number, status
+                ) VALUES (?, ?, ?, 1, ?, 'pending')
+            `);
+            const result = stmt.run(
+                tournamentId,
+                player1.id,
+                player2?.id || null,
+                Math.floor(i / 2) + 1
+            );
+            round1Matches.push(result.lastInsertRowid as number);
+        }
+
+        let previousMatches = round1Matches;
+        for (let round = 2; round <= totalRounds; round++) {
+            const roundMatches: number[] = [];
+            
+            for (let i = 0; i < previousMatches.length; i += 2) {
+                const stmt = db.prepare(`
+                    INSERT INTO games (
+                        tournament_id, round, match_number,
+                        source_match_id_1, source_match_id_2, status
+                    ) VALUES (?, ?, ?, ?, ?, 'pending')
+                `);
+                const result = stmt.run(
+                    tournamentId,
+                    round,
+                    Math.floor(i / 2) + 1,
+                    previousMatches[i],
+                    previousMatches[i + 1] || null
+                );
+                roundMatches.push(result.lastInsertRowid as number);
+            }
+            
+            previousMatches = roundMatches;
+        }
+    }
+    static getCurrentMatch(tournamentId: number): Match | null {
+        const stmt = db.prepare(`
+            SELECT * FROM games 
+            WHERE tournament_id = ? 
+            AND status = 'pending'
+            AND player1_id IS NOT NULL 
+            AND player2_id IS NOT NULL
+            ORDER BY round ASC, match_number ASC
+            LIMIT 1
+        `);
+        return (stmt.get(tournamentId) as Match) || null;
+    }
+
+    static recordMatchResult(
+        matchId: number, 
+        winnerId: number, 
+        score1: number, 
+        score2: number
+    ): boolean {
+        try {
+            const updateStmt = db.prepare(`
+                UPDATE games 
+                SET winner_id = ?, 
+                    player1_score = ?, 
+                    player2_score = ?,
+                    status = 'completed'
+                WHERE id = ?
+            `);
+            updateStmt.run(winnerId, score1, score2, matchId);
+            const nextMatchStmt = db.prepare(`
+                SELECT * FROM games 
+                WHERE source_match_id_1 = ? OR source_match_id_2 = ?
+            `);
+            const nextMatch = nextMatchStmt.get(matchId, matchId) as Match | undefined;
+
+            if (nextMatch) {
+                if (nextMatch.source_match_id_1 === matchId) {
+                    db.prepare(`UPDATE games SET player1_id = ? WHERE id = ?`)
+                        .run(winnerId, nextMatch.id);
+                } else {
+                    db.prepare(`UPDATE games SET player2_id = ? WHERE id = ?`)
+                        .run(winnerId, nextMatch.id);
+                }
+            } else {
+                const match = db.prepare(`SELECT * FROM games WHERE id = ?`).get(matchId) as Match;
+                db.prepare(`UPDATE tournaments SET status = 'completed', winner_id = ? WHERE id = ?`)
+                    .run(winnerId, match.tournament_id);
+            }
+
+            return true;
+        } catch (error) {
+            console.error('Error recording match result:', error);
+            return false;
+        }
+    }
+
+    static getAllMatches(tournamentId: number): Match[] {
+        const stmt = db.prepare(`
+            SELECT * FROM games 
+            WHERE tournament_id = ?
+            ORDER BY round ASC, match_number ASC
+        `);
+        return stmt.all(tournamentId) as Match[];
+    }
+
+    private static shuffleArray<T>(array: T[]): T[] {
+        const shuffled = [...array];
+        for (let i = shuffled.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+        }
+        return shuffled;
+    }
 }
