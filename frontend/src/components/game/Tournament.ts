@@ -8,21 +8,12 @@ interface Match {
     player1: Player | null;
     player2: Player | null;
     winner: Player | null;
-    loser?: Player | null;
     score1?: number | null;
     score2?: number | null;
     round: number;
     matchNumber: number;
     sourceMatch1?: string;
     sourceMatch2?: string;
-    isRepechage?: boolean;
-    repechageRound?: number;
-}
-
-interface LoserEntry {
-    player: Player;
-    score: number;
-    round: number;
 }
 
 interface TournamentState {
@@ -32,7 +23,6 @@ interface TournamentState {
     currentRound: number;
     isActive: boolean;
     isComplete: boolean;
-    losers: LoserEntry[];
     maxPlayers: number;
 }
 
@@ -50,18 +40,26 @@ export class Tournament {
             currentRound: 1,
             isActive: false,
             isComplete: false,
-            losers: [],
             maxPlayers: 0
         };
     }
 
-    public setTournamentSize(size: TournamentSize): boolean{
+    public setTournamentSize(size: TournamentSize): boolean {
         if (this.state.isActive || this.state.players.length > 0) {
             return false;
         }
         this.state.maxPlayers = size;
         this.notifyStateChange();
         return true;
+    }
+
+    public getTournamentSize(): number {
+        return this.state.maxPlayers;
+    }
+
+    public isFull(): boolean {
+        if (this.state.maxPlayers === 0) return false;
+        return this.state.players.length >= this.state.maxPlayers;
     }
 
     public getRemainingSlots(): number {
@@ -73,8 +71,7 @@ export class Tournament {
         return { 
             ...this.state, 
             players: [...this.state.players], 
-            matches: [...this.state.matches], 
-            losers: [...this.state.losers] 
+            matches: [...this.state.matches]
         };
     }
 
@@ -93,7 +90,6 @@ export class Tournament {
             return false;
         }
 
-        // NEW: Check if tournament is full
         if (this.isFull()) {
             return false;
         }
@@ -142,6 +138,10 @@ export class Tournament {
     }
 
     public startTournament(): boolean {
+        if (this.state.maxPlayers === 0) {
+            return false;
+        }
+
         if (this.state.players.length < 2) {
             return false;
         }
@@ -154,79 +154,47 @@ export class Tournament {
     }
 
     private generateMatches(): void {
-        // create a bracket tree for all rounds up to final
         const players = [...this.state.players];
         this.shufflePlayers(players);
+        
+        const bracketSize = this.state.maxPlayers;
         const numPlayers = players.length;
-        const nextPowerOfTwo = Math.pow(2, Math.ceil(Math.log2(Math.max(2, numPlayers))));
-        // Do NOT auto-advance byes. Collect players who would have received a bye.
-        const byePlayers: Player[] = [];
+        
         const mainMatches: Match[] = [];
         let matchNumber = 1;
 
-        // Pair players for main bracket where both sides exist; collect singletons as byePlayers
-        for (let i = 0; i < nextPowerOfTwo; i += 2) {
+        for (let i = 0; i < bracketSize; i += 2) {
             const p1 = players[i] ?? null;
             const p2 = players[i + 1] ?? null;
-            if (p1 && p2) {
-                const m: Match = {
-                    id: `match_1_${matchNumber}`,
-                    player1: p1,
-                    player2: p2,
-                    winner: null,
-                    loser: null,
-                    round: 1,
-                    matchNumber: matchNumber++
-                };
-                mainMatches.push(m);
-            } else if (p1 && !p2) {
-                byePlayers.push(p1);
-            } else if (!p1 && p2) {
-                byePlayers.push(p2);
-            } else {
-                // both null (padding) - ignore
-            }
-        }
-
-        // Create repechage matches for bye players (pair bye-players together).
-        // If odd number, one repechage will have player2 = null and be filled later from losers.
-        const repechageMatches: Match[] = [];
-        for (let i = 0; i < byePlayers.length; i += 2) {
-            const rp1 = byePlayers[i];
-            const rp2 = byePlayers[i + 1] ?? null;
-            const rm: Match = {
-                id: `repechage_1_${matchNumber}`,
-                player1: rp1 || null,
-                player2: rp2,
+            
+            const m: Match = {
+                id: `match_1_${matchNumber}`,
+                player1: p1,
+                player2: p2,
                 winner: null,
-                loser: null,
                 round: 1,
-                matchNumber: matchNumber++,
-                isRepechage: true,
-                repechageRound: 1
+                matchNumber: matchNumber++
             };
-            repechageMatches.push(rm);
+            mainMatches.push(m);
         }
 
-        // First round is main matches plus repechage matches
-        const round1 = [...mainMatches, ...repechageMatches];
-        const rounds: Match[][] = [round1];
+        const rounds: Match[][] = [mainMatches];
+        const totalRounds = Math.log2(bracketSize);
 
-        // build higher rounds with source references (include repechage matches in ordering)
-        const totalRounds = Math.log2(nextPowerOfTwo);
         for (let r = 2; r <= totalRounds; r++) {
             const prev = rounds[r - 2];
             const matchesThisRound: Match[] = [];
-            let numMatches = Math.ceil(prev.length / 2);
+            const numMatches = prev.length / 2;
+            
             for (let j = 0; j < numMatches; j++) {
-                const source1 = prev[j * 2] ? prev[j * 2].id : undefined;
-                const source2 = prev[j * 2 + 1] ? prev[j * 2 + 1].id : undefined;
+                const source1 = prev[j * 2].id;
+                const source2 = prev[j * 2 + 1].id;
+                
                 const m: Match = {
                     id: `match_${r}_${j + 1}`,
                     player1: null,
                     player2: null,
                     winner: null,
-                    loser: null,
                     round: r,
                     matchNumber: j + 1,
                     sourceMatch1: source1,
@@ -237,139 +205,8 @@ export class Tournament {
             rounds.push(matchesThisRound);
         }
 
-        // flatten rounds into state.matches
         this.state.matches = rounds.flat();
-
-        // propagate any winners that already exist (none for byes — we purposefully avoided auto-advance)
-        this.state.matches.forEach(m => {
-            if (m.sourceMatch1) {
-                const src = this.state.matches.find(x => x.id === m.sourceMatch1);
-                if (src && src.winner) m.player1 = src.winner;
-            }
-            if (m.sourceMatch2) {
-                const src2 = this.state.matches.find(x => x.id === m.sourceMatch2);
-                if (src2 && src2.winner) m.player2 = src2.winner;
-            }
-        });
-
-        // try to immediately fill any repechage gaps if we already have losers (unlikely at start)
-        this.fillRepechageWithLosers();
-
         this.setNextMatch();
-    }
-
-    /**
-     * Fill all repechage gaps using the losers pool.
-     * Preference: pick highest-scoring losers from the same round as the repechage.
-     * If the top two losers have equal score, create an immediate repechage match between them.
-     */
-    private fillRepechageWithLosers(): void {
-        // Find all repechage matches missing a player
-        const repechageMatches = this.state.matches.filter(m => m.isRepechage && !m.winner);
-        const roundsToProcess = Array.from(new Set(repechageMatches.map(m => m.repechageRound ?? m.round)));
-
-        for (const r of roundsToProcess) {
-            this.attemptToPopulateRepechageForRound(r);
-        }
-    }
-
-    private attemptToPopulateRepechageForRound(round: number): void {
-        // candidates from same round, sorted by score desc
-        const candidates = this.state.losers.filter(l => l.round === round).sort((a, b) => b.score - a.score);
-
-        if (candidates.length === 0) return;
-
-        // Find repechage matches for this (repechageRound or round) that are missing a player slot
-        const emptyRepechage = this.state.matches.filter(m =>
-            m.isRepechage && !m.winner && ((m.repechageRound ?? m.round) === round) &&
-            ( !m.player1 || !m.player2 )
-        );
-
-        // If a top two tie, create a match between them (new repechage match)
-        if (candidates.length >= 2 && candidates[0].score === candidates[1].score) {
-            // create a direct repechage match between the two tied losers
-            const topA = candidates.shift()!;
-            const topB = candidates.shift()!;
-
-            // remove them from losers pool
-            this.state.losers = this.state.losers.filter(l => l.player.id !== topA.player.id && l.player.id !== topB.player.id);
-
-            const newMatch: Match = {
-                id: `repechage_tiebreak_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
-                player1: topA.player,
-                player2: topB.player,
-                winner: null,
-                loser: null,
-                score1: null,
-                score2: null,
-                round: round, // schedule it in same round so it will be resolved soon
-                matchNumber: this.state.matches.length + 1,
-                isRepechage: true,
-                repechageRound: round
-            };
-
-            this.state.matches.push(newMatch);
-
-            // IMPORTANT: if topA/topB came from specific original matches, update any higher-round
-            // matches that referenced those original match IDs so that the new repechage match will feed correctly.
-            const affectedSourceIds = new Set<string>();
-            // try to find the original match IDs for these players (best-effort)
-            const origA = this.state.matches.find(m => (m.player1?.id === topA.player.id || m.player2?.id === topA.player.id) && m.round === round);
-            const origB = this.state.matches.find(m => (m.player1?.id === topB.player.id || m.player2?.id === topB.player.id) && m.round === round);
-            if (origA) affectedSourceIds.add(origA.id);
-            if (origB) affectedSourceIds.add(origB.id);
-
-            if (affectedSourceIds.size > 0) {
-                for (const mm of this.state.matches) {
-                    if (mm.sourceMatch1 && affectedSourceIds.has(mm.sourceMatch1)) mm.sourceMatch1 = newMatch.id;
-                    if (mm.sourceMatch2 && affectedSourceIds.has(mm.sourceMatch2)) mm.sourceMatch2 = newMatch.id;
-                }
-            }
-            // after pushing a new match, we can try to fill other empty slots too
-        }
-
-        // For each empty repechage slot, pick highest remaining candidate who is not the same as the existing player
-        for (const match of emptyRepechage) {
-            // Refresh candidates list
-            const remaining = this.state.losers.filter(l => l.round === round).sort((a, b) => b.score - a.score);
-            if (remaining.length === 0) break;
-
-            // prefer filling player2 if player1 exists
-            if (match.player1 && !match.player2) {
-                const idx = remaining.findIndex(l => l.player.id !== match.player1?.id);
-                if (idx !== -1) {
-                    const chosen = remaining[idx];
-                    match.player2 = chosen.player;
-                    // remove from pool
-                    this.state.losers = this.state.losers.filter(l => l.player.id !== chosen.player.id);
-                }
-            } else if (!match.player1 && match.player2) {
-                const idx = remaining.findIndex(l => l.player.id !== match.player2?.id);
-                if (idx !== -1) {
-                    const chosen = remaining[idx];
-                    match.player1 = chosen.player;
-                    this.state.losers = this.state.losers.filter(l => l.player.id !== chosen.player.id);
-                }
-            } else if (!match.player1 && !match.player2) {
-                // fill both slots if possible
-                const rem = this.state.losers.filter(l => l.round === round).sort((a,b)=> b.score - a.score);
-                if (rem.length >= 2) {
-                    // if top two have same score they should have been handled above; otherwise assign top two (ensuring distinct)
-                    const a = rem.shift()!;
-                    const b = rem.shift()!;
-                    match.player1 = a.player;
-                    match.player2 = b.player;
-                    this.state.losers = this.state.losers.filter(l => l.player.id !== a.player.id && l.player.id !== b.player.id);
-                } else if (rem.length === 1) {
-                    const a = rem.shift()!;
-                    match.player1 = a.player;
-                    this.state.losers = this.state.losers.filter(l => l.player.id !== a.player.id);
-                }
-            }
-        }
-
-        // notify if changes occurred
-        this.notifyStateChange();
     }
 
     private shufflePlayers(players: Player[]): void {
@@ -378,81 +215,12 @@ export class Tournament {
             [players[i], players[j]] = [players[j], players[i]];
         }
     }
+
     private isMatchPlayable(m: Match): boolean {
-        // A match is playable only when both players are present (no BYE)
         return !!(m.player1 && m.player2);
-    }
-    private resolveByesForRound(round: number): void {
-        // First try filling repechage gaps from explicit loser logic
-        this.fillRepechageWithLosers();
-
-        // Collect matches in this round that have exactly one player (singletons)
-        const singletons = this.state.matches
-            .filter(m => m.round === round && !m.winner)
-            .map(m => {
-                const p = m.player1 && !m.player2 ? m.player1
-                        : m.player2 && !m.player1 ? m.player2
-                        : null;
-                return p ? { match: m, player: p } : null;
-            })
-            .filter(Boolean) as { match: Match; player: Player }[];
-
-        // Pair up singleton players into new repechage matches so they actually play
-        while (singletons.length >= 2) {
-            const a = singletons.shift()!;
-            const b = singletons.shift()!;
-
-            // Record original match ids before we vacate them
-            const origAId = a.match.id;
-            const origBId = b.match.id;
-
-            // Remove players from their original placeholder matches (they are moved into a new match)
-            if (a.match.player1 && a.match.player1.id === a.player.id) a.match.player1 = null;
-            if (a.match.player2 && a.match.player2.id === a.player.id) a.match.player2 = null;
-            if (b.match.player1 && b.match.player1.id === b.player.id) b.match.player1 = null;
-            if (b.match.player2 && b.match.player2.id === b.player.id) b.match.player2 = null;
-
-            const newMatch: Match = {
-                id: `repechage_pair_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
-                player1: a.player,
-                player2: b.player,
-                winner: null,
-                loser: null,
-                round: round,
-                matchNumber: this.state.matches.length + 1,
-                isRepechage: true,
-                repechageRound: round
-            };
-            this.state.matches.push(newMatch);
-
-            // Update higher-round source references that previously pointed to the original matches
-            for (const mm of this.state.matches) {
-                if (mm.sourceMatch1 === origAId || mm.sourceMatch1 === origBId) mm.sourceMatch1 = newMatch.id;
-                if (mm.sourceMatch2 === origAId || mm.sourceMatch2 === origBId) mm.sourceMatch2 = newMatch.id;
-            }
-        }
-
-        // If one singleton remains, try to fill it from any available loser (any round)
-        if (singletons.length === 1) {
-            const remaining = singletons[0];
-            // find a loser not equal to the singleton
-            const idx = this.state.losers.findIndex(l => l.player.id !== remaining.player.id);
-            if (idx !== -1) {
-                const chosen = this.state.losers.splice(idx, 1)[0];
-                // assign to the empty slot of the original match
-                if (!remaining.match.player1) remaining.match.player1 = chosen.player;
-                else if (!remaining.match.player2) remaining.match.player2 = chosen.player;
-
-                // If we filled a slot in the original match, no source remapping needed.
-            }
-        }
-
-        // notify if we changed anything
-        this.notifyStateChange();
     }
 
     private setNextMatch(): void {
-        // Prefer matches in current round that have both players present
         const playableMatches = this.state.matches.filter(
             m => m.round === this.state.currentRound && !m.winner && this.isMatchPlayable(m)
         );
@@ -462,51 +230,15 @@ export class Tournament {
             return;
         }
 
-        // No immediately playable matches — try to fill repechage gaps from losers pool
-        this.fillRepechageWithLosers();
-
-        // Recompute playable matches after attempting to fill repechage
-        let playableAfterFill = this.state.matches.filter(
-            m => m.round === this.state.currentRound && !m.winner && this.isMatchPlayable(m)
-        );
-        if (playableAfterFill.length > 0) {
-            this.state.currentMatch = playableAfterFill[0];
-            return;
-        }
-
-        // If there are still matches without winners in this round but they are waiting for opponents (BYE),
-        // attempt to resolve BYEs by pairing singleton players or pulling from losers
-        const pendingMatches = this.state.matches.filter(
-            m => m.round === this.state.currentRound && !m.winner
-        );
-        if (pendingMatches.length > 0) {
-            // try to resolve BYEs for this round to unblock progression
-            this.resolveByesForRound(this.state.currentRound);
-
-            // recompute playable matches after attempting to resolve
-            playableAfterFill = this.state.matches.filter(
-                m => m.round === this.state.currentRound && !m.winner && this.isMatchPlayable(m)
-            );
-            if (playableAfterFill.length > 0) {
-                this.state.currentMatch = playableAfterFill[0];
-                return;
-            }
-
-            // still waiting: no playable matches yet (maybe waiting on future losers) — keep waiting
-            this.state.currentMatch = null;
-            return;
-        }
-
-        // No pending matches left in this round -> check round completion and possibly advance
         this.state.currentMatch = null;
         this.checkRoundCompletion();
     }
+
     private checkRoundCompletion(): void {
         const currentRoundMatches = this.state.matches.filter(
             m => m.round === this.state.currentRound
         );
 
-        // If any match in this round has no winner, the round is not complete
         const allMatchesComplete = currentRoundMatches.every(m => m.winner !== null);
 
         if (allMatchesComplete) {
@@ -519,64 +251,29 @@ export class Tournament {
                 this.state.isActive = false;
                 this.state.currentMatch = null;
             } else if (winners.length > 1) {
-                // advance round index (next-round matches are prebuilt in generateMatches)
                 this.state.currentRound++;
                 this.setNextMatch();
             }
         }
     }
 
-    /**
-     * Record a match winner and optional scores.
-     * If scores are provided they will be stored and the loser entry pushed into the losers pool.
-     */
     public recordMatchWinner(matchId: string, winnerId: string, score1?: number, score2?: number): boolean {
         const match = this.state.matches.find(m => m.id === matchId);
         if (!match || match.winner) {
             return false;
         }
 
-        // store scores if provided
         if (typeof score1 === 'number') match.score1 = score1;
         if (typeof score2 === 'number') match.score2 = score2;
 
         if (match.player1?.id === winnerId) {
             match.winner = match.player1;
-            match.loser = match.player2 || null;
         } else if (match.player2?.id === winnerId) {
             match.winner = match.player2;
-            match.loser = match.player1 || null;
         } else {
             return false;
         }
 
-        // compute loser score (prefer recorded score, otherwise 0)
-        let loserScore = 0;
-        if (match.loser) {
-            if (match.player1 && match.player2) {
-                // if scores were provided, map them
-                if (typeof match.score1 === 'number' && typeof match.score2 === 'number') {
-                    loserScore = (match.player1.id === match.loser.id) ? (match.score1 ?? 0) : (match.score2 ?? 0);
-                } else {
-                    // fallback: if no scores provided, best-effort (winner gets 5)
-                    loserScore =  (match.winner.id === match.player1?.id) ? (match.score2 ?? 0) : (match.score1 ?? 0);
-                }
-            } else {
-                loserScore = 0;
-            }
-
-            // push loser into pool with the round they lost in
-            this.state.losers.push({
-                player: match.loser,
-                score: loserScore,
-                round: match.round
-            });
-
-            // Try populate repechage for this round now that a new loser exists
-            this.attemptToPopulateRepechageForRound(match.round);
-        }
-
-        // propagate winner into next-round slot (if any)
         const nextMatch = this.state.matches.find(m => m.sourceMatch1 === matchId || m.sourceMatch2 === matchId);
         if (nextMatch) {
             if (nextMatch.sourceMatch1 === matchId) {
@@ -623,18 +320,13 @@ export class Tournament {
             currentRound: 1,
             isActive: false,
             isComplete: false,
-            losers: []
+            maxPlayers: 0
         };
         this.notifyStateChange();
     }
 
     public getPlayers(): Player[] {
         return [...this.state.players];
-    }
-
-    // preserve external API: return player list only
-    public getLosers(): Player[] {
-        return this.state.losers.map(l => l.player);
     }
 
     public isActive(): boolean {
