@@ -21,6 +21,8 @@ export function initializeDatabase(): void {
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
             status TEXT DEFAULT 'pending',
+            max_players INTEGER NOT NULL,
+            current_round INTEGER DEFAULT 1,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             winner_id INTEGER,
             FOREIGN KEY (winner_id) REFERENCES users (id)
@@ -48,12 +50,18 @@ export function initializeDatabase(): void {
             player2_score INTEGER DEFAULT 0,
             winner_id INTEGER,
             game_type TEXT DEFAULT 'pong',
-            status TEXT DEFAULT 'completed',
+            status TEXT DEFAULT 'pending',
+            round INTEGER DEFAULT 1,
+            match_number INTEGER DEFAULT 1,
+            source_match_id_1 INTEGER,
+            source_match_id_2 INTEGER,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (tournament_id) REFERENCES tournaments (id),
             FOREIGN KEY (player1_id) REFERENCES users (id),
             FOREIGN KEY (player2_id) REFERENCES users (id),
-            FOREIGN KEY (winner_id) REFERENCES users (id)
+            FOREIGN KEY (winner_id) REFERENCES users (id),
+            FOREIGN KEY (source_match_id_1) REFERENCES games (id),
+            FOREIGN KEY (source_match_id_2) REFERENCES games (id)
         )
     `);
     
