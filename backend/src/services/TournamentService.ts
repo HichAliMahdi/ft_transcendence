@@ -153,7 +153,7 @@ export class TournamentService {
         const round1Matches: number[] = [];
         for (let i = 0; i < players.length; i += 2) {
             const player1 = players[i];
-            const player2 = players[i + 1] || null;
+            const player2 = players[i + 1];
 
             const stmt = db.prepare(`
                 INSERT INTO games (
@@ -163,7 +163,7 @@ export class TournamentService {
             `);
             const result = stmt.run(
                 tournamentId,
-                player1.id,
+                player1?.id || null,
                 player2?.id || null,
                 Math.floor(i / 2) + 1
             );
@@ -265,7 +265,11 @@ export class TournamentService {
         const shuffled = [...array];
         for (let i = shuffled.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
-            [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+            const temp = shuffled[i];
+            if (temp !== undefined && shuffled[j] !== undefined) {
+                shuffled[i] = shuffled[j] as T;
+                shuffled[j] = temp;
+            }
         }
         return shuffled;
     }
