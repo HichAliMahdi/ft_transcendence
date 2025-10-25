@@ -13,6 +13,8 @@ interface Match {
     matchNumber: number;
     sourceMatch1?: string;
     sourceMatch2?: string;
+    isRepechage?: boolean;      // new: marks repechage matches
+    repechageRound?: number;    // new: optional repechage round index
 }
 
 interface TournamentState {
@@ -120,38 +122,62 @@ export class Tournament {
         const players = [...this.state.players];
         this.shufflePlayers(players);
         const numPlayers = players.length;
-        const nextPowerOfTwo = Math.pow(2, Math.ceil(Math.log2(numPlayers)));
-        const byes = nextPowerOfTwo - numPlayers;
-        for (let i = 0; i < byes; i++) {
-            players.push(null as any);
-        }
-
-        const totalRounds = Math.log2(players.length);
-        const rounds: Match[][] = [];
-
-        // Round 1
-        const round1: Match[] = [];
+        const nextPowerOfTwo = Math.pow(2, Math.ceil(Math.log2(Math.max(2, numPlayers))));
+        // Do NOT auto-advance byes. Collect players who would have received a bye.
+        const byePlayers: Player[] = [];
+        const mainMatches: Match[] = [];
         let matchNumber = 1;
-        for (let i = 0; i < players.length; i += 2) {
-            const m: Match = {
-                id: `match_1_${matchNumber}`,
-                player1: players[i] || null,
-                player2: players[i + 1] || null,
-                winner: null,
-                round: 1,
-                matchNumber: matchNumber++
-            };
-            // auto-advance byes
-            if (m.player1 && !m.player2) {
-                m.winner = m.player1;
-            } else if (!m.player1 && m.player2) {
-                m.winner = m.player2;
-            }
-            round1.push(m);
-        }
-        rounds.push(round1);
 
-        // build higher rounds with source references
+        // Pair players for main bracket where both sides exist; collect singletons as byePlayers
+        for (let i = 0; i < nextPowerOfTwo; i += 2) {
+            const p1 = players[i] ?? null;
+            const p2 = players[i + 1] ?? null;
+            if (p1 && p2) {
+                const m: Match = {
+                    id: `match_1_${matchNumber}`,
+                    player1: p1,
+                    player2: p2,
+                    winner: null,
+                    loser: null,
+                    round: 1,
+                    matchNumber: matchNumber++
+                };
+                mainMatches.push(m);
+            } else if (p1 && !p2) {
+                byePlayers.push(p1);
+            } else if (!p1 && p2) {
+                byePlayers.push(p2);
+            } else {
+                // both null (padding) - ignore
+            }
+        }
+
+        // Create repechage matches for bye players (pair bye-players together).
+        // If odd number, one repechage will have player2 = null and be filled later from losers.
+        const repechageMatches: Match[] = [];
+        for (let i = 0; i < byePlayers.length; i += 2) {
+            const rp1 = byePlayers[i];
+            const rp2 = byePlayers[i + 1] ?? null;
+            const rm: Match = {
+                id: `repechage_1_${matchNumber}`,
+                player1: rp1 || null,
+                player2: rp2,
+                winner: null,
+                loser: null,
+                round: 1,
+                matchNumber: matchNumber++,
+                isRepechage: true,
+                repechageRound: 1
+            };
+            repechageMatches.push(rm);
+        }
+
+        // First round is main matches plus repechage matches
+        const round1 = [...mainMatches, ...repechageMatches];
+        const rounds: Match[][] = [round1];
+
+        // build higher rounds with source references (include repechage matches in ordering)
+        const totalRounds = Math.log2(nextPowerOfTwo);
         for (let r = 2; r <= totalRounds; r++) {
             const prev = rounds[r - 2];
             const matchesThisRound: Match[] = [];
@@ -164,6 +190,7 @@ export class Tournament {
                     player1: null,
                     player2: null,
                     winner: null,
+                    loser: null,
                     round: r,
                     matchNumber: j + 1,
                     sourceMatch1: source1,
@@ -174,10 +201,10 @@ export class Tournament {
             rounds.push(matchesThisRound);
         }
 
-        // flatten rounds into state.matches (round order)
+        // flatten rounds into state.matches
         this.state.matches = rounds.flat();
 
-        // propagate any byes from round 1 into next rounds (if a round1 match already has a winner)
+        // propagate any winners that already exist (none for byes — we purposefully avoided auto-advance)
         this.state.matches.forEach(m => {
             if (m.sourceMatch1) {
                 const src = this.state.matches.find(x => x.id === m.sourceMatch1);
@@ -189,8 +216,48 @@ export class Tournament {
             }
         });
 
+        // try to immediately fill any repechage gaps if we already have losers (unlikely at start)
+        this.fillRepechageWithLosers();
+
         this.setNextMatch();
     }
+
+    private fillRepechageWithLosers(): void {
+        if (!this.state.losers || this.state.losers.length === 0) return;
+
+        // Find repechage matches that are missing a player (prefer matches with player1 set and player2 null)
+        const emptyRepechage = this.state.matches.filter(m => m.isRepechage && !m.winner && m.player1 && !m.player2);
+
+        for (const match of emptyRepechage) {
+            // pick the first loser who is not the same as player1
+            const idx = this.state.losers.findIndex(l => l.id !== match.player1?.id);
+            if (idx !== -1) {
+                const player = this.state.losers.splice(idx, 1)[0];
+                match.player2 = player;
+            }
+        }
+
+        // if any repechage matches still have both players null (edge cases), try to fill them too
+        const anyEmpty = this.state.matches.filter(m => m.isRepechage && !m.winner && (!m.player1 || !m.player2));
+        for (const match of anyEmpty) {
+            // try to fill player1 first if empty
+            if (!match.player1 && this.state.losers.length > 0) {
+                match.player1 = this.state.losers.shift() || null;
+            }
+            // then try to fill player2
+            if (!match.player2 && this.state.losers.length > 0) {
+                // ensure not same as player1
+                const idx2 = this.state.losers.findIndex(l => l.id !== match.player1?.id);
+                if (idx2 !== -1) {
+                    match.player2 = this.state.losers.splice(idx2, 1)[0];
+                }
+            }
+        }
+
+        // notify if any changes occurred
+        this.notifyStateChange();
+    }
+
     private shufflePlayers(players: Player[]): void {
         for (let i = players.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
@@ -252,6 +319,8 @@ export class Tournament {
         // If there is a real loser (non-bye), add to losers pool
         if (match.loser) {
             this.state.losers.push(match.loser);
+            // Attempt to fill repechage matches with available losers
+            this.fillRepechageWithLosers();
         }
 
         // propagate winner into the next round match slots (if any)
@@ -262,8 +331,6 @@ export class Tournament {
             } else if (nextMatch.sourceMatch2 === matchId) {
                 nextMatch.player2 = match.winner;
             }
-            // If the next match has both players and one is null due to a bye, the winner will be set and available.
-            // If the other source already had a bye winner, it will have been propagated earlier.
         }
 
         this.setNextMatch();
