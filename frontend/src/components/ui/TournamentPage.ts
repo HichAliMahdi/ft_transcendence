@@ -289,7 +289,14 @@ export class TournamentPage {
         const backButton = document.createElement('button');
         backButton.textContent = '← Change Size';
         backButton.className = 'bg-game-dark hover:bg-blue-800 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-300';
-        backButton.onclick = () => {
+        backButton.onclick = async () => {
+            if (this.tournament){
+                try {
+                    await TournamentAPI.deleteTournament(this.tournament.id);
+                } catch (error: any) {
+                    console.error('Error deleting tournament:', error);
+                }
+            }
             this.tournament = null;
             this.participants = [];
             this.matches = [];
