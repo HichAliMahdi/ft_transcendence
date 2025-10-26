@@ -335,4 +335,19 @@ export class TournamentService {
             return 0;
         }
     }
+
+    static getJoinableTournaments(): Array<Tournament & { available_slots: number }> {
+        const stmt = db.prepare(`
+            SELECT 
+                t.*,
+                t.max_players - COUNT(tp.user_id) as available_slots
+            FROM tournaments t
+            LEFT JOIN tournament_participants tp ON t.id = tp.tournament_id
+            WHERE t.status = 'pending'
+            GROUP BY t.id
+            HAVING available_slots > 0
+            ORDER BY t.created_at DESC
+        `);
+        return stmt.all() as Array<Tournament & { available_slots: number }>;
+    }
 }

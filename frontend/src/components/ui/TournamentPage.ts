@@ -15,7 +15,7 @@ export class TournamentPage {
     public render(): HTMLElement {
         this.container = document.createElement('div');
         this.container.className = 'container mx-auto p-8 tournament-container fade-in';
-        this.renderSizeSelection();
+        this.renderLobby();
         return this.container;
     }
 
@@ -495,6 +495,132 @@ export class TournamentPage {
                 }, 2000);
             }, 3000);
         }
+    }
+
+    private async renderLobby(): Promise<void> {
+        if (!this.container) return;
+        
+        const title = document.createElement('h1');
+        title.textContent = 'Welcome to the Tournament Lobby';
+        title.className = 'text-4xl font-bold text-white text-center mb-8 gradient-text';
+
+        const subtitle = document.createElement('p');
+        subtitle.textContent = 'Join or create tournaments to compete with others!';
+        subtitle.className = 'text-gray-300 text-lg mb-12 text-center';
+
+        const createSection = document.createElement('div');
+        createSection.className = 'text-gray-300 text-lg mb-12 text-center';
+
+        const createTitile = document.createElement('h2');
+        createTitile.textContent = 'Create a New Tournament';
+        createTitile.className = 'text-2xl font-semibold text-white mb-4 text-center';
+
+        const createButton = document.createElement('button');
+        createButton.textContent = '➕ Create Tournament';
+        createButton.className = 'btn-primary text-lg px-8 py-4 mx-auto block';
+        createButton.onclick = () => this.renderSizeSelection();
+
+        createSection.appendChild(createTitile);
+        createSection.appendChild(createButton);
+
+        const availableSection = document.createElement('div');
+        availableSection.className = 'glass-effect p-8 rounded-2xl';
+
+        const availableTitle = document.createElement('h2');
+        availableTitle.textContent = 'Available Tournaments to Join';
+        availableTitle.className = 'text-2xl font-semibold text-white mb-6 text-center';
+
+        availableSection.appendChild(availableTitle);
+
+        const loading = document.createElement('p');
+        loading.textContent = 'Loading available tournaments...';
+        loading.className = 'text-gray-400 text-center';
+        availableSection.appendChild(loading);
+
+        this.container.appendChild(title);
+        this.container.appendChild(subtitle);
+        this.container.appendChild(createSection);
+        this.container.appendChild(availableSection);
+
+        try {
+            const tournaments = await TournamentAPI.getJoinableTournaments();
+            availableSection.removeChild(loading);
+
+            if (tournaments.length === 0) {
+                const noTournaments = document.createElement('p');
+                noTournaments.textContent = 'No available tournaments at the moment.';
+                noTournaments.className = 'text-gray-400 text-center';
+                availableSection.appendChild(noTournaments);
+            } else {
+                const tournamentsGrid = document.createElement('div');
+                tournamentsGrid.className = 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6';
+
+                tournaments.forEach(tournament => {
+                    const card = document.createElement('div');
+                    card.className = 'bg-game-dark p-6 rounded-xl hover:bg-blue-700 transition-all duration-300 cursor-pointer border-2 border-transparent hover:border-accent-pink';
+                    
+                    const tournamentName = document.createElement('h3');
+                    tournamentName.textContent = tournament.name;
+                    tournamentName.className = 'text-xl font-bold text-white mb-3';
+                    
+                    const info = document.createElement('div');
+                    info.className = 'space-y-2 text-gray-300 mb-4';
+                    
+                    const size = document.createElement('p');
+                    size.innerHTML = `<span class="text-accent-pink">⚡</span> ${tournament.max_players}-Player Tournament`;
+                    
+                    const slots = document.createElement('p');
+                    slots.innerHTML = `<span class="text-accent-purple">👥</span> ${tournament.available_slots} slot${tournament.available_slots > 1 ? 's' : ''} available`;
+                    
+                    const created = document.createElement('p');
+                    const createdDate = new Date(tournament.created_at);
+                    created.innerHTML = `<span class="text-blue-400">🕒</span> Created ${this.getTimeAgo(createdDate)}`;
+                    
+                    info.appendChild(size);
+                    info.appendChild(slots);
+                    info.appendChild(created);
+
+
+                    const joinButton = document.createElement('button');
+                    joinButton.textContent = 'Join Tournament';
+                    joinButton.className = 'btn-primary w-full text-sm py-2';
+                    joinButton.onclick = async (e) => {
+                        e.stopPropagation();
+                        await this.joinTournament(tournament);
+                    };
+                    
+                    card.appendChild(tournamentName);
+                    card.appendChild(info);
+                    card.appendChild(joinButton);
+                    
+                    tournamentsGrid.appendChild(card);
+                });
+
+                availableSection.appendChild(tournamentsGrid);
+            }
+
+            const refreshButton = document.createElement('button');
+            refreshButton.textContent = '🔄 Refresh';
+            refreshButton.className = 'bg-game-dark hover:bg-blue-800 text-white font-bold py-2 px-6 rounded-lg transition-colors duration-300 mt-6 mx-auto block';
+            refreshButton.onclick = () => this.renderLobby();
+            availableSection.appendChild(refreshButton);
+
+        } catch (error: any) {
+            availableSection.removeChild(loading);
+            const errorMsg = document.createElement('p');
+            errorMsg.textContent = `Error: ${error.message}`;
+            errorMsg.className = 'text-red-500 text-center';
+            availableSection.appendChild(errorMsg);
+        }
+    }
+
+    private getTimeAgo(date: Date): string {
+        const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
+
+        if (seconds < 60) return 'just now';
+        if (seconds < 3600) return `${Math.floor(seconds / 60)} min ago`;
+        if (seconds < 86400) return `${Math.floor(seconds / 3600)} hours ago`;
+        return `${Math.floor(seconds / 86400)} days ago`;
     }
 
     private renderBracket(): HTMLElement {

@@ -32,6 +32,10 @@ export interface Tournament {
     created_at: string;
 }
 
+export interface JoinableTournament extends Tournament {
+    available_slots: number;
+}
+
 export interface TournamentDetails {
     tournament: Tournament;
     participants: Player[];
@@ -73,6 +77,18 @@ export class TournamentAPI {
         if (!response.ok) {
             const error = await response.json();
             throw new Error(error.error || 'Failed to fetch tournaments');
+        }
+
+        const data = await response.json();
+        return data.tournaments;
+    }
+
+    static async getJoinableTournaments(): Promise<JoinableTournament[]> {
+        const response = await fetch(`${API_BASE}/tournaments/joinable`);
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to fetch joinable tournaments');
         }
 
         const data = await response.json();

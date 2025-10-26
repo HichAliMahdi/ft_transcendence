@@ -57,6 +57,18 @@ export default async function tournamentRoutes(fastify: FastifyInstance) {
     }
   );
 
+
+  // Get joinable tournaments
+  fastify.get('/tournaments/joinable', async (request, reply) => {
+    try {
+      const tournaments = TournamentService.getJoinableTournaments();
+      return reply.send({ tournaments });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ error: 'Failed to fetch joinable tournaments' });
+    }
+  });
+
   // Get tournament by ID
   fastify.get<{ Params: TournamentParams }>(
     '/tournaments/:id',
