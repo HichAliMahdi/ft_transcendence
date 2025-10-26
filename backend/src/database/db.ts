@@ -10,12 +10,44 @@ export function initializeDatabase(): void {
             username TEXT UNIQUE NOT NULL,
             email TEXT UNIQUE,
             password_hash TEXT,
+            display_name TEXT UNIQUE NOT NULL,
             avatar_url TEXT DEFAULT '/default-avatar.png',
+            is_online INTEGER DEFAULT 0,
+            last_seen DATETIME DEFAULT CURRENT_TIMESTAMP,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     `);
 
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS friends (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            friend_id INTEGER NOT NULL,
+            status TEXT DEFAULT 'pending',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY (friend_id) REFERENCES users(id) ON DELETE CASCADE,
+            UNIQUE(user_id, friend_id)
+        )
+    `);
+
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS matches (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            player1_id INTEGER NOT NULL,
+            player2_id INTEGER NOT NULL,
+            player1_score INTEGER NOT NULL,
+            player2_score INTEGER NOT NULL,
+            winner_id INTEGER,
+            duration INTEGER,
+            played_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (player1_id) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY (player2_id) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY (winner_id) REFERENCES users(id) ON DELETE SET NULL
+        )
+    `);
+    
     db.exec(`
         CREATE TABLE IF NOT EXISTS tournaments (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
