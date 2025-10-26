@@ -273,4 +273,40 @@ export class TournamentService {
         }
         return shuffled;
     }
+
+    static deleteTournament(id: number): boolean {
+        try {
+            const tournament = this.getTournamentById(id);
+            if(!tournament) {
+                return false;
+            }
+            db.prepare(`DELETE FROM games WHERE tournament_id = ?`).run(id);
+            db.prepare(`DELETE FROM tournament_participants WHERE tournament_id = ?`).run(id);
+            db.prepare(`DELETE FROM tournaments WHERE id = ?`).run(id);
+            return true;
+        } catch (error) {
+            console.error('Error deleting tournament:', error);
+            return false;
+        }
+    }
+
+    static resetTournament(id: number): boolean {
+        try {
+            if (!tournament || tournament.status === 'completed') {
+                return false;
+            }
+            db.prepare(`DELETE FROM games WHERE tournament_id = ?`).run(id);
+            db.prepare(`
+            UPDATE tournaments
+            SET status = 'pending', current_round = 1, winner_id = NULL
+            WHERE id = ?
+        `).run(id);
+            return true;
+        } catch (error) {
+            console.error('Error resetting tournament:', error);
+            return false;
+        }
+    }
+
+    
 }
