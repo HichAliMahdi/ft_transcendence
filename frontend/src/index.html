@@ -1,23 +1,30 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pong Game</title>
     <link rel="stylesheet" href="./styles/main.css">
 </head>
+
 <body>
     <div id="app" class="flex flex-col min-h-screen">
-        <nav id="main-nav" class="fixed top-0 left-0 w-full z-50 glass-effect border-b border-white/10 shadow-xl shadow-black/20 px-8 py-5">
-            <ul class="flex gap-8 list-none">
-                <li><a href="/" data-link class="nav-link">Home</a></li>
-                <li><a href="/game" data-link class="nav-link">Play Game</a></li>
-                <li><a href="/tournament" data-link class="nav-link">Tournament</a></li>
-                <li><a href="/multiplayer" data-link class="nav-link">Multiplayer</a></li>
-            </ul>
+        <nav id="main-nav"
+            class="fixed top-0 left-0 w-full z-50 glass-effect border-b border-white/10 shadow-xl shadow-black/20 px-8 py-5">
+            <div class="flex justify-between items-center">
+                <ul class="flex gap-8 list-none">
+                    <li><a href="/" data-link class="nav-link">Home</a></li>
+                    <li><a href="/game" data-link class="nav-link">Play Game</a></li>
+                    <li><a href="/tournament" data-link class="nav-link">Tournament</a></li>
+                    <li><a href="/multiplayer" data-link class="nav-link">Multiplayer</a></li>
+                </ul>
+                <div id="auth-section"></div>
+            </div>
         </nav>
         <main id="content" class="flex-1 p-12 pt-24 fade-in"></main>
     </div>
     <script type="module" src="./main.ts"></script>
 </body>
+
 </html>

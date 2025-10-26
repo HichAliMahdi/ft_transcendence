@@ -2,10 +2,14 @@ import { HomePage } from '../components/ui/HomePage';
 import { GamePage } from '../components/ui/GamePage';
 import { TournamentPage } from '../components/ui/TournamentPage';
 import { MultiplayerPage } from '../components/ui/MultiPlayerPage';
+import { LoginPage } from '../components/ui/LoginPage';
+import { RegisterPage } from '../components/ui/RegisterPage';
+import { AuthService } from '../components/game/AuthService';
 
 interface Route {
     path: string;
     view: () => any;
+    requiresAuth?: boolean;
 }
 
 export class Router {
@@ -14,10 +18,12 @@ export class Router {
 
     constructor() {
         this.routes = [
-            { path: '/', view: () => new HomePage() },
-            { path: '/game', view: () => new GamePage() },
-            { path: '/tournament', view: () => new TournamentPage() },
-            { path: '/multiplayer', view: () => new MultiplayerPage() },
+            { path: '/', view: () => new HomePage(), requiresAuth: false },
+            { path: '/game', view: () => new GamePage(), requiresAuth: false },
+            { path: '/tournament', view: () => new TournamentPage(), requiresAuth: false },
+            { path: '/multiplayer', view: () => new MultiplayerPage(), requiresAuth: false },
+            { path: '/login', view: () => new LoginPage(), requiresAuth: false },
+            { path: '/register', view: () => new RegisterPage(), requiresAuth: false },
         ];
     }
 
@@ -34,6 +40,16 @@ export class Router {
         const path = window.location.pathname;
         const route = this.routes.find(r => r.path === path) || this.routes[0];
         
+        if (route.requiresAuth && !AuthService.isAuthenticated()) {
+            this.navigateTo('/login');
+            return;
+        }
+
+        if ((path === '/login' || path === '/register') && AuthService.isAuthenticated()) {
+            this.navigateTo('/');
+            return;
+        }
+
         this.currentPage = route.view();
         
         const content = document.getElementById('content');
