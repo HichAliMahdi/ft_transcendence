@@ -21,6 +21,7 @@ export class LoginPage {
         const usernameInput = document.createElement('input');
         usernameInput.type = 'text';
         usernameInput.required = true;
+        usernameInput.placeholder = 'Enter your username';
         usernameInput.className = 'w-full px-4 py-3 rounded-lg bg-game-dark text-white border-2 border-gray-600 focus:border-accent-pink focus:outline-none mb-4';
 
         const passwordLabel = document.createElement('label');
@@ -30,6 +31,7 @@ export class LoginPage {
         const passwordInput = document.createElement('input');
         passwordInput.type = 'password';
         passwordInput.required = true;
+        passwordInput.placeholder = 'Enter your password';
         passwordInput.className = 'w-full px-4 py-3 rounded-lg bg-game-dark text-white border-2 border-gray-600 focus:border-accent-pink focus:outline-none mb-6';
 
         const errorMsg = document.createElement('p');
@@ -41,8 +43,17 @@ export class LoginPage {
         submitButton.className = 'btn-primary w-full text-lg py-3';
 
         const registerLink = document.createElement('p');
-        registerLink.className = 'text-white text-center mt-4';
-        registerLink.innerHTML = `Don't have an account? <a href="#/register" class="text-accent-pink font-semibold">Register</a>`;
+        registerLink.className = 'text-center text-gray-300 mt-4';
+
+        const registerText = document.createTextNode("Don't have an account? ");
+        const registerAnchor = document.createElement('a');
+        registerAnchor.href = '/register';
+        registerAnchor.setAttribute('data-link', '');
+        registerAnchor.className = 'text-accent-pink hover:text-accent-purple transition-colors duration-300';
+        registerAnchor.textContent = 'Register here';
+        
+        registerLink.appendChild(registerText);
+        registerLink.appendChild(registerAnchor);
 
         form.onsubmit = async (e) => {
             e.preventDefault();
@@ -53,6 +64,13 @@ export class LoginPage {
             try {
                 await AuthService.login(usernameInput.value, passwordInput.value);
                 window.location.hash = '#/dashboard';
+                const redirectUrl = sessionStorage.getItem('redirectAfterLogin');
+                if (redirectUrl) {
+                    sessionStorage.removeItem('redirectAfterLogin');
+                    window.location.href = redirectUrl;
+                } else {
+                    window.location.href = '/';
+                }
             } catch (error: any) {
                 errorMsg.textContent = error.message;
                 errorMsg.classList.remove('hidden');
