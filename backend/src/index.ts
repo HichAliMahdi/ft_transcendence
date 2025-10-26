@@ -2,6 +2,7 @@ import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import { config } from './config';
 import { initializeDatabase } from './database/db';
+import { TournamentService } from './services/TournamentService';
 import routes from './routes';
 
 const fastify = Fastify({ 
@@ -19,6 +20,11 @@ const fastify = Fastify({
 
 // Initialize database
 initializeDatabase();
+
+// Clean up abandoned tournaments every hour
+setInterval(() => {
+  TournamentService.cleanupAbandonedTournaments(24);
+}, 60 * 60 * 1000);
 
 // Register CORS
 fastify.register(cors, {

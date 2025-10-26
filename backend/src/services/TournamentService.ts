@@ -308,5 +308,30 @@ export class TournamentService {
         }
     }
 
-    
+    static cleanupAbandonedTournaments(hoursOld: number = 24): number {
+        try {
+            const cutoffDate = new Date();
+            cutoffDate.setHours(cutoffDate.getHours() - hoursOld);
+            const cutoffISO = cutoffDate.toISOString();
+
+            const abandonedTournaments = db.prepare(`
+                SELECT id FROM tournaments 
+                WHERE status IN ('pending', 'active') 
+                AND created_at < ?
+            `).all(cutoffISO) as { id: number }[];
+
+            let deletedCount = 0;
+            for (const tournament of abandonedTournaments) {
+                if (this.deleteTournament(tournament.id)) {
+                    deletedCount++;
+                }
+            }
+
+            console.log(`Cleaned up ${deletedCount} abandoned tournaments`);
+            return deletedCount;
+        } catch (error) {
+            console.error('Error cleaning up abandoned tournaments:', error);
+            return 0;
+        }
+    }
 }

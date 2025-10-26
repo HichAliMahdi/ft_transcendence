@@ -294,4 +294,63 @@ export default async function tournamentRoutes(fastify: FastifyInstance) {
       }
     }
   );
+
+  // Delete tournament
+  fastify.delete<{ Params: TournamentParams }>(
+    '/tournaments/:id',
+    async (request, reply) => {
+      try {
+        const { id } = request.params;
+        const tournamentId = parseInt(id);
+
+        if (isNaN(tournamentId)) {
+          return reply.code(400).send({ error: 'Invalid tournament ID' });
+        }
+
+        const success = TournamentService.deleteTournament(tournamentId);
+        
+        if (!success) {
+          return reply.code(404).send({ error: 'Tournament not found' });
+        }
+
+        return reply.send({ success: true, message: 'Tournament deleted successfully' });
+      } catch (error) {
+        fastify.log.error(error);
+        return reply.code(500).send({ error: 'Failed to delete tournament' });
+      }
+    }
+  );
+
+  // Reset tournament
+  fastify.post<{ Params: TournamentParams }>(
+    '/tournaments/:id/reset',
+    async (request, reply) => {
+      try {
+        const { id } = request.params;
+        const tournamentId = parseInt(id);
+
+        if (isNaN(tournamentId)) {
+          return reply.code(400).send({ error: 'Invalid tournament ID' });
+        }
+
+        const success = TournamentService.resetTournament(tournamentId);
+        
+        if (!success) {
+          return reply.code(400).send({ 
+            error: 'Could not reset tournament' 
+          });
+        }
+
+        const tournament = TournamentService.getTournamentById(tournamentId);
+        return reply.send({ 
+          success: true, 
+          tournament,
+          message: 'Tournament reset successfully' 
+        });
+      } catch (error) {
+        fastify.log.error(error);
+        return reply.code(500).send({ error: 'Failed to reset tournament' });
+      }
+    }
+  );
 }
