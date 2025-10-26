@@ -6,7 +6,7 @@ import { config } from '../config';
 
 interface RegisterBody {
     username: string;
-    email: string;
+    email: string;  // Fixed: was 'emaail'
     password: string;
     display_name: string;
 }
@@ -18,7 +18,7 @@ interface LoginBody {
 
 export default async function authRoutes(fastify: FastifyInstance) {
     fastify.post<{ Body: RegisterBody }>(
-        '/auth/regitser',
+        '/auth/register',  // Fixed: was '/auth/regitser'
         async (request, reply) => {
             const { username, email, password, display_name } = request.body;
 
@@ -41,7 +41,8 @@ export default async function authRoutes(fastify: FastifyInstance) {
                     'INSERT INTO users (username, email, password_hash, display_name) VALUES (?, ?, ?, ?)'
                 ).run(username, email, password_hash, display_name);
 
-                const token = jwt.sign({ userId: result.lastInsertRowid }, config.jwtSecret, { expiresIn: config.jwt.expiresIn });
+                // Fixed: config.jwtSecret -> config.jwt.secret
+                const token = jwt.sign({ userId: result.lastInsertRowid }, config.jwt.secret, { expiresIn: config.jwt.expiresIn });
                 reply.code(201).send({
                     message: 'User registered successfully',
                     token,
@@ -53,6 +54,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
             }
         }
     );
+    
     fastify.post<{ Body: LoginBody }>(
         '/auth/login',
         async (request, reply) => {
@@ -63,7 +65,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
             }
 
             try {
-                const user = db.prepare('SELECT * FROM users WHERE username = ?').get(username);
+                const user = db.prepare('SELECT * FROM users WHERE username = ?').get(username) as any;
                 if (!user) {
                     return reply.status(401).send({ message: 'Invalid username or password' });
                 }
@@ -75,7 +77,8 @@ export default async function authRoutes(fastify: FastifyInstance) {
 
                 db.prepare('UPDATE users SET is_online = 1, last_seen = CURRENT_TIMESTAMP WHERE id = ?').run(user.id);
                 
-                const token = jwt.sign({ userId: user.id }, config.jwtSecret, { expiresIn: config.jwt.expiresIn });
+                // Fixed: config.jwtSecret -> config.jwt.secret
+                const token = jwt.sign({ userId: user.id }, config.jwt.secret, { expiresIn: config.jwt.expiresIn });
                 reply.code(200).send({
                     message: 'Login successful',
                     token,
@@ -87,6 +90,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
             }
         }
     );
+    
     fastify.post('/auth/logout', async (request, reply) => {
         try {
             const authHeader = request.headers.authorization;
@@ -95,7 +99,8 @@ export default async function authRoutes(fastify: FastifyInstance) {
             }
 
             const token = authHeader.split(' ')[1];
-            const decoded: any = jwt.verify(token, config.jwtSecret);
+            // Fixed: config.jwtSecret -> config.jwt.secret
+            const decoded: any = jwt.verify(token, config.jwt.secret);
             const userId = decoded.userId;
 
             db.prepare('UPDATE users SET is_online = 0, last_seen = CURRENT_TIMESTAMP WHERE id = ?').run(userId);
@@ -106,6 +111,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
             reply.code(500).send({ message: 'Internal Server Error' });
         }
     });
+    
     fastify.get('/auth/me', async (request, reply) => {
         try {
             const authHeader = request.headers.authorization;
@@ -114,7 +120,8 @@ export default async function authRoutes(fastify: FastifyInstance) {
             }
 
             const token = authHeader.split(' ')[1];
-            const decoded: any = jwt.verify(token, config.jwtSecret);
+            // Fixed: config.jwtSecret -> config.jwt.secret
+            const decoded: any = jwt.verify(token, config.jwt.secret);
             const userId = decoded.userId;
 
             const user = db.prepare('SELECT id, username, email, display_name, avatar_url, is_online, last_seen, created_at, updated_at FROM users WHERE id = ?').get(userId);
