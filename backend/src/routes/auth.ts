@@ -6,7 +6,7 @@ import { config } from '../config';
 
 interface RegisterBody {
     username: string;
-    email: string;  // Fixed: was 'emaail'
+    email: string;
     password: string;
     display_name: string;
 }
@@ -18,7 +18,7 @@ interface LoginBody {
 
 export default async function authRoutes(fastify: FastifyInstance) {
     fastify.post<{ Body: RegisterBody }>(
-        '/auth/register',  // Fixed: was '/auth/regitser'
+        '/auth/register',
         async (request, reply) => {
             const { username, email, password, display_name } = request.body;
 
@@ -77,7 +77,6 @@ export default async function authRoutes(fastify: FastifyInstance) {
 
                 db.prepare('UPDATE users SET is_online = 1, last_seen = CURRENT_TIMESTAMP WHERE id = ?').run(user.id);
                 
-                // Fixed: config.jwtSecret -> config.jwt.secret
                 const token = jwt.sign({ userId: user.id }, config.jwt.secret, { expiresIn: config.jwt.expiresIn });
                 reply.code(200).send({
                     message: 'Login successful',
@@ -99,7 +98,6 @@ export default async function authRoutes(fastify: FastifyInstance) {
             }
 
             const token = authHeader.split(' ')[1];
-            // Fixed: config.jwtSecret -> config.jwt.secret
             const decoded: any = jwt.verify(token, config.jwt.secret);
             const userId = decoded.userId;
 
@@ -120,7 +118,6 @@ export default async function authRoutes(fastify: FastifyInstance) {
             }
 
             const token = authHeader.split(' ')[1];
-            // Fixed: config.jwtSecret -> config.jwt.secret
             const decoded: any = jwt.verify(token, config.jwt.secret);
             const userId = decoded.userId;
 
