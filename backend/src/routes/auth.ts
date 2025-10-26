@@ -87,4 +87,45 @@ export default async function authRoutes(fastify: FastifyInstance) {
             }
         }
     );
+    fastify.post('/auth/logout', async (request, reply) => {
+        try {
+            const authHeader = request.headers.authorization;
+            if (!authHeader) {
+                return reply.status(401).send({ message: 'Authorization header missing' });
+            }
+
+            const token = authHeader.split(' ')[1];
+            const decoded: any = jwt.verify(token, config.jwtSecret);
+            const userId = decoded.userId;
+
+            db.prepare('UPDATE users SET is_online = 0, last_seen = CURRENT_TIMESTAMP WHERE id = ?').run(userId);
+
+            reply.code(200).send({ message: 'Logout successful' });
+        } catch (error) {
+            fastify.log.error(error);
+            reply.code(500).send({ message: 'Internal Server Error' });
+        }
+    });
+    fastify.get('/auth/me', async (request, reply) => {
+        try {
+            const authHeader = request.headers.authorization;
+            if (!authHeader) {
+                return reply.status(401).send({ message: 'Authorization header missing' });
+            }
+
+            const token = authHeader.split(' ')[1];
+            const decoded: any = jwt.verify(token, config.jwtSecret);
+            const userId = decoded.userId;
+
+            const user = db.prepare('SELECT id, username, email, display_name, avatar_url, is_online, last_seen, created_at, updated_at FROM users WHERE id = ?').get(userId);
+            if (!user) {
+                return reply.status(404).send({ message: 'User not found' });
+            }
+
+            reply.code(200).send({ user });
+        } catch (error) {
+            fastify.log.error(error);
+            reply.code(500).send({ message: 'Internal Server Error' });
+        }
+    });
 }
