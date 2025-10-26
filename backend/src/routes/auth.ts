@@ -44,7 +44,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
                 const token = jwt.sign(
                     { userId: result.lastInsertRowid }, 
                     config.jwt.secret,
-                    { expiresIn: config.jwt.expiresIn }
+                    { expiresIn: '7d' }
                 );
                 reply.code(201).send({
                     message: 'User registered successfully',
