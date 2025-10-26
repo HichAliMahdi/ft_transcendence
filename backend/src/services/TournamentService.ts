@@ -292,6 +292,7 @@ export class TournamentService {
 
     static resetTournament(id: number): boolean {
         try {
+            const tournament = this.getTournamentById(id);
             if (!tournament || tournament.status === 'completed') {
                 return false;
             }
