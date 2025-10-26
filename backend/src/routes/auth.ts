@@ -51,7 +51,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
                     token,
                     user: { id: result.lastInsertRowid, username, email, display_name }
                 });
-            }   catch (error) {
+            } catch (error) {
                 fastify.log.error(error);
                 reply.code(500).send({ message: 'Internal Server Error' });
             }
@@ -83,7 +83,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
                 const token = jwt.sign(
                     { userId: user.id }, 
                     config.jwt.secret,
-                    { expiresIn: config.jwt.expiresIn } as jwt.SignOptions
+                    { expiresIn: config.jwt.expiresIn }
                 );
                 reply.code(200).send({
                     message: 'Login successful',
@@ -105,7 +105,11 @@ export default async function authRoutes(fastify: FastifyInstance) {
             }
 
             const token = authHeader.split(' ')[1];
-            const decoded: any = jwt.verify(token, config.jwt.secret);
+            if (!token) {
+                return reply.status(401).send({ message: 'Token missing' });
+            }
+
+            const decoded = jwt.verify(token, config.jwt.secret) as { userId: number };
             const userId = decoded.userId;
 
             db.prepare('UPDATE users SET is_online = 0, last_seen = CURRENT_TIMESTAMP WHERE id = ?').run(userId);
@@ -125,7 +129,11 @@ export default async function authRoutes(fastify: FastifyInstance) {
             }
 
             const token = authHeader.split(' ')[1];
-            const decoded: any = jwt.verify(token, config.jwt.secret);
+            if (!token) {
+                return reply.status(401).send({ message: 'Token missing' });
+            }
+
+            const decoded = jwt.verify(token, config.jwt.secret) as { userId: number };
             const userId = decoded.userId;
 
             const user = db.prepare('SELECT id, username, email, display_name, avatar_url, is_online, last_seen, created_at, updated_at FROM users WHERE id = ?').get(userId);
