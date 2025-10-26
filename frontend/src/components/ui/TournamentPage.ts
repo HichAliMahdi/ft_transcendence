@@ -55,6 +55,7 @@ export class TournamentPage {
     }
     private renderSizeSelection(): void {
         if (!this.container) return;
+        this.container.innerHTML = '';
 
         const title = document.createElement('h1');
         title.textContent = 'Tournament Setup';
@@ -506,6 +507,7 @@ export class TournamentPage {
 
     private async renderLobby(): Promise<void> {
         if (!this.container) return;
+        this.container.innerHTML = '';
         
         const title = document.createElement('h1');
         title.textContent = 'Welcome to the Tournament Lobby';
