@@ -41,8 +41,11 @@ export default async function authRoutes(fastify: FastifyInstance) {
                     'INSERT INTO users (username, email, password_hash, display_name) VALUES (?, ?, ?, ?)'
                 ).run(username, email, password_hash, display_name);
 
-                // Fixed: config.jwtSecret -> config.jwt.secret
-                const token = jwt.sign({ userId: result.lastInsertRowid }, config.jwt.secret, { expiresIn: config.jwt.expiresIn });
+                const token = jwt.sign(
+                    { userId: result.lastInsertRowid }, 
+                    config.jwt.secret,
+                    { expiresIn: config.jwt.expiresIn }
+                );
                 reply.code(201).send({
                     message: 'User registered successfully',
                     token,
@@ -77,7 +80,11 @@ export default async function authRoutes(fastify: FastifyInstance) {
 
                 db.prepare('UPDATE users SET is_online = 1, last_seen = CURRENT_TIMESTAMP WHERE id = ?').run(user.id);
                 
-                const token = jwt.sign({ userId: user.id }, config.jwt.secret, { expiresIn: config.jwt.expiresIn });
+                const token = jwt.sign(
+                    { userId: user.id }, 
+                    config.jwt.secret,
+                    { expiresIn: config.jwt.expiresIn } as jwt.SignOptions
+                );
                 reply.code(200).send({
                     message: 'Login successful',
                     token,

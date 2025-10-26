@@ -9,10 +9,10 @@ export const config = {
     },
     jwt: {
         secret: process.env.JWT_SECRET || 'fallback-secret-change-in-production',
-        expiresIn: process.env.JWT_EXPIRES_IN || '7d',
+        expiresIn: (process.env.JWT_EXPIRES_IN || '7d') as string,
     },
     cors: {
         origin: process.env.FRONTEND_URL || 'http://localhost:5173',
         credentials: true,
     }
-} as const;
+};
