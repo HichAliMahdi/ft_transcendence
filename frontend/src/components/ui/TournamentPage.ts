@@ -664,6 +664,11 @@ export class TournamentPage {
 
     public cleanup(): void {
         this.cleanupCurrentGame();
+        if (this.tournament && this.tournament.status === 'pending') {
+            TournamentAPI.deleteTournament(this.tournament.id).catch(err => {
+                console.error('Error deleting tournament on cleanup:', err);
+            });
+        }
     }
 
     private cleanupCurrentGame(): void {

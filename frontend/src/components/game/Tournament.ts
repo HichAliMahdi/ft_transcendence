@@ -178,4 +178,29 @@ export class TournamentAPI {
         if (!match.winner_id) return null;
         return participants.find(p => p.id === match.winner_id) || null;
     }
+
+    static async deleteTournament(tournamentId: number): Promise<void> {
+        const response = await fetch(`${API_BASE}/tournaments/${tournamentId}`, {
+            method: 'DELETE'
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to delete tournament');
+        }
+    }
+
+    static async resetTournament(tournamentId: number): Promise<Tournament> {
+        const response = await fetch(`${API_BASE}/tournaments/${tournamentId}/reset`, {
+            method: 'POST'
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to reset tournament');
+        }
+
+        const data = await response.json();
+        return data.tournament;
+    }
 }
