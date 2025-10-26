@@ -623,6 +623,33 @@ export class TournamentPage {
         return `${Math.floor(seconds / 86400)} days ago`;
     }
 
+    private async joinTournament(tournament: Tournament): Promise<void> {
+        const alias = prompt('Enter your player alias:');
+        if (!alias || alias.trim().length === 0) {
+            return ;
+        }
+
+        if (alias.length > 20) {
+            alert('Alias must be 20 characters or less.');
+            return ;
+        }
+
+        if (!/^[a-zA-Z0-9\s_-]+$/.test(alias)) {
+            alert('Alias can only contain letters, numbers, spaces, underscores, and hyphens.');
+            return ;
+        }
+        try {
+            this.tournament = tournament;
+            await TournamentAPI.addPlayer(tournament.id, alias.trim());
+            await this.refreshTournamentData();
+            await this.updateUI();
+        } catch (error: any) {
+            alert(`Error: ${error.message}`);
+            this.tournament = null;
+        }
+    }
+
+
     private renderBracket(): HTMLElement {
         const bracket = document.createElement('div');
         bracket.className = 'bg-game-dark p-8 rounded-lg mt-8 overflow-x-auto';
@@ -790,7 +817,7 @@ export class TournamentPage {
 
     public cleanup(): void {
         this.cleanupCurrentGame();
-        if (this.tournament && this.tournament.status === 'pending') {
+        if (this.tournament && this.tournament.status === 'pending' && this.participants.length === 0) {
             TournamentAPI.deleteTournament(this.tournament.id).catch(err => {
                 console.error('Error deleting tournament on cleanup:', err);
             });
