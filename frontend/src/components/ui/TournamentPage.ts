@@ -125,9 +125,29 @@ export class TournamentPage {
             const card = document.createElement('div');
             card.className = 'glass-effect p-8 rounded-2xl cursor-pointer transition-all duration-300 border-2 border-transparent hover:border-accent-pink hover:-translate-y-2 flex flex-col items-center';
             card.onclick = async () => {
+                // Prompt for creator's alias
+                const alias = prompt('Enter your player alias:');
+                if (!alias || alias.trim().length === 0) {
+                    return;
+                }
+
+                if (alias.length > 20) {
+                    alert('Alias must be 20 characters or less.');
+                    return;
+                }
+
+                if (!/^[a-zA-Z0-9\s_-]+$/.test(alias)) {
+                    alert('Alias can only contain letters, numbers, spaces, underscores, and hyphens.');
+                    return;
+                }
+
                 try {
                     this.tournament = await TournamentAPI.createTournament(`Tournament ${Date.now()}`, size);
-                    this.saveTournamentId(this.tournament.id); // Save to storage
+                    this.saveTournamentId(this.tournament.id);
+                    
+                    // Automatically register the creator
+                    this.participants = await TournamentAPI.addPlayer(this.tournament.id, alias.trim());
+                    
                     await this.refreshTournamentData();
                     await this.updateUI();
                 } catch (error: any) {
@@ -208,6 +228,13 @@ export class TournamentPage {
         const subtitle = document.createElement('p');
         subtitle.textContent = `${maxPlayers}-Player Tournament`;
         subtitle.className = 'text-gray-300 text-lg mb-2 text-center';
+        
+        // Add creator info
+        const creatorInfo = document.createElement('p');
+        if (this.participants.length > 0) {
+            creatorInfo.textContent = `Created by ${this.participants[0].alias}`;
+            creatorInfo.className = 'text-blue-400 text-sm mb-4 text-center';
+        }
         
         const playerCount = document.createElement('p');
         playerCount.className = 'text-2xl font-bold text-center mb-8';
@@ -357,6 +384,9 @@ export class TournamentPage {
         
         this.container.appendChild(title);
         this.container.appendChild(subtitle);
+        if (this.participants.length > 0) {
+            this.container.appendChild(creatorInfo);
+        }
         this.container.appendChild(playerCount);
         this.container.appendChild(registrationForm);
         this.container.appendChild(playersList);
