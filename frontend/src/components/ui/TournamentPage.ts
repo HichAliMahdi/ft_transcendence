@@ -970,7 +970,7 @@ export class TournamentPage {
             this.participants = [];
             this.matches = [];
             this.currentMatch = null;
-            this.clearTournamentId(); // Clear storage
+            this.clearTournamentId();
             this.updateUI();
         };
         
@@ -978,7 +978,7 @@ export class TournamentPage {
         homeBtn.textContent = 'Back to Home';
         homeBtn.className = 'bg-game-dark hover:bg-blue-800 text-white font-bold text-lg py-4 px-8 rounded-lg transition-colors duration-300';
         homeBtn.onclick = () => {
-            this.clearTournamentId(); // Clear storage
+            this.clearTournamentId();
             window.location.href = '/';
         };
         
@@ -997,7 +997,7 @@ export class TournamentPage {
             TournamentAPI.deleteTournament(this.tournament.id).catch(err => {
                 console.error('Error deleting tournament on cleanup:', err);
             });
-            this.clearTournamentId(); // Clear storage
+            this.clearTournamentId();
         }
     }
 

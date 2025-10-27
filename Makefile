@@ -50,13 +50,12 @@ clean:
 	@docker compose -f $(COMPOSE) down -v
 	@echo "$(GREEN)✅ Containers and volumes removed!$(RESET)"
 
-fclean:
-	@echo "$(RED)🗑️  Deep cleaning $(NAME)...$(RESET)"
-	@docker compose -f $(COMPOSE) down -v --rmi all
-	@docker system prune -af --volumes
-	@rm -rf frontend/node_modules frontend/dist
-	@rm -rf data/pong.db
-	@echo "$(GREEN)✅ Full clean complete!$(RESET)"
+fclean: down
+	docker system prune -af --volumes
+	@if [ -f data/pong.db ]; then \
+		sudo rm -f data/pong.db || echo "Could not remove data/pong.db, skipping..."; \
+	fi
+	@echo "Cleaned everything!"
 
 re: fclean up
 
