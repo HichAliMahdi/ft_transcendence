@@ -11,12 +11,59 @@ export class TournamentPage {
     private participants: Player[] = [];
     private matches: Match[] = [];
     private currentMatch: Match | null = null;
+    // Add storage key
+    private readonly STORAGE_KEY = 'active_tournament_id';
 
     public render(): HTMLElement {
         this.container = document.createElement('div');
         this.container.className = 'container mx-auto p-8 tournament-container fade-in';
-        this.renderLobby();
+        // Try to restore tournament state before rendering lobby
+        this.restoreTournamentState().then(() => {
+            if (!this.tournament) {
+                this.renderLobby();
+            } else {
+                this.updateUI();
+            }
+        });
         return this.container;
+    }
+
+    // Add method to restore tournament from sessionStorage
+    private async restoreTournamentState(): Promise<void> {
+        const storedId = sessionStorage.getItem(this.STORAGE_KEY);
+        if (!storedId) return;
+
+        try {
+            const tournamentId = parseInt(storedId);
+            if (isNaN(tournamentId)) {
+                sessionStorage.removeItem(this.STORAGE_KEY);
+                return;
+            }
+
+            const data = await TournamentAPI.getTournament(tournamentId);
+            this.tournament = data.tournament;
+            this.participants = data.participants;
+            this.matches = data.matches;
+
+            if (this.tournament.status === 'active') {
+                this.currentMatch = await TournamentAPI.getCurrentMatch(this.tournament.id);
+            }
+
+            console.log('Tournament state restored:', this.tournament.name);
+        } catch (error) {
+            console.error('Failed to restore tournament:', error);
+            sessionStorage.removeItem(this.STORAGE_KEY);
+        }
+    }
+
+    // Save tournament ID when tournament is created or joined
+    private saveTournamentId(tournamentId: number): void {
+        sessionStorage.setItem(this.STORAGE_KEY, tournamentId.toString());
+    }
+
+    // Clear tournament ID when leaving
+    private clearTournamentId(): void {
+        sessionStorage.removeItem(this.STORAGE_KEY);
     }
 
     private async refreshTournamentData(): Promise<void> {
@@ -80,6 +127,7 @@ export class TournamentPage {
             card.onclick = async () => {
                 try {
                     this.tournament = await TournamentAPI.createTournament(`Tournament ${Date.now()}`, size);
+                    this.saveTournamentId(this.tournament.id); // Save to storage
                     await this.refreshTournamentData();
                     await this.updateUI();
                 } catch (error: any) {
@@ -424,6 +472,7 @@ export class TournamentPage {
                 this.tournament = null;
                 this.participants = [];
                 this.matches = [];
+                this.clearTournamentId(); // Clear storage
                 window.location.href = '/';
             }
         };
@@ -649,12 +698,14 @@ export class TournamentPage {
         }
         try {
             this.tournament = tournament;
+            this.saveTournamentId(tournament.id); // Save to storage
             await TournamentAPI.addPlayer(tournament.id, alias.trim());
             await this.refreshTournamentData();
             await this.updateUI();
         } catch (error: any) {
             alert(`Error: ${error.message}`);
             this.tournament = null;
+            this.clearTournamentId(); // Clear on error
         }
     }
 
@@ -755,6 +806,7 @@ export class TournamentPage {
                 this.tournament = null;
                 this.participants = [];
                 this.matches = [];
+                this.clearTournamentId(); // Clear storage
                 window.location.href = '/';
             }
         };
@@ -805,6 +857,7 @@ export class TournamentPage {
             this.participants = [];
             this.matches = [];
             this.currentMatch = null;
+            this.clearTournamentId(); // Clear storage
             this.updateUI();
         };
         
@@ -812,6 +865,7 @@ export class TournamentPage {
         homeBtn.textContent = 'Back to Home';
         homeBtn.className = 'bg-game-dark hover:bg-blue-800 text-white font-bold text-lg py-4 px-8 rounded-lg transition-colors duration-300';
         homeBtn.onclick = () => {
+            this.clearTournamentId(); // Clear storage
             window.location.href = '/';
         };
         
@@ -830,6 +884,7 @@ export class TournamentPage {
             TournamentAPI.deleteTournament(this.tournament.id).catch(err => {
                 console.error('Error deleting tournament on cleanup:', err);
             });
+            this.clearTournamentId(); // Clear storage
         }
     }
 

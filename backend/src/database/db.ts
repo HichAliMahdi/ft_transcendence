@@ -10,7 +10,7 @@ export function initializeDatabase(): void {
             username TEXT UNIQUE NOT NULL,
             email TEXT UNIQUE,
             password_hash TEXT,
-            display_name TEXT UNIQUE NOT NULL,
+            display_name TEXT NOT NULL DEFAULT '',
             avatar_url TEXT DEFAULT '/default-avatar.png',
             is_online INTEGER DEFAULT 0,
             last_seen DATETIME DEFAULT CURRENT_TIMESTAMP,

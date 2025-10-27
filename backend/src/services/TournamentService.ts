@@ -65,15 +65,18 @@ export class TournamentService {
             return false;
         }
 
-        if (currentPlayers.some(p => p.alias.toLowerCase() === alias.toLowerCase())) {
+        // Case-insensitive alias check
+        const normalizedAlias = alias.toLowerCase().trim();
+        if (currentPlayers.some(p => p.alias.toLowerCase().trim() === normalizedAlias)) {
             return false;
         }
 
         try {
             const userStmt = db.prepare(`
-                INSERT INTO users (username) VALUES (?)
+                INSERT INTO users (username, display_name) VALUES (?, ?)
             `);
-            const userResult = userStmt.run(`${alias}_${Date.now()}`);
+            const uniqueUsername = `${alias}_${Date.now()}`;
+            const userResult = userStmt.run(uniqueUsername, alias);
             const userId = userResult.lastInsertRowid as number;
 
             const participantStmt = db.prepare(`
