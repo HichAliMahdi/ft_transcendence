@@ -1,7 +1,6 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { TournamentService, TournamentSize } from '../services/TournamentService';
 
-// Request body types
 interface CreateTournamentBody {
   name: string;
   maxPlayers: TournamentSize;
@@ -17,7 +16,6 @@ interface RecordMatchResultBody {
   score2: number;
 }
 
-// Route params types
 interface TournamentParams {
   id: string;
 }
@@ -33,7 +31,6 @@ interface MatchParams {
 
 export default async function tournamentRoutes(fastify: FastifyInstance) {
   
-  // Create a new tournament
   fastify.post<{ Body: CreateTournamentBody }>(
     '/tournaments',
     async (request, reply) => {
@@ -58,7 +55,6 @@ export default async function tournamentRoutes(fastify: FastifyInstance) {
   );
 
 
-  // Get joinable tournaments
   fastify.get('/tournaments/joinable', async (request, reply) => {
     try {
       const tournaments = TournamentService.getJoinableTournaments();
@@ -69,7 +65,6 @@ export default async function tournamentRoutes(fastify: FastifyInstance) {
     }
   });
 
-  // Get tournament by ID
   fastify.get<{ Params: TournamentParams }>(
     '/tournaments/:id',
     async (request, reply) => {
@@ -102,7 +97,6 @@ export default async function tournamentRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // Get all tournaments
   fastify.get('/tournaments', async (request, reply) => {
     try {
       const tournaments = TournamentService.getAllTournaments();
@@ -113,7 +107,6 @@ export default async function tournamentRoutes(fastify: FastifyInstance) {
     }
   });
 
-  // Add player to tournament
   fastify.post<{ Params: TournamentParams; Body: AddPlayerBody }>(
     '/tournaments/:id/players',
     async (request, reply) => {
@@ -157,7 +150,6 @@ export default async function tournamentRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // Remove player from tournament
   fastify.delete<{ Params: PlayerParams }>(
     '/tournaments/:id/players/:playerId',
     async (request, reply) => {
@@ -187,7 +179,6 @@ export default async function tournamentRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // Start tournament
   fastify.post<{ Params: TournamentParams }>(
     '/tournaments/:id/start',
     async (request, reply) => {
@@ -221,7 +212,6 @@ export default async function tournamentRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // Get current match
   fastify.get<{ Params: TournamentParams }>(
     '/tournaments/:id/current-match',
     async (request, reply) => {
@@ -247,7 +237,6 @@ export default async function tournamentRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // Record match result
   fastify.post<{ Params: MatchParams; Body: RecordMatchResultBody }>(
     '/tournaments/matches/:matchId/result',
     async (request, reply) => {
@@ -286,7 +275,6 @@ export default async function tournamentRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // Get all matches for a tournament
   fastify.get<{ Params: TournamentParams }>(
     '/tournaments/:id/matches',
     async (request, reply) => {
@@ -307,7 +295,6 @@ export default async function tournamentRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // Delete tournament
   fastify.delete<{ Params: TournamentParams }>(
     '/tournaments/:id',
     async (request, reply) => {
@@ -333,7 +320,6 @@ export default async function tournamentRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // Reset tournament
   fastify.post<{ Params: TournamentParams }>(
     '/tournaments/:id/reset',
     async (request, reply) => {
