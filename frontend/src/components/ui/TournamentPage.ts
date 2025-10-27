@@ -125,34 +125,21 @@ export class TournamentPage {
             const card = document.createElement('div');
             card.className = 'glass-effect p-8 rounded-2xl cursor-pointer transition-all duration-300 border-2 border-transparent hover:border-accent-pink hover:-translate-y-2 flex flex-col items-center';
             card.onclick = async () => {
-                // Prompt for creator's alias
-                const alias = prompt('Enter your player alias:');
-                if (!alias || alias.trim().length === 0) {
-                    return;
-                }
-
-                if (alias.length > 20) {
-                    alert('Alias must be 20 characters or less.');
-                    return;
-                }
-
-                if (!/^[a-zA-Z0-9\s_-]+$/.test(alias)) {
-                    alert('Alias can only contain letters, numbers, spaces, underscores, and hyphens.');
-                    return;
-                }
-
-                try {
-                    this.tournament = await TournamentAPI.createTournament(`Tournament ${Date.now()}`, size);
-                    this.saveTournamentId(this.tournament.id);
-                    
-                    // Automatically register the creator
-                    this.participants = await TournamentAPI.addPlayer(this.tournament.id, alias.trim());
-                    
-                    await this.refreshTournamentData();
-                    await this.updateUI();
-                } catch (error: any) {
-                    alert(`Error: ${error.message}`);
-                }
+                // Show alias input modal
+                this.showAliasModal(async (alias: string) => {
+                    try {
+                        this.tournament = await TournamentAPI.createTournament(`Tournament ${Date.now()}`, size);
+                        this.saveTournamentId(this.tournament.id);
+                        
+                        // Automatically register the creator
+                        this.participants = await TournamentAPI.addPlayer(this.tournament.id, alias.trim());
+                        
+                        await this.refreshTournamentData();
+                        await this.updateUI();
+                    } catch (error: any) {
+                        alert(`Error: ${error.message}`);
+                    }
+                }, 'Enter your alias to create tournament');
             };
             
             const emojiDiv = document.createElement('div');
@@ -712,33 +699,129 @@ export class TournamentPage {
     }
 
     private async joinTournament(tournament: Tournament): Promise<void> {
-        const alias = prompt('Enter your player alias:');
-        if (!alias || alias.trim().length === 0) {
-            return ;
-        }
-
-        if (alias.length > 20) {
-            alert('Alias must be 20 characters or less.');
-            return ;
-        }
-
-        if (!/^[a-zA-Z0-9\s_-]+$/.test(alias)) {
-            alert('Alias can only contain letters, numbers, spaces, underscores, and hyphens.');
-            return ;
-        }
-        try {
-            this.tournament = tournament;
-            this.saveTournamentId(tournament.id); // Save to storage
-            await TournamentAPI.addPlayer(tournament.id, alias.trim());
-            await this.refreshTournamentData();
-            await this.updateUI();
-        } catch (error: any) {
-            alert(`Error: ${error.message}`);
-            this.tournament = null;
-            this.clearTournamentId(); // Clear on error
-        }
+        this.showAliasModal(async (alias: string) => {
+            try {
+                this.tournament = tournament;
+                this.saveTournamentId(tournament.id);
+                await TournamentAPI.addPlayer(tournament.id, alias.trim());
+                await this.refreshTournamentData();
+                await this.updateUI();
+            } catch (error: any) {
+                alert(`Error: ${error.message}`);
+                this.tournament = null;
+                this.clearTournamentId();
+            }
+        }, 'Enter your alias to join tournament');
     }
 
+    private showAliasModal(onSubmit: (alias: string) => void, title: string = 'Enter Your Alias'): void {
+        // Create modal overlay
+        const overlay = document.createElement('div');
+        overlay.className = 'fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 fade-in';
+        
+        // Create modal container
+        const modal = document.createElement('div');
+        modal.className = 'glass-effect p-8 rounded-2xl max-w-md w-full mx-4 transform scale-95 animate-scale-in';
+        
+        // Modal title
+        const modalTitle = document.createElement('h2');
+        modalTitle.textContent = title;
+        modalTitle.className = 'text-2xl font-bold text-white mb-6 text-center gradient-text';
+        
+        // Input field
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.placeholder = 'Your alias (e.g., ProGamer123)';
+        input.maxLength = 20;
+        input.className = 'w-full px-4 py-3 text-lg border-2 border-blue-800 rounded-xl bg-primary-dark text-white focus:outline-none focus:border-accent-pink transition-colors duration-300';
+        
+        // Error message
+        const errorMsg = document.createElement('p');
+        errorMsg.className = 'text-red-500 text-sm mt-2 hidden';
+        
+        // Character counter
+        const charCounter = document.createElement('p');
+        charCounter.className = 'text-gray-400 text-sm mt-2 text-right';
+        charCounter.textContent = '0 / 20';
+        
+        input.addEventListener('input', () => {
+            charCounter.textContent = `${input.value.length} / 20`;
+            errorMsg.classList.add('hidden');
+        });
+        
+        // Buttons container
+        const buttonsContainer = document.createElement('div');
+        buttonsContainer.className = 'flex gap-4 mt-6';
+        
+        // Cancel button
+        const cancelBtn = document.createElement('button');
+        cancelBtn.textContent = 'Cancel';
+        cancelBtn.className = 'flex-1 bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-300';
+        cancelBtn.onclick = () => {
+            document.body.removeChild(overlay);
+        };
+        
+        // Submit button
+        const submitBtn = document.createElement('button');
+        submitBtn.textContent = 'Continue';
+        submitBtn.className = 'flex-1 btn-primary';
+        submitBtn.onclick = () => {
+            const alias = input.value.trim();
+            
+            if (!alias) {
+                errorMsg.textContent = 'Please enter an alias';
+                errorMsg.classList.remove('hidden');
+                input.focus();
+                return;
+            }
+            
+            if (alias.length > 20) {
+                errorMsg.textContent = 'Alias must be 20 characters or less';
+                errorMsg.classList.remove('hidden');
+                input.focus();
+                return;
+            }
+            
+            if (!/^[a-zA-Z0-9\s_-]+$/.test(alias)) {
+                errorMsg.textContent = 'Only letters, numbers, spaces, - and _ allowed';
+                errorMsg.classList.remove('hidden');
+                input.focus();
+                return;
+            }
+            
+            document.body.removeChild(overlay);
+            onSubmit(alias);
+        };
+        
+        // Handle Enter key
+        input.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                submitBtn.click();
+            }
+        });
+        
+        // Handle Escape key
+        overlay.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                cancelBtn.click();
+            }
+        });
+        
+        // Assemble modal
+        modal.appendChild(modalTitle);
+        modal.appendChild(input);
+        modal.appendChild(charCounter);
+        modal.appendChild(errorMsg);
+        buttonsContainer.appendChild(cancelBtn);
+        buttonsContainer.appendChild(submitBtn);
+        modal.appendChild(buttonsContainer);
+        
+        overlay.appendChild(modal);
+        document.body.appendChild(overlay);
+        
+        // Focus input after a short delay
+        setTimeout(() => input.focus(), 100);
+    }
 
     private renderBracket(): HTMLElement {
         const bracket = document.createElement('div');
