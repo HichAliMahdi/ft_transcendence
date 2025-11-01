@@ -9,21 +9,36 @@
 </head>
 
 <body>
-    <div id="app" class="flex flex-col min-h-screen">
+    <div id="app" class="flex min-h-screen">
+        <!-- Left sidebar nav (was top) -->
         <nav id="main-nav"
-            class="fixed top-0 left-0 w-full z-50 glass-effect border-b border-white/10 shadow-xl shadow-black/20 px-8 py-5">
-            <div class="flex justify-between items-center">
-                <ul class="flex gap-8 list-none">
-                    <li><a href="/" data-link class="nav-link">Home</a></li>
-                    <li><a href="/game" data-link class="nav-link">Play Game</a></li>
-                    <li><a href="/tournament" data-link class="nav-link">Tournament</a></li>
-                    <li><a href="/multiplayer" data-link class="nav-link">Multiplayer</a></li>
-                </ul>
-                <div id="auth-section"></div>
+            class="fixed left-0 top-0 h-full w-72 z-50 glass-effect border-r border-white/10 shadow-xl shadow-black/20 px-6 py-6">
+            <div class="flex flex-col justify-between h-full">
+                <div>
+                    <ul class="flex flex-col gap-6 list-none">
+                        <li><a href="/" data-link class="nav-link">Home</a></li>
+                        <li><a href="/game" data-link class="nav-link">Play Game</a></li>
+                        <li><a href="/tournament" data-link class="nav-link">Tournament</a></li>
+                        <li><a href="/multiplayer" data-link class="nav-link">Multiplayer</a></li>
+                    </ul>
+                </div>
+                <div id="auth-section" class="mt-6"></div>
             </div>
         </nav>
-        <main id="content" class="flex-1 p-12 pt-24 fade-in"></main>
+
+        <!-- Toggle button to show/hide sidebar -->
+        <button id="nav-toggle-btn" aria-controls="main-nav" aria-expanded="true" title="Toggle navigation"
+            class="hidden md:block">
+            <!-- Visual content handled via CSS; fallback character -->
+            ☰
+        </button>
+
+        <!-- Main content area -->
+        <main id="content" class="flex-1 p-12 fade-in">
+            <!-- ...existing code... -->
+        </main>
     </div>
+
     <script type="module" src="./main.ts"></script>
 </body>
 

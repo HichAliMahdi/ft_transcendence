@@ -21,6 +21,15 @@ class App {
                 if (href) {
                     this.router.navigateTo(href);
                     setTimeout(() => this.updateAuthSection(), 0);
+
+                    // Collapse sidebar on small screens after navigation
+                    const nav = document.getElementById('main-nav');
+                    const toggleBtn = document.getElementById('nav-toggle-btn');
+                    if (nav && window.innerWidth < 768) {
+                        nav.classList.add('collapsed');
+                        document.body.classList.add('nav-collapsed');
+                        if (toggleBtn) toggleBtn.setAttribute('aria-expanded', 'false');
+                    }
                 }
             }
         });
@@ -41,30 +50,39 @@ class App {
             console.error('Unhandled promise rejection:', event.reason);
         });
 
+        // Sidebar toggle logic (replaces mouse-based behavior)
         const nav = document.getElementById('main-nav');
+        const toggleBtn = document.getElementById('nav-toggle-btn');
+
         if (nav) {
-            let lastScrollY = window.scrollY;
-            let ticking = false;
-            window.addEventListener('scroll', () => {
-                if (!ticking) {
-                    ticking = true;
-                    requestAnimationFrame(() => {
-                        if (window.scrollY > lastScrollY && window.scrollY > 100) {
-                            nav.style.transform = 'translateY(-100%)';
-                        } else {
-                            nav.style.transform = 'translateY(0)';
-                        }
-                        lastScrollY = window.scrollY;
-                        ticking = false;
-                    });
+            // Initialize collapsed state on small screens
+            if (window.innerWidth < 768) {
+                nav.classList.add('collapsed');
+                document.body.classList.add('nav-collapsed');
+                if (toggleBtn) toggleBtn.setAttribute('aria-expanded', 'false');
+            }
+
+            if (toggleBtn) {
+                toggleBtn.addEventListener('click', () => {
+                    const collapsed = nav.classList.toggle('collapsed');
+                    document.body.classList.toggle('nav-collapsed', collapsed);
+                    toggleBtn.setAttribute('aria-expanded', String(!collapsed));
+                });
+            }
+
+            // Make resize responsive: ensure desktop shows sidebar by default
+            window.addEventListener('resize', () => {
+                if (window.innerWidth >= 768) {
+                    nav.classList.remove('collapsed');
+                    document.body.classList.remove('nav-collapsed');
+                    if (toggleBtn) toggleBtn.setAttribute('aria-expanded', 'true');
+                } else {
+                    // keep small screens collapsed by default
+                    nav.classList.add('collapsed');
+                    document.body.classList.add('nav-collapsed');
+                    if (toggleBtn) toggleBtn.setAttribute('aria-expanded', 'false');
                 }
             }, { passive: true });
-
-            document.addEventListener('mousemove', (e) => {
-                if (e.clientY < 80) {
-                    nav.style.transform = 'translateY(0)';
-                }
-            });
         }
 
         this.router.handleRoute();

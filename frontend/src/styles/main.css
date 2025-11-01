@@ -30,6 +30,73 @@
   }
 }
 
+/* Add left-sidebar and toggle styles */
+#main-nav {
+  /* Keep the Tailwind glass-effect visual but enforce left-sidebar layout */
+  position: fixed;
+  left: 0;
+  top: 0;
+  height: 100vh;
+  width: 18rem; /* 72 */
+  transform: translateX(0);
+  transition: transform 0.25s ease;
+  z-index: 50;
+  padding-top: 1.25rem;
+}
+
+/* Collapsed state - hidden offscreen */
+#main-nav.collapsed {
+  transform: translateX(-100%);
+}
+
+/* Content shifts to the right when sidebar is visible */
+#content {
+  transition: margin-left 0.25s ease;
+  margin-left: 18rem;
+}
+
+/* When nav is collapsed remove left margin */
+body.nav-collapsed #content {
+  margin-left: 0;
+}
+
+/* Toggle button */
+#nav-toggle-btn {
+  position: fixed;
+  left: 18rem;
+  top: 1rem;
+  z-index: 60;
+  background: rgba(255,255,255,0.04);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,0.06);
+  padding: 0.5rem 0.6rem;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: left 0.25s ease, background-color 0.15s ease;
+  font-size: 1.05rem;
+  line-height: 1;
+}
+
+/* When collapsed set button closer to edge */
+body.nav-collapsed #nav-toggle-btn {
+  left: 0.75rem;
+}
+
+/* Small screens: default collapsed and button visible */
+@media (max-width: 768px) {
+  #main-nav {
+    width: 16rem;
+  }
+  /* Start collapsed on small screens unless opened by the user */
+  #content {
+    margin-left: 0;
+  }
+  #nav-toggle-btn {
+    display: block;
+    left: 0.75rem;
+  }
+}
+
 @layer utilities {
   .fade-in {
     animation: fadeIn 0.8s ease;
