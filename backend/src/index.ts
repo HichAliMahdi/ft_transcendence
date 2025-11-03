@@ -1,5 +1,6 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
+import websocketPlugin from '@fastify/websocket';
 import { config } from './config';
 import { initializeDatabase } from './database/db';
 import { TournamentService } from './services/TournamentService';
@@ -30,6 +31,13 @@ setInterval(() => {
 fastify.register(cors, {
   origin: config.cors.origin,
   credentials: true,
+});
+
+// Register websocket plugin (required for websocket routes)
+fastify.register(websocketPlugin, {
+  options: {
+    maxPayload: 1024 * 1024
+  }
 });
 
 // Register routes
