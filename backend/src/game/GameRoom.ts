@@ -1,4 +1,4 @@
-import { GameEngine, BroadcastFn } from './GameEngine';
+import { GameEngine } from './GameEngine';
 
 type WS = any;
 
@@ -6,11 +6,12 @@ export class GameRoom {
   public id: string;
   private clients = new Set<WS>();
   private engine: GameEngine;
-  private playerMap = new Map<WS, 1 | 2>();
+  private playerMap = new Map<WS, 1 | 2 | null>();
 
   constructor(id: string) {
     this.id = id;
-    const broadcaster: BroadcastFn = (msg: any) => {
+
+    const broadcaster = (msg: any) => {
       const data = JSON.stringify(msg);
       for (const s of this.clients) {
         try {
@@ -18,31 +19,34 @@ export class GameRoom {
         } catch (e) {}
       }
     };
+
     this.engine = new GameEngine(broadcaster);
   }
 
   public addClient(socket: WS): { player: 1 | 2 | null; isHost: boolean } {
     if (this.clients.has(socket)) return { player: this.playerMap.get(socket) ?? null, isHost: false };
 
-    if (this.clients.size >= 2) {
-      this.clients.add(socket);
-      this.playerMap.set(socket, null as any);
-      try { socket.send(JSON.stringify({ type: 'joined', roomId: this.id, isHost: false, spectator: true })); } catch (e) {}
-      return { player: null, isHost: false };
-    }
-
+    // allow up to 2 players (others become spectators)
     this.clients.add(socket);
-    const existingPlayers = Array.from(this.playerMap.values());
-    let assigned: 1 | 2 = existingPlayers.includes(1) ? 2 : 1;
-    this.playerMap.set(socket, assigned);
+
+    const existingPlayers = Array.from(this.playerMap.values()).filter(v => v === 1 || v === 2) as Array<1 | 2>;
+    let assigned: 1 | 2 | null = null;
+    if (existingPlayers.length < 2) {
+      assigned = existingPlayers.includes(1) ? 2 : 1;
+      this.playerMap.set(socket, assigned);
+    } else {
+      this.playerMap.set(socket, null); // spectator
+    }
 
     const isHost = assigned === 1;
 
-    try { socket.send(JSON.stringify({ type: 'joined', roomId: this.id, isHost })); } catch (e) {}
+    try { socket.send(JSON.stringify({ type: 'joined', roomId: this.id, isHost, player: assigned ?? null })); } catch (e) {}
 
-    if (this.getPlayerCount() >= 2 && !this.isEngineRunning()) {
+    // Start engine when there are two players connected
+    if (this.getPlayerCount() >= 2) {
       this.engine.start();
-      broadcasterNotify(this.clients, { type: 'peerJoined', roomId: this.id });
+      // notify players that both are present
+      this.broadcastToAll({ type: 'peerJoined', roomId: this.id });
     }
 
     return { player: assigned, isHost };
@@ -50,12 +54,14 @@ export class GameRoom {
 
   public removeClient(socket: WS): void {
     if (!this.clients.has(socket)) return;
-    const player = this.playerMap.get(socket);
+    const wasPlayer = this.playerMap.get(socket);
     this.clients.delete(socket);
     this.playerMap.delete(socket);
 
-    broadcasterNotify(this.clients, { type: 'peerLeft', roomId: this.id });
+    // notify remaining
+    this.broadcastToAll({ type: 'peerLeft', roomId: this.id });
 
+    // if fewer than 2 players, stop engine
     if (this.getPlayerCount() < 2) this.engine.stop();
   }
 
@@ -68,10 +74,11 @@ export class GameRoom {
         this.engine.applyInput(player, msg.direction, !!msg.keydown);
         break;
       case 'create':
-        break;
       case 'join':
+        // handled at connection level by route logic
         break;
       default:
+        // ignore or broadcast to spectators
         break;
     }
   }
@@ -85,20 +92,20 @@ export class GameRoom {
     this.playerMap.clear();
   }
 
-  private getPlayerCount(): number {
+  public getClientCount(): number {
+    return this.clients.size;
+  }
+
+  public getPlayerCount(): number {
     let count = 0;
     for (const v of this.playerMap.values()) if (v === 1 || v === 2) count++;
     return count;
   }
 
-  private isEngineRunning(): boolean {
-    return false;
-  }
-}
-
-function broadcasterNotify(clients: Set<WS>, msg: any) {
-  const data = JSON.stringify(msg);
-  for (const s of clients) {
-    try { if ((s as any).readyState === 1) (s as any).send(data); } catch (e) {}
+  private broadcastToAll(msg: any): void {
+    const data = JSON.stringify(msg);
+    for (const s of this.clients) {
+      try { if ((s as any).readyState === 1) (s as any).send(data); } catch (e) {}
+    }
   }
 }

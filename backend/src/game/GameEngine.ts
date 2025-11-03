@@ -48,7 +48,6 @@ export class GameEngine {
     if (this.running) return;
     this.running = true;
     this.timer = setInterval(() => this.step(), this.tickInterval);
-    // send initial state immediately
     this.broadcastState();
   }
 
@@ -93,7 +92,6 @@ export class GameEngine {
       if (this.ball.y >= p1Top && this.ball.y <= p1Bottom) {
         this.ball.x = 30 + this.ball.radius;
         this.ball.dx = Math.abs(this.ball.dx) * 1.03;
-
         const hit = (this.ball.y - (p1Top + this.PADDLE_HEIGHT / 2)) / (this.PADDLE_HEIGHT / 2);
         this.ball.dy = hit * 5;
       }
@@ -121,7 +119,6 @@ export class GameEngine {
     this.broadcastState();
 
     if (this.scores.player1 >= this.WIN_SCORE || this.scores.player2 >= this.WIN_SCORE) {
-      // broadcast final state + gameOver event
       this.broadcast({ type: 'gameOver', winner: this.scores.player1 >= this.WIN_SCORE ? 1 : 2, state: this.serializeState() });
       this.stop();
     }
@@ -146,7 +143,7 @@ export class GameEngine {
   }
 
   private broadcastState(): void {
-    try { this.broadcasterFn({ type: 'gameState', state: this.serializeState() }); } catch (e) {}
+    try { this.broadcasterFn({ type: 'gameState', state: this.serializeState() }); } catch (e) { /* ignore */ }
   }
 
   private broadcast(msg: any): void {

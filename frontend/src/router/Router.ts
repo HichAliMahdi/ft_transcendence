@@ -23,7 +23,7 @@ export class Router {
             { path: '/game', view: () => new GamePage(), requiresAuth: true },
             { path: '/tournament', view: () => new TournamentPage(), requiresAuth: true },
             { path: '/multiplayer', view: () => new MultiplayerPage(), requiresAuth: true },
-            { path: '/login', view: () => new LoginPage(), requiresAuth: true },
+            { path: '/login', view: () => new LoginPage(), requiresAuth: false },
             { path: '/register', view: () => new RegisterPage(), requiresAuth: false },
         ];
     }
