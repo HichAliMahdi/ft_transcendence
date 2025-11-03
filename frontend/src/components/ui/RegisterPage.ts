@@ -60,7 +60,14 @@ export class RegisterPage {
 
         const loginLink = document.createElement('p');
         loginLink.className = 'text-white text-center mt-4';
-        loginLink.innerHTML = `Already have an account? <a href="#/login" class="text-accent-pink font-semibold">Login</a>`;
+        const loginText = document.createTextNode('Already have an account? ');
+        const loginAnchor = document.createElement('a');
+        loginAnchor.href = '/login';
+        loginAnchor.setAttribute('data-link', '');
+        loginAnchor.className = 'text-accent-pink font-semibold';
+        loginAnchor.textContent = 'Login';
+        loginLink.appendChild(loginText);
+        loginLink.appendChild(loginAnchor);
 
         form.onsubmit = async (e) => {
             e.preventDefault();
