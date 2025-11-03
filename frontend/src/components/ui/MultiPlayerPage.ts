@@ -27,13 +27,11 @@ export class MultiplayerPage {
         connectionCard.className = 'glass-effect p-8 rounded-2xl max-w-md mx-auto';
 
         if (this.status === 'disconnected') {
-            // Quick Match Button
             const quickMatchButton = document.createElement('button');
             quickMatchButton.textContent = '🎮 Find Online Match';
             quickMatchButton.className = 'btn-primary w-full text-lg py-4 mb-4';
-            quickMatchButton.onclick = () => this.connectToServer();
+            quickMatchButton.onclick = () => this.createPrivateRoom();
 
-            // Divider
             const divider = document.createElement('div');
             divider.className = 'flex items-center my-6';
             const dividerLine1 = document.createElement('div');
@@ -47,13 +45,11 @@ export class MultiplayerPage {
             divider.appendChild(dividerText);
             divider.appendChild(dividerLine2);
 
-            // Create Room Button
             const createRoomButton = document.createElement('button');
             createRoomButton.textContent = '🏠 Create Private Room';
             createRoomButton.className = 'btn-primary w-full text-lg py-4 mb-3';
             createRoomButton.onclick = () => this.createPrivateRoom();
 
-            // Join Room Section
             const joinRoomContainer = document.createElement('div');
             joinRoomContainer.className = 'mt-4';
 
@@ -108,7 +104,6 @@ export class MultiplayerPage {
             if (this.isHost) {
                 statusText.textContent = 'Waiting for opponent to join...';
                 
-                // Show room code
                 const roomCodeDisplay = document.createElement('div');
                 roomCodeDisplay.className = 'bg-game-dark p-6 rounded-xl my-6';
                 
@@ -237,115 +232,117 @@ export class MultiplayerPage {
         this.container.appendChild(gameInfo);
         this.container.appendChild(canvas);
         this.container.appendChild(disconnectButton);
-        this.game = new OnlinePongGame(canvas, this.socket!);
-    }
 
-
-    // For demo purposes, we'll simulate WebSocket connection
-    // In a real implementation, connect to your WebSocket server created in backend
-    private connectToServer(): void {
-        this.status = 'connecting';
-        this.renderConnectionScreen();
-
-        setTimeout(() => {
-            this.socket = this.createMockWebSocket();
-            this.status = 'waiting';
-            this.renderConnectionScreen();
-
-            // Simulate finding a match after 2-5 seconds
-            setTimeout(() => {
-                this.roomId = 'room_' + Math.random().toString(36).substr(2, 9);
-                this.status = 'playing';
-                this.renderGameScreen();
-            }, 2000 + Math.random() * 3000);
-        }, 1000);
-    }
-
-    private createPrivateRoom(): void {
-        this.isHost = true;
-        this.status = 'connecting';
-        this.renderConnectionScreen();
-
-        setTimeout(() => {
-            this.socket = this.createMockWebSocket();
-            // Generate a shorter, more user-friendly room code
-            this.roomId = this.generateRoomCode();
-            this.status = 'waiting';
-            this.renderConnectionScreen();
-
-            // Simulate someone joining after 5-10 seconds
-            setTimeout(() => {
-                this.status = 'playing';
-                this.renderGameScreen();
-            }, 5000 + Math.random() * 5000);
-        }, 1000);
-    }
-
-    private generateRoomCode(): string {
-        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Exclude similar looking chars
-        let code = '';
-        for (let i = 0; i < 6; i++) {
-            code += chars.charAt(Math.floor(Math.random() * chars.length));
+        if (this.socket) {
+            this.game = new OnlinePongGame(canvas, this.socket);
+        } else {
+            this.game = new OnlinePongGame(canvas, this.createLocalSocketShim());
         }
-        return code;
     }
 
-    private joinPrivateRoom(roomCode: string): void {
-        this.isHost = false;
+    private createLocalSocketShim(): WebSocket {
+        const url = 'about:blank';
+        const ws = new WebSocket(url);
+        setTimeout(() => { try { ws.close(); } catch (e) {} }, 10);
+        return ws;
+    }
+
+    private buildWsUrl(room?: string): string {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const backendPort = 3000;
+        const host = `${window.location.hostname}:${backendPort}`;
+        return `${protocol}//${host}/ws${room ? `/${encodeURIComponent(room)}` : ''}`;
+    }
+
+    private connectWithRoom(room?: string): void {
         this.status = 'connecting';
         this.renderConnectionScreen();
 
-        setTimeout(() => {
-            // Simulate checking if room exists
-            const roomExists = Math.random() > 0.3; // 70% success rate for demo
-            
-            if (roomExists) {
-                this.socket = this.createMockWebSocket();
-                this.roomId = roomCode;
-                this.status = 'playing';
-                this.renderGameScreen();
-            } else {
-                // Room not found
-                alert('Room not found! Please check the code and try again.');
+        const wsUrl = this.buildWsUrl(room);
+        const socket = new WebSocket(wsUrl);
+        this.socket = socket as any;
+
+        socket.onopen = () => {
+            console.info('WS open', wsUrl);
+        };
+
+        socket.onmessage = (evt) => {
+            let msg: any;
+            try { msg = JSON.parse(evt.data); } catch (e) { console.warn('Invalid WS message', e); return; }
+
+            switch (msg.type) {
+                case 'joined':
+                    this.roomId = msg.roomId;
+                    this.isHost = !!msg.isHost;
+                    this.status = this.isHost ? 'waiting' : 'playing';
+                    if (this.status === 'playing') this.renderGameScreen();
+                    else this.renderConnectionScreen();
+                    break;
+                case 'created':
+                    this.roomId = msg.roomId;
+                    this.isHost = true;
+                    this.status = 'waiting';
+                    this.renderConnectionScreen();
+                    break;
+                case 'peerJoined':
+                    this.status = 'playing';
+                    this.renderGameScreen();
+                    break;
+                case 'peerLeft':
+                    this.status = 'disconnected';
+                    alert('Opponent left the room.');
+                    this.disconnect();
+                    break;
+                case 'error':
+                    alert(msg.message || 'WebSocket error');
+                    break;
+                default:
+                    if (this.game && typeof (this.game as any).onSocketMessage === 'function') {
+                        (this.game as any).onSocketMessage(msg);
+                    }
+                    break;
+            }
+        };
+
+        socket.onerror = (err) => {
+            console.error('WebSocket error', err);
+            alert('WebSocket connection failed.');
+            this.status = 'disconnected';
+            this.renderConnectionScreen();
+        };
+
+        socket.onclose = () => {
+            console.info('WebSocket closed');
+            if (this.status !== 'disconnected') {
                 this.status = 'disconnected';
                 this.renderConnectionScreen();
             }
-        }, 1000);
+        };
     }
 
-    // This is a mock WebSocket for demonstration
-    // In a real implementation, ze zill use actual WebSocket connection
-    private createMockWebSocket(): WebSocket {
-        const mockSocket = {
-            send: (data: string) => {
-                console.log('Sending:', data);
-            },
-            close: () => {
-                console.log('Connection closed');
-            },
-            onmessage: null
-        } as any;
-
-        return mockSocket;
-    }
-
-    private disconnect(): void {
-        if (this.socket) {
-            this.socket.close();
-        }
-        if (this.game) {
-            this.game.destroy();
-            this.game = null;
-        }
-        this.status = 'disconnected';
-        this.roomId = null;
-        this.isHost = false;
-        this.renderConnectionScreen();
-    }
-
-    public cleanup(): void {
-        this.disconnect();
-    }
-}
-
-// What is needed to be done: Creating proper websocket for connection online
+    private createPrivateRoom(): void {
+        this.connectWithRoom();
+     }
+ 
+     private joinPrivateRoom(roomCode: string): void {
+        this.connectWithRoom(roomCode);
+     }
+ 
+     private disconnect(): void {
+         if (this.socket) {
+            try { this.socket.close(); } catch (e) {}
+         }
+         if (this.game) {
+             this.game.destroy();
+             this.game = null;
+         }
+         this.status = 'disconnected';
+         this.roomId = null;
+         this.isHost = false;
+         this.renderConnectionScreen();
+     }
+ 
+     public cleanup(): void {
+         this.disconnect();
+     }
+ }

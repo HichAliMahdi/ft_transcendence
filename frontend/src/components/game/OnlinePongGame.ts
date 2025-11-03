@@ -11,6 +11,7 @@ export class OnlinePongGame {
     private ctx: CanvasRenderingContext2D;
     private socket: WebSocket;
     private gameState: OnlineGameState;
+    private remoteKeys: { up: boolean; down: boolean } = { up: false, down: false };
     private keys: { [key: string]: boolean } = {};
     private animationId: number | null = null;
     private isRunning: boolean = false;
@@ -35,7 +36,11 @@ export class OnlinePongGame {
         };
 
         this.setupControls();
-        this.setupSocketListeners();
+        this.setupSocketListeners(); // kept but implementation below is a no-op (page will forward messages)
+        // expose a simple hook so page-level can forward unknown messages
+        (this as any).onSocketMessage = (msg: any) => {
+            this.handleSocketMessage(msg);
+        };
         // Pause/resume on tab visibility
         this.visibilityHandler = () => {
             if (document.hidden) {
@@ -81,20 +86,11 @@ export class OnlinePongGame {
         }
     }
 
-    // Simulation for updating game locally 
-    // TODO Implement real time socker listener in backend
+    // Remove direct socket.onmessage assignment. The page will forward messages to the game via onSocketMessage.
     private setupSocketListeners(): void {
-        this.socket.onmessage = (event) => {
-            try {
-                const data = JSON.parse(event.data);
-                if (data.type === 'gameState') {
-                    this.gameState = data.state;
-                }
-            } catch (error) {
-                console.error('Error parsing game state:', error);
-            }
-        };
-        // we used to run a setInterval here. simulation is now integrated into game loop (gameLoop).
+        // No-op here: do not overwrite socket.onmessage. The page-level WS handler will forward messages to
+        // this.onSocketMessage (set in the constructor).
+        return;
     }
 
     // This is just for demonstration - in real implementation, server handles game logic
@@ -152,13 +148,20 @@ export class OnlinePongGame {
             this.gameState.paddles.player1 = Math.min(this.canvas.height - 100, this.gameState.paddles.player1 + move);
         }
 
-        // Simulate opponent movement (temporary)
-        const ballCenter = this.gameState.ball.y;
-        const paddle2Center = this.gameState.paddles.player2 + 50;
-        if (paddle2Center < ballCenter - 10) {
-            this.gameState.paddles.player2 = Math.min(this.canvas.height - 100, this.gameState.paddles.player2 + 5 * deltaFactor);
-        } else if (paddle2Center > ballCenter + 10) {
-            this.gameState.paddles.player2 = Math.max(0, this.gameState.paddles.player2 - 5 * deltaFactor);
+        // Remote-controlled opponent: use remoteKeys received over socket
+        if (this.remoteKeys.up) {
+            this.gameState.paddles.player2 = Math.max(0, this.gameState.paddles.player2 - move);
+        } else if (this.remoteKeys.down) {
+            this.gameState.paddles.player2 = Math.min(this.canvas.height - 100, this.gameState.paddles.player2 + move);
+        } else {
+            // slight drift fallback to keep paddle reasonable
+            const ballCenter = this.gameState.ball.y;
+            const paddle2Center = this.gameState.paddles.player2 + 50;
+            if (paddle2Center < ballCenter - 20) {
+                this.gameState.paddles.player2 = Math.min(this.canvas.height - 100, this.gameState.paddles.player2 + 2 * deltaFactor);
+            } else if (paddle2Center > ballCenter + 20) {
+                this.gameState.paddles.player2 = Math.max(0, this.gameState.paddles.player2 - 2 * deltaFactor);
+            }
         }
     }
 
@@ -273,6 +276,19 @@ export class OnlinePongGame {
         if (this.visibilityHandler) {
             document.removeEventListener('visibilitychange', this.visibilityHandler);
             this.visibilityHandler = null;
+        }
+    }
+
+    // handle page-forwarded messages
+    private handleSocketMessage(msg: any): void {
+        if (!msg || typeof msg !== 'object') return;
+        if (msg.type === 'paddleMove') {
+            const dir = msg.direction;
+            const keydown = !!msg.keydown;
+            if (dir === 'up') this.remoteKeys.up = keydown;
+            if (dir === 'down') this.remoteKeys.down = keydown;
+        } else if (msg.type === 'gameState' && msg.state) {
+            this.gameState = msg.state;
         }
     }
 }
