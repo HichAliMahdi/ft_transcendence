@@ -10,7 +10,5 @@ export default async function routes(fastify: FastifyInstance) {
   fastify.register(authRoutes, { prefix: '/api' });
   fastify.register(tournamentRoutes, { prefix: '/api' });
   fastify.register(userRoutes, { prefix: '/api' });
-  // Register websocket routes (no '/api' prefix so WS path can be /ws/...)
   fastify.register(websocketRoutes);
-  // fastify.regiter(websockerRoutes, { prefix: '/api' }); // Routes added for websocket
 }

@@ -248,9 +248,11 @@ export class MultiplayerPage {
     }
 
     private buildWsUrl(room?: string): string {
+        // Use current page origin so the browser connects to the same host/port the page was served from.
+        // This allows nginx (or whatever fronting server) to proxy /ws to the backend and avoids
+        // attempting a direct wss to the backend container (which may not have TLS).
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const backendPort = 3000;
-        const host = `${window.location.hostname}:${backendPort}`;
+        const host = window.location.host;
         return `${protocol}//${host}/ws${room ? `/${encodeURIComponent(room)}` : ''}`;
     }
 
