@@ -76,7 +76,8 @@ export default async function websocketRoutes(fastify: FastifyInstance) {
           break;
 
         case 'state':
-          broadcast(roomId!, { type: 'state', state: payload.state }, socket);
+          // normalize server broadcast name to "gameState" for frontend
+          broadcast(roomId!, { type: 'gameState', state: payload.state }, socket);
           break;
 
         case 'start':
