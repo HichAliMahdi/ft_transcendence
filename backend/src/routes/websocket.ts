@@ -32,7 +32,8 @@ export default async function websocketRoutes(fastify: FastifyInstance) {
     }
   };
 
-  fastify.get('/ws/:room?', { websocket: true }, (connection: any, request: FastifyRequest) => {
+  // Handler shared for both /ws and /ws/:room
+  const wsHandler = (connection: any, request: FastifyRequest) => {
     const socket: WS = connection.socket;
     const params = (request.params as any) || {};
     let roomId: string | null = params.room || null;
@@ -64,7 +65,6 @@ export default async function websocketRoutes(fastify: FastifyInstance) {
         const text = typeof raw === 'string' ? raw : raw.toString();
         payload = JSON.parse(text);
       } catch (err) {
-        // cast to any to satisfy logger typings
         fastify.log.debug('Invalid WS message JSON', err as any);
         return;
       }
@@ -140,5 +140,9 @@ export default async function websocketRoutes(fastify: FastifyInstance) {
     socket.on('error', (err: any) => {
       fastify.log.debug('WS error', err as any);
     });
-  });
+  };
+
+  // register both explicit routes to avoid any ambiguity behind proxies
+  fastify.get('/ws', { websocket: true }, wsHandler);
+  fastify.get('/ws/:room', { websocket: true }, wsHandler);
 }

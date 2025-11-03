@@ -247,79 +247,160 @@ export class MultiplayerPage {
         return ws;
     }
 
-    private buildWsUrl(room?: string): string {
-        // Use current page origin so the browser connects to the same host/port the page was served from.
-        // This allows nginx (or whatever fronting server) to proxy /ws to the backend and avoids
-        // attempting a direct wss to the backend container (which may not have TLS).
+    // replaced buildWsUrl to use window.location.* (host was undefined) and expose alternate forms
+    private buildWsUrl(room?: string, trailingSlash = true): string {
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const host = window.location.host;
-        return `${protocol}//${host}/ws${room ? `/${encodeURIComponent(room)}` : ''}`;
+        const host = window.location.host || `${window.location.hostname}${window.location.port ? ':' + window.location.port : ''}`;
+        const base = `${protocol}//${host}`;
+        // If trailingSlash=true produce /ws/ (helps nginx location /ws/); otherwise produce /ws (some proxies/clients prefer no trailing slash)
+        if (room) {
+            // always place room segment after /ws/
+            return `${base}/ws/${encodeURIComponent(room)}`;
+        } else {
+            return trailingSlash ? `${base}/ws/` : `${base}/ws`;
+        }
     }
 
     private connectWithRoom(room?: string): void {
         this.status = 'connecting';
         this.renderConnectionScreen();
 
-        const wsUrl = this.buildWsUrl(room);
-        const socket = new WebSocket(wsUrl);
-        this.socket = socket as any;
+        // List of candidate URLs to try (ordered). Only allow insecure ws on http pages.
+        const candidates: string[] = [];
+        const prefersSecure = window.location.protocol === 'https:';
+        // prefer trailing slash first (matches nginx location /ws/)
+        candidates.push(this.buildWsUrl(room, true));
+        // also try without trailing slash as some setups forward differently
+        candidates.push(this.buildWsUrl(room, false));
+        // if page is http, also try ws scheme variants (shouldn't on https due to mixed-content)
+        if (!prefersSecure) {
+            // swap protocol by constructing from current host but with ws (buildWsUrl respects protocol)
+            const alt1 = this.buildWsUrl(room, true).replace(/^wss:/i, 'ws:');
+            const alt2 = this.buildWsUrl(room, false).replace(/^wss:/i, 'ws:');
+            candidates.push(alt1, alt2);
+        }
 
-        socket.onopen = () => {
-            console.info('WS open', wsUrl);
-        };
-
-        socket.onmessage = (evt) => {
-            let msg: any;
-            try { msg = JSON.parse(evt.data); } catch (e) { console.warn('Invalid WS message', e); return; }
-
-            switch (msg.type) {
-                case 'joined':
-                    this.roomId = msg.roomId;
-                    this.isHost = !!msg.isHost;
-                    this.status = this.isHost ? 'waiting' : 'playing';
-                    if (this.status === 'playing') this.renderGameScreen();
-                    else this.renderConnectionScreen();
-                    break;
-                case 'created':
-                    this.roomId = msg.roomId;
-                    this.isHost = true;
-                    this.status = 'waiting';
-                    this.renderConnectionScreen();
-                    break;
-                case 'peerJoined':
-                    this.status = 'playing';
-                    this.renderGameScreen();
-                    break;
-                case 'peerLeft':
-                    this.status = 'disconnected';
-                    alert('Opponent left the room.');
-                    this.disconnect();
-                    break;
-                case 'error':
-                    alert(msg.message || 'WebSocket error');
-                    break;
-                default:
-                    if (this.game && typeof (this.game as any).onSocketMessage === 'function') {
-                        (this.game as any).onSocketMessage(msg);
-                    }
-                    break;
-            }
-        };
-
-        socket.onerror = (err) => {
-            console.error('WebSocket error', err);
-            alert('WebSocket connection failed.');
-            this.status = 'disconnected';
-            this.renderConnectionScreen();
-        };
-
-        socket.onclose = () => {
-            console.info('WebSocket closed');
-            if (this.status !== 'disconnected') {
+        const tryConnect = async (idx = 0) => {
+            if (idx >= candidates.length) {
+                console.error('All WebSocket connection attempts failed:', candidates);
+                alert('WebSocket connection failed. Make sure the server is running and your browser trusts the TLS certificate.');
                 this.status = 'disconnected';
                 this.renderConnectionScreen();
+                return;
             }
+
+            const wsUrl = candidates[idx];
+            console.info('Attempting WebSocket:', wsUrl);
+
+            let socket: WebSocket | null = null;
+            let timedOut = false;
+            const timeoutMs = 8000;
+
+            try {
+                socket = new WebSocket(wsUrl);
+            } catch (err) {
+                console.error('WebSocket constructor threw:', err, wsUrl);
+                // try next candidate
+                return tryConnect(idx + 1);
+            }
+
+            // connect timeout guard
+            const to = window.setTimeout(() => {
+                timedOut = true;
+                try {
+                    socket?.close();
+                } catch (e) {}
+            }, timeoutMs);
+
+            socket.onopen = () => {
+                if (timedOut) {
+                    socket?.close();
+                    return;
+                }
+                clearTimeout(to);
+                console.info('WS open', wsUrl);
+                this.socket = socket as any;
+            };
+
+            socket.onmessage = (evt) => {
+                let msg: any;
+                try { msg = JSON.parse(evt.data); } catch (e) { console.warn('Invalid WS message', e); return; }
+
+                // existing handling...
+                switch (msg.type) {
+                    case 'joined':
+                        this.roomId = msg.roomId;
+                        this.isHost = !!msg.isHost;
+                        this.status = this.isHost ? 'waiting' : 'playing';
+                        if (this.status === 'playing') this.renderGameScreen();
+                        else this.renderConnectionScreen();
+                        break;
+                    case 'created':
+                        this.roomId = msg.roomId;
+                        this.isHost = true;
+                        this.status = 'waiting';
+                        this.renderConnectionScreen();
+                        break;
+                    case 'peerJoined':
+                        this.status = 'playing';
+                        this.renderGameScreen();
+                        break;
+                    case 'peerLeft':
+                        this.status = 'disconnected';
+                        alert('Opponent left the room.');
+                        this.disconnect();
+                        break;
+                    case 'error':
+                        alert(msg.message || 'WebSocket error');
+                        break;
+                    default:
+                        if (this.game && typeof (this.game as any).onSocketMessage === 'function') {
+                            (this.game as any).onSocketMessage(msg);
+                        }
+                        break;
+                }
+            };
+
+            socket.onerror = (err) => {
+                console.error('WebSocket error event on', wsUrl, err);
+                // If we haven't established a connection yet, try the next candidate.
+                if (!this.socket) {
+                    clearTimeout(to);
+                    try { socket.close(); } catch (e) {}
+                    // slight delay to avoid rapid retries
+                    setTimeout(() => tryConnect(idx + 1), 200);
+                } else {
+                    alert('WebSocket connection failed. Make sure the server is running.');
+                    this.status = 'disconnected';
+                    this.renderConnectionScreen();
+                }
+            };
+
+            socket.onclose = (ev) => {
+                clearTimeout(to);
+                console.info('WebSocket closed', wsUrl, ev.code, ev.reason);
+                // If connection never opened (timedOut=true or close shortly after), try next candidate
+                if (!this.socket || timedOut) {
+                    // if this socket was not accepted as the active socket, try next
+                    if (!this.socket) {
+                        setTimeout(() => tryConnect(idx + 1), 100);
+                    }
+                    return;
+                }
+
+                // Normal close when we had an active socket
+                if (this.status !== 'disconnected') {
+                    this.status = 'disconnected';
+                    this.renderConnectionScreen();
+                }
+            };
+
+            // If after short delay we still don't have this.socket set (onopen didn't run), wait for timeout handler to advance
+            // When socket.onopen runs it will set this.socket.
         };
+
+        // start attempts
+        tryConnect(0);
     }
 
     private createPrivateRoom(): void {
