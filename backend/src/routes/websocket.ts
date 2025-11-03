@@ -55,6 +55,10 @@ export default async function websocketRoutes(fastify: FastifyInstance) {
 
     fastify.log.info(`WS connected to room ${roomId} (clients=${room.clients.size})`);
 
+    if (room.clients.size > 1) {
+      broadcast(roomId, { type: 'peerJoined', roomId }, socket);
+    }
+
     try {
       (socket as any).send(JSON.stringify({ type: 'joined', roomId, isHost }));
     } catch (e) {}
@@ -76,7 +80,6 @@ export default async function websocketRoutes(fastify: FastifyInstance) {
           break;
 
         case 'state':
-          // normalize server broadcast name to "gameState" for frontend
           broadcast(roomId!, { type: 'gameState', state: payload.state }, socket);
           break;
 
@@ -103,7 +106,6 @@ export default async function websocketRoutes(fastify: FastifyInstance) {
             (socket as any).send(JSON.stringify({ type: 'error', message: 'Room not found' }));
             break;
           }
-          // leave previous room
           room.clients.delete(socket);
           target.clients.add(socket);
           (socket as any).send(JSON.stringify({ type: 'joined', roomId: target.id, isHost: false }));
@@ -111,7 +113,6 @@ export default async function websocketRoutes(fastify: FastifyInstance) {
           break;
 
         default:
-          // Unknown type: ignore or relay generically
           broadcast(roomId!, payload, socket);
           break;
       }
@@ -128,7 +129,6 @@ export default async function websocketRoutes(fastify: FastifyInstance) {
             rooms.delete(roomId!);
             fastify.log.info(`Room ${roomId} removed (empty)`);
           } else {
-            // notify remaining clients
             broadcast(roomId!, { type: 'peerLeft', roomId });
           }
         }
@@ -142,7 +142,6 @@ export default async function websocketRoutes(fastify: FastifyInstance) {
     });
   };
 
-  // register both explicit routes to avoid any ambiguity behind proxies
   fastify.get('/ws', { websocket: true }, wsHandler);
   fastify.get('/ws/:room', { websocket: true }, wsHandler);
 }
