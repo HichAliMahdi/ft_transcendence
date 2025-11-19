@@ -11,12 +11,26 @@ export class GameRoom {
   constructor(id: string) {
     this.id = id;
 
+    const safeSend = (s: WS, data: string) => {
+      try {
+        if ((s as any).readyState === 1) {
+          try {
+            (s as any).send(data, (err: any) => {
+              if (err) {
+                try { (s as any).terminate?.(); } catch (_) {}
+              }
+            });
+          } catch (e) {
+            try { (s as any).terminate?.(); } catch (_) {}
+          }
+        }
+      } catch (e) { /* ignore */ }
+    };
+
     const broadcaster = (msg: any) => {
       const data = JSON.stringify(msg);
       for (const s of this.clients) {
-        try {
-          if ((s as any).readyState === 1) (s as any).send(data);
-        } catch (e) {}
+        safeSend(s, data);
       }
     };
 
@@ -26,7 +40,6 @@ export class GameRoom {
   public addClient(socket: WS): { player: 1 | 2 | null; isHost: boolean } {
     if (this.clients.has(socket)) return { player: this.playerMap.get(socket) ?? null, isHost: false };
 
-    // allow up to 2 players (others become spectators)
     this.clients.add(socket);
 
     const existingPlayers = Array.from(this.playerMap.values()).filter(v => v === 1 || v === 2) as Array<1 | 2>;
@@ -35,17 +48,18 @@ export class GameRoom {
       assigned = existingPlayers.includes(1) ? 2 : 1;
       this.playerMap.set(socket, assigned);
     } else {
-      this.playerMap.set(socket, null); // spectator
+      this.playerMap.set(socket, null);
     }
 
     const isHost = assigned === 1;
 
-    try { socket.send(JSON.stringify({ type: 'joined', roomId: this.id, isHost, player: assigned ?? null })); } catch (e) {}
+    try {
+      const data = JSON.stringify({ type: 'joined', roomId: this.id, isHost, player: assigned ?? null });
+      if ((socket as any).readyState === 1) (socket as any).send(data, () => {});
+    } catch (e) {}
 
-    // Start engine when there are two players connected
     if (this.getPlayerCount() >= 2) {
       this.engine.start();
-      // notify players that both are present
       this.broadcastToAll({ type: 'peerJoined', roomId: this.id });
     }
 
@@ -58,10 +72,8 @@ export class GameRoom {
     this.clients.delete(socket);
     this.playerMap.delete(socket);
 
-    // notify remaining
     this.broadcastToAll({ type: 'peerLeft', roomId: this.id });
 
-    // if fewer than 2 players, stop engine
     if (this.getPlayerCount() < 2) this.engine.stop();
   }
 
@@ -75,10 +87,8 @@ export class GameRoom {
         break;
       case 'create':
       case 'join':
-        // handled at connection level by route logic
         break;
       default:
-        // ignore or broadcast to spectators
         break;
     }
   }
@@ -86,7 +96,7 @@ export class GameRoom {
   public destroy(): void {
     try { this.engine.destroy(); } catch (e) {}
     for (const s of this.clients) {
-      try { s.close(); } catch (e) {}
+      try { (s as any).close?.(); } catch (e) {}
     }
     this.clients.clear();
     this.playerMap.clear();
@@ -105,7 +115,7 @@ export class GameRoom {
   private broadcastToAll(msg: any): void {
     const data = JSON.stringify(msg);
     for (const s of this.clients) {
-      try { if ((s as any).readyState === 1) (s as any).send(data); } catch (e) {}
+      try { if ((s as any).readyState === 1) (s as any).send(data, () => {}); } catch (e) {}
     }
   }
 }

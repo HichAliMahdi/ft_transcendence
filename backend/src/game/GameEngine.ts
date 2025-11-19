@@ -21,7 +21,7 @@ export class GameEngine {
   private readonly BALL_SPEED_INIT = 5;
   private readonly WIN_SCORE = 5;
 
-  constructor(broadcast: BroadcastFn, width = 800, height = 600, tickMs = 50) {
+  constructor(broadcast: BroadcastFn, width = 800, height = 600, tickMs = 33) { // was 50 -> now 33ms (~30Hz)
     this.width = width;
     this.height = height;
     this.broadcasterFn = broadcast;
@@ -94,6 +94,9 @@ export class GameEngine {
         this.ball.dx = Math.abs(this.ball.dx) * 1.03;
         const hit = (this.ball.y - (p1Top + this.PADDLE_HEIGHT / 2)) / (this.PADDLE_HEIGHT / 2);
         this.ball.dy = hit * 5;
+        const maxSpeed = 12;
+        if (Math.abs(this.ball.dx) > maxSpeed) this.ball.dx = Math.sign(this.ball.dx) * maxSpeed;
+        if (Math.abs(this.ball.dy) > maxSpeed) this.ball.dy = Math.sign(this.ball.dy) * maxSpeed;
       }
     }
 
@@ -105,6 +108,9 @@ export class GameEngine {
         this.ball.dx = -Math.abs(this.ball.dx) * 1.03;
         const hit = (this.ball.y - (p2Top + this.PADDLE_HEIGHT / 2)) / (this.PADDLE_HEIGHT / 2);
         this.ball.dy = hit * 5;
+        const maxSpeed = 12;
+        if (Math.abs(this.ball.dx) > maxSpeed) this.ball.dx = Math.sign(this.ball.dx) * maxSpeed;
+        if (Math.abs(this.ball.dy) > maxSpeed) this.ball.dy = Math.sign(this.ball.dy) * maxSpeed;
       }
     }
 
