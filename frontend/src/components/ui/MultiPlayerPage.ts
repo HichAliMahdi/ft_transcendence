@@ -257,21 +257,27 @@ export class MultiplayerPage {
                 }
             }
 
-            // Fallback: prompt for username (legacy)
-            const input = prompt('Enter the username of the player you want to add as friend:');
-            if (!input) return;
-            const username = input.trim();
-            if (!username) { 
-                alert('Please enter a valid username'); 
-                return; 
-            }
-            try {
-                await AuthService.sendFriendRequestByUsername(username);
-                alert(`Friend request sent to ${username}`);
-                this.friendWidget?.refreshNow();
-            } catch (err: any) {
-                alert(`Failed to send friend request: ${err?.message || err}`);
-            }
+            // Fallback: open a UI modal to enter username (replaces prompt)
+            this.showInputModal(
+                'Add Friend',
+                'Enter username',
+                'Send Request',
+                async (username: string) => {
+                    const u = username.trim();
+                    if (!u) {
+                        // showInputModal will prevent empty callback, but guard here too
+                        alert('Please enter a valid username');
+                        return;
+                    }
+                    try {
+                        await AuthService.sendFriendRequestByUsername(u);
+                        alert(`Friend request sent to ${u}`);
+                        this.friendWidget?.refreshNow();
+                    } catch (err: any) {
+                        alert(`Failed to send friend request: ${err?.message || err}`);
+                    }
+                }
+            );
         };
 
         const topRow = document.createElement('div');
@@ -551,4 +557,13 @@ export class MultiplayerPage {
             if (firstBtn) firstBtn.focus();
         }, 50);
     }
-}
+
+    private showInputModal(title: string, placeholder: string, submitLabel: string, onSubmit: (value: string) => Promise<void> | void): void {
+        if (!this.container) return;
+        const overlay = document.createElement('div');
+        overlay.className = 'fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50';
+        overlay.setAttribute('role', 'dialog');
+        overlay.setAttribute('aria-modal', 'true');
+
+        const modal = document.createElement('div');
+        modal.className = 'glass-effect p-6 rounded-2xl max-w-md w

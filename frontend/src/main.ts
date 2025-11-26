@@ -13,7 +13,6 @@ class App {
     }
 
     private init(): void {
-        // Mount global friend widget so it's available on every page
         try {
             if (!(window as any)._friendWidget) {
                 const fw = new FriendWidget();
@@ -24,7 +23,6 @@ class App {
             console.error('Failed to mount FriendWidget:', e);
         }
 
-        // Mount global notification widget
         try {
             if (!(window as any)._notificationWidget) {
                 const nw = new NotificationWidget();
@@ -74,12 +72,10 @@ class App {
             console.error('Unhandled promise rejection:', event.reason);
         });
 
-        // Sidebar: show only when authenticated, keep collapse/toggle behavior otherwise
         const nav = document.getElementById('main-nav');
         const toggleBtn = document.getElementById('nav-toggle-btn');
 
         if (nav) {
-            // helper to add/remove collapsed state based on width
             const applyResponsiveCollapsed = () => {
                 if (window.innerWidth < 768) {
                     nav.classList.add('collapsed');
@@ -92,12 +88,10 @@ class App {
                 }
             };
 
-            // show/hide functions
             const showNav = () => {
                 nav.style.display = '';
                 if (toggleBtn) toggleBtn.style.display = '';
                 applyResponsiveCollapsed();
-                // attach toggle listener once
                 if (toggleBtn && !toggleBtn.getAttribute('data-nav-listener')) {
                     toggleBtn.addEventListener('click', () => {
                         const collapsed = nav.classList.toggle('collapsed');
@@ -113,7 +107,6 @@ class App {
                 if (toggleBtn) toggleBtn.style.display = 'none';
             };
 
-            // initial visibility based on auth
             let prevAuth = AuthService.isAuthenticated();
             if (prevAuth) {
                 showNav();
@@ -121,14 +114,12 @@ class App {
                 hideNav();
             }
 
-            // respond to window resize to keep responsive collapsed state when visible
             window.addEventListener('resize', () => {
                 if (nav.style.display === '' || nav.style.display === 'block' || nav.style.display === '') {
                     applyResponsiveCollapsed();
                 }
             }, { passive: true });
 
-            // watch auth status and show/hide nav accordingly
             window.setInterval(() => {
                 const curAuth = AuthService.isAuthenticated();
                 if (curAuth !== prevAuth) {
@@ -138,7 +129,6 @@ class App {
                 }
             }, 1500);
 
-            // Note: we intentionally do not clear this interval for the lifetime of the app.
         }
 
         this.router.handleRoute();
