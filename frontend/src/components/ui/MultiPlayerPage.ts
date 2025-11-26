@@ -326,7 +326,6 @@ export class MultiplayerPage {
                 let msg: any;
                 try { msg = JSON.parse(evt.data); } catch (e) { console.warn('Invalid WS message', e); return; }
 
-                // existing handling...
                 switch (msg.type) {
                     case 'joined':
                         this.roomId = msg.roomId;
@@ -347,8 +346,14 @@ export class MultiplayerPage {
                         break;
                     case 'peerLeft':
                         this.status = 'disconnected';
-                        alert('Opponent left the room.');
-                        this.disconnect();
+                        this.showInfoModal(
+                            'Opponent Left',
+                            'Your opponent has left the room. You can return to the lobby or try reconnecting to the same room.',
+                            [
+                                { label: 'Return to Lobby', style: 'danger', action: () => { this.disconnect(); } },
+                                { label: 'Reconnect', style: 'primary', action: () => { this.connectWithRoom(this.roomId || undefined); } }
+                            ]
+                        );
                         break;
                     case 'error':
                         alert(msg.message || 'WebSocket error');
@@ -428,4 +433,61 @@ export class MultiplayerPage {
      public cleanup(): void {
          this.disconnect();
      }
+
+     private showInfoModal(title: string, message: string, actions: Array<{ label: string; style?: 'primary' | 'danger' | 'default'; action: () => void }>): void {
+        if (!this.container) return;
+        const overlay = document.createElement('div');
+        overlay.className = 'fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50';
+        overlay.setAttribute('role', 'dialog');
+        overlay.setAttribute('aria-modal', 'true');
+
+        const modal = document.createElement('div');
+        modal.className = 'glass-effect p-6 rounded-2xl max-w-lg w-full mx-4 relative text-center border-2 border-white/5';
+
+        const h = document.createElement('h2');
+        h.className = 'text-2xl font-bold text-white mb-2 gradient-text';
+        h.textContent = title;
+
+        const p = document.createElement('p');
+        p.className = 'text-gray-300 mb-6';
+        p.textContent = message;
+
+        const btnRow = document.createElement('div');
+        btnRow.className = 'flex gap-4 justify-center';
+
+        actions.forEach((act) => {
+            const btn = document.createElement('button');
+            const base = 'px-6 py-3 rounded-lg font-semibold transition-colors duration-200';
+            if (act.style === 'primary') {
+                btn.className = `${base} btn-primary`;
+            } else if (act.style === 'danger') {
+                btn.className = `${base} bg-game-red hover:bg-red-600 text-white`;
+            } else {
+                btn.className = `${base} bg-game-dark hover:bg-blue-800 text-white`;
+            }
+            btn.textContent = act.label;
+            btn.onclick = () => {
+                try { act.action(); } catch (e) { console.error('Modal action error', e); }
+                if (document.body.contains(overlay)) document.body.removeChild(overlay);
+            };
+            btnRow.appendChild(btn);
+        });
+
+        const closeX = document.createElement('button');
+        closeX.className = 'absolute top-4 right-6 text-gray-400 hover:text-white';
+        closeX.innerHTML = '&times;';
+        closeX.onclick = () => { if (document.body.contains(overlay)) document.body.removeChild(overlay); };
+
+        modal.appendChild(closeX);
+        modal.appendChild(h);
+        modal.appendChild(p);
+        modal.appendChild(btnRow);
+        overlay.appendChild(modal);
+        document.body.appendChild(overlay);
+
+        setTimeout(() => {
+            const firstBtn = btnRow.querySelector('button') as HTMLElement | null;
+            if (firstBtn) firstBtn.focus();
+        }, 50);
+    }
  }
