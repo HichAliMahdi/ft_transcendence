@@ -1,5 +1,6 @@
 import { OnlinePongGame } from '../game/OnlinePongGame';
-import { AuthService } from '../game/AuthService'; // added import
+import { AuthService } from '../game/AuthService';
+import { FriendWidget } from './FriendWidget';
 
 export class MultiplayerPage {
     private game: OnlinePongGame | null = null;
@@ -8,9 +9,9 @@ export class MultiplayerPage {
     private roomId: string | null = null;
     private status: 'disconnected' | 'connecting' | 'waiting' | 'playing' = 'disconnected';
     private isHost: boolean = false;
-    private friendWidget: FriendWidget | null = null; // new
-    private playerNumber: 1 | 2 | null = null; // new
-    private opponentUser: { id?: number; username?: string; display_name?: string } | null = null; // new
+    private friendWidget: FriendWidget | null = null;
+    private playerNumber: 1 | 2 | null = null;
+    private opponentUser: { id?: number; username?: string; display_name?: string } | null = null;
 
     public render(): HTMLElement {
         this.container = document.createElement('div');
@@ -238,7 +239,7 @@ export class MultiplayerPage {
         disconnectButton.className = 'bg-game-red hover:bg-red-600 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-300 mt-4';
         disconnectButton.onclick = () => this.disconnect();
 
-        // Quick Add Friend while in-game - uses opponent username when available
+        // Quick Add Friend button - uses opponent username when available
         const addFriendButton = document.createElement('button');
         addFriendButton.textContent = '➕ Add Friend';
         addFriendButton.className = 'bg-accent-purple hover:bg-purple-600 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-300 mt-4 ml-4';
@@ -257,11 +258,14 @@ export class MultiplayerPage {
                 }
             }
 
-            // fallback: prompt (legacy) - kept minimal
+            // Fallback: prompt for username (legacy)
             const input = prompt('Enter the username of the player you want to add as friend:');
             if (!input) return;
             const username = input.trim();
-            if (!username) { alert('Please enter a valid username'); return; }
+            if (!username) { 
+                alert('Please enter a valid username'); 
+                return; 
+            }
             try {
                 await AuthService.sendFriendRequestByUsername(username);
                 alert(`Friend request sent to ${username}`);
@@ -295,14 +299,12 @@ export class MultiplayerPage {
         return ws;
     }
 
-    // replaced buildWsUrl to use window.location.* (host was undefined) and expose alternate forms
     private buildWsUrl(room?: string, trailingSlash = true): string {
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const host = window.location.host || `${window.location.hostname}${window.location.port ? ':' + window.location.port : ''}`;
         const base = `${protocol}//${host}`;
-        // If trailingSlash=true produce /ws/ (helps nginx location /ws/); otherwise produce /ws (some proxies/clients prefer no trailing slash)
+        
         if (room) {
-            // always place room segment after /ws/
             return `${base}/ws/${encodeURIComponent(room)}`;
         } else {
             return trailingSlash ? `${base}/ws/` : `${base}/ws`;
@@ -313,16 +315,12 @@ export class MultiplayerPage {
         this.status = 'connecting';
         this.renderConnectionScreen();
 
-        // List of candidate URLs to try (ordered). Only allow insecure ws on http pages.
         const candidates: string[] = [];
         const prefersSecure = window.location.protocol === 'https:';
-        // prefer trailing slash first (matches nginx location /ws/)
         candidates.push(this.buildWsUrl(room, true));
-        // also try without trailing slash as some setups forward differently
         candidates.push(this.buildWsUrl(room, false));
-        // if page is http, also try ws scheme variants (shouldn't on https due to mixed-content)
+        
         if (!prefersSecure) {
-            // swap protocol by constructing from current host but with ws (buildWsUrl respects protocol)
             const alt1 = this.buildWsUrl(room, true).replace(/^wss:/i, 'ws:');
             const alt2 = this.buildWsUrl(room, false).replace(/^wss:/i, 'ws:');
             candidates.push(alt1, alt2);
@@ -348,11 +346,9 @@ export class MultiplayerPage {
                 socket = new WebSocket(wsUrl);
             } catch (err) {
                 console.error('WebSocket constructor threw:', err, wsUrl);
-                // try next candidate
                 return tryConnect(idx + 1);
             }
 
-            // connect timeout guard
             const to = window.setTimeout(() => {
                 timedOut = true;
                 try {
@@ -376,10 +372,8 @@ export class MultiplayerPage {
 
                 switch (msg.type) {
                     case 'joined':
-                        // store our player number and optional user info (server may echo it)
+                        // Store our player number
                         this.playerNumber = msg.player ?? null;
-                        // If server included user info in joined message, optionally store (not required)
-                        // this.meUser = msg.user || this.meUser;
                         this.roomId = msg.roomId;
                         this.isHost = !!msg.isHost;
                         this.status = this.isHost ? 'waiting' : 'playing';
@@ -393,12 +387,16 @@ export class MultiplayerPage {
                         this.renderConnectionScreen();
                         break;
                     case 'peerJoined':
-                        // server now sends players array with attached user info when available
+                        // Server sends players array with attached user info when available
                         if (Array.isArray(msg.players)) {
                             const players: Array<{ player: number; user?: any | null }> = msg.players;
                             const opponent = players.find(p => p.player !== this.playerNumber);
                             if (opponent && opponent.user) {
-                                this.opponentUser = { id: opponent.user.id, username: opponent.user.username, display_name: opponent.user.display_name };
+                                this.opponentUser = { 
+                                    id: opponent.user.id, 
+                                    username: opponent.user.username, 
+                                    display_name: opponent.user.display_name 
+                                };
                             }
                         }
                         this.status = 'playing';
@@ -429,11 +427,9 @@ export class MultiplayerPage {
 
             socket.onerror = (err) => {
                 console.error('WebSocket error event on', wsUrl, err);
-                // If we haven't established a connection yet, try the next candidate.
                 if (!this.socket) {
                     clearTimeout(to);
                     try { socket.close(); } catch (e) {}
-                    // slight delay to avoid rapid retries
                     setTimeout(() => tryConnect(idx + 1), 200);
                 } else {
                     alert('WebSocket connection failed. Make sure the server is running.');
@@ -445,62 +441,61 @@ export class MultiplayerPage {
             socket.onclose = (ev) => {
                 clearTimeout(to);
                 console.info('WebSocket closed', wsUrl, ev.code, ev.reason);
-                // If connection never opened (timedOut=true or close shortly after), try next candidate
                 if (!this.socket || timedOut) {
-                    // if this socket was not accepted as the active socket, try next
                     if (!this.socket) {
                         setTimeout(() => tryConnect(idx + 1), 100);
                     }
                     return;
                 }
 
-                // Normal close when we had an active socket
                 if (this.status !== 'disconnected') {
                     this.status = 'disconnected';
                     this.renderConnectionScreen();
                 }
             };
-
-            // If after short delay we still don't have this.socket set (onopen didn't run), wait for timeout handler to advance
-            // When socket.onopen runs it will set this.socket.
         };
 
-        // start attempts
         tryConnect(0);
     }
 
     private createPrivateRoom(): void {
         this.connectWithRoom();
-     }
+    }
  
-     private joinPrivateRoom(roomCode: string): void {
+    private joinPrivateRoom(roomCode: string): void {
         this.connectWithRoom(roomCode);
-     }
+    }
  
-     private disconnect(): void {
-         if (this.socket) {
+    private disconnect(): void {
+        if (this.socket) {
             try { this.socket.close(); } catch (e) {}
-         }
-         if (this.game) {
-             this.game.destroy();
-             this.game = null;
-         }
-         this.status = 'disconnected';
-         this.roomId = null;
-         this.isHost = false;
-         this.renderConnectionScreen();
-     }
+        }
+        if (this.game) {
+            this.game.destroy();
+            this.game = null;
+        }
+        this.status = 'disconnected';
+        this.roomId = null;
+        this.isHost = false;
+        this.opponentUser = null;
+        this.renderConnectionScreen();
+    }
  
-     public cleanup(): void {
-         this.disconnect();
-         if (this.friendWidget) {
-             this.friendWidget.unmount();
-             this.friendWidget = null;
-         }
-     }
+    public cleanup(): void {
+        this.disconnect();
+        if (this.friendWidget) {
+            this.friendWidget.unmount();
+            this.friendWidget = null;
+        }
+    }
 
-     private showInfoModal(title: string, message: string, actions: Array<{ label: string; style?: 'primary' | 'danger' | 'default'; action: () => void }>): void {
+    private showInfoModal(
+        title: string, 
+        message: string, 
+        actions: Array<{ label: string; style?: 'primary' | 'danger' | 'default'; action: () => void }>
+    ): void {
         if (!this.container) return;
+        
         const overlay = document.createElement('div');
         overlay.className = 'fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50';
         overlay.setAttribute('role', 'dialog');
@@ -539,9 +534,11 @@ export class MultiplayerPage {
         });
 
         const closeX = document.createElement('button');
-        closeX.className = 'absolute top-4 right-6 text-gray-400 hover:text-white';
+        closeX.className = 'absolute top-4 right-6 text-gray-400 hover:text-white text-2xl';
         closeX.innerHTML = '&times;';
-        closeX.onclick = () => { if (document.body.contains(overlay)) document.body.removeChild(overlay); };
+        closeX.onclick = () => { 
+            if (document.body.contains(overlay)) document.body.removeChild(overlay); 
+        };
 
         modal.appendChild(closeX);
         modal.appendChild(h);
@@ -554,208 +551,5 @@ export class MultiplayerPage {
             const firstBtn = btnRow.querySelector('button') as HTMLElement | null;
             if (firstBtn) firstBtn.focus();
         }, 50);
-    }
- }
- 
- // --- FriendWidget (exported) ---
- export class FriendWidget {
-    private root: HTMLElement | null = null;
-    private panel: HTMLElement | null = null;
-    private btn: HTMLElement | null = null;
-    private intervalId: number | null = null;
-    private visible = false;
-    private searchInput: HTMLInputElement | null = null;
-    private searchBtn: HTMLButtonElement | null = null;
-
-    mount(): void {
-        // If a widget root is already on the page, reuse it
-        const existing = document.getElementById('friend-widget-root');
-        if (existing) {
-            this.root = existing as HTMLElement;
-            this.panel = this.root.querySelector('#friend-widget-panel') as HTMLElement | null;
-            this.btn = this.root.querySelector('#friend-widget-btn') as HTMLElement | null;
-            this.searchInput = this.root.querySelector('#friend-widget-search-input') as HTMLInputElement | null;
-            this.searchBtn = this.root.querySelector('#friend-widget-search-btn') as HTMLButtonElement | null;
-            // ensure polling started
-            this.startPolling();
-            return;
-        }
-
-        this.root = document.createElement('div');
-        this.root.id = 'friend-widget-root';
-        this.root.style.position = 'fixed';
-        this.root.style.bottom = '20px';
-        this.root.style.right = '20px';
-        this.root.style.zIndex = '9999';
-        document.body.appendChild(this.root);
-
-        // toggle button
-        this.btn = document.createElement('button');
-        this.btn.id = 'friend-widget-btn';
-        this.btn.title = 'Friends';
-        this.btn.className = 'bg-game-dark hover:bg-blue-800 text-white rounded-full w-14 h-14 flex items-center justify-center shadow-lg';
-        this.btn.style.cursor = 'pointer';
-        this.btn.innerHTML = '👥';
-        this.btn.onclick = () => this.toggle();
-        this.root.appendChild(this.btn);
-
-        // panel (hidden by default)
-        this.panel = document.createElement('div');
-        this.panel.id = 'friend-widget-panel';
-        this.panel.className = 'glass-effect p-4 rounded-2xl shadow-xl';
-        this.panel.style.width = '320px';
-        this.panel.style.maxHeight = '70vh';
-        this.panel.style.overflow = 'auto';
-        this.panel.style.marginBottom = '12px';
-        this.panel.style.display = 'none';
-        this.panel.style.boxShadow = '0 8px 30px rgba(0,0,0,0.6)';
-        this.root.appendChild(this.panel);
-
-        // header + inline add-by-username form (no browser prompt)
-        const header = document.createElement('div');
-        header.className = 'flex items-center justify-between mb-3 gap-2';
-        const h = document.createElement('h4');
-        h.textContent = 'Friends';
-        h.className = 'text-lg font-semibold text-white';
-        header.appendChild(h);
-
-        const searchContainer = document.createElement('div');
-        searchContainer.className = 'flex gap-2 items-center';
-
-        this.searchInput = document.createElement('input');
-        this.searchInput.id = 'friend-widget-search-input';
-        this.searchInput.type = 'text';
-        this.searchInput.placeholder = 'Add by username';
-        this.searchInput.className = 'px-2 py-1 rounded bg-game-dark text-white text-sm';
-        searchContainer.appendChild(this.searchInput);
-
-        this.searchBtn = document.createElement('button');
-        this.searchBtn.id = 'friend-widget-search-btn';
-        this.searchBtn.textContent = '+';
-        this.searchBtn.title = 'Send friend request by username';
-        this.searchBtn.className = 'bg-accent-pink text-white rounded px-2 py-1 text-sm';
-        this.searchBtn.onclick = async () => {
-            const val = this.searchInput?.value?.trim();
-            if (!val) { alert('Enter a username'); return; }
-            try {
-                await AuthService.sendFriendRequestByUsername(val);
-                this.searchInput!.value = '';
-                this.refreshNow();
-                alert(`Friend request sent to ${val}`);
-            } catch (err: any) {
-                alert(`Failed to send request: ${err?.message || err}`);
-            }
-        };
-        searchContainer.appendChild(this.searchBtn);
-
-        header.appendChild(searchContainer);
-        this.panel.appendChild(header);
-
-        const list = document.createElement('div');
-        list.id = 'friend-list';
-        this.panel.appendChild(list);
-
-        this.refreshNow();
-        this.startPolling();
-    }
-
-    private async fetchAndRender(): Promise<void> {
-        const listEl = this.panel ? this.panel.querySelector('#friend-list') as HTMLElement | null : null;
-        if (!listEl) return;
-        listEl.innerHTML = '<p class="text-gray-400">Loading...</p>';
-
-        try {
-            const me = AuthService.getUser();
-            if (!me) {
-                listEl.innerHTML = '<p class="text-gray-400">Not signed in</p>';
-                return;
-            }
-            const friends = await AuthService.getFriends(me.id);
-            if (!friends || friends.length === 0) {
-                listEl.innerHTML = '<p class="text-gray-400">No friends yet</p>';
-                return;
-            }
-            listEl.innerHTML = '';
-            friends.forEach(f => {
-                const row = document.createElement('div');
-                row.className = 'flex items-center justify-between p-2 rounded hover:bg-blue-800';
-                const left = document.createElement('div');
-                left.className = 'flex items-center gap-3';
-                const dot = document.createElement('span');
-                dot.style.width = '10px';
-                dot.style.height = '10px';
-                dot.style.borderRadius = '50%';
-                dot.style.display = 'inline-block';
-                dot.style.marginRight = '6px';
-                dot.style.background = f.is_online ? '#22c55e' : '#94a3b8';
-                const name = document.createElement('div');
-                name.className = 'text-white';
-                name.textContent = f.display_name || f.username;
-                left.appendChild(dot);
-                left.appendChild(name);
-
-                const actions = document.createElement('div');
-                actions.className = 'flex items-center gap-2';
-                const status = document.createElement('span');
-                status.className = 'text-sm text-gray-300';
-                status.textContent = f.status === 'pending' ? 'Pending' : (f.is_online ? 'Online' : 'Offline');
-                const remove = document.createElement('button');
-                remove.className = 'ml-2 bg-game-red text-white px-2 py-1 rounded';
-                remove.textContent = 'Remove';
-                remove.onclick = async () => {
-                    const me = AuthService.getUser();
-                    if (!me) { alert('Not authenticated'); return; }
-                    if (!confirm(`Remove ${f.display_name || f.username} from friends?`)) return;
-                    try {
-                        await AuthService.removeFriend(me.id, f.id);
-                        this.refreshNow();
-                    } catch (err: any) {
-                        alert(`Failed to remove friend: ${err?.message || err}`);
-                    }
-                };
-
-                actions.appendChild(status);
-                actions.appendChild(remove);
-
-                row.appendChild(left);
-                row.appendChild(actions);
-                listEl.appendChild(row);
-            });
-        } catch (err) {
-            listEl.innerHTML = `<p class="text-red-400">Error loading friends</p>`;
-            console.error(err);
-        }
-    }
-
-    toggle(): void {
-        this.visible = !this.visible;
-        if (!this.panel || !this.btn) return;
-        this.panel.style.display = this.visible ? 'block' : 'none';
-        this.btn.classList.toggle('bg-accent-pink', this.visible);
-        if (this.visible) this.refreshNow();
-    }
-
-    async refreshNow(): Promise<void> {
-        await this.fetchAndRender();
-    }
-
-    private startPolling(): void {
-        if (this.intervalId) return;
-        this.intervalId = window.setInterval(() => {
-            if (this.visible) this.refreshNow();
-        }, 15000) as unknown as number;
-    }
-
-    unmount(): void {
-        if (this.intervalId) {
-            clearInterval(this.intervalId);
-            this.intervalId = null;
-        }
-        if (this.root && document.body.contains(this.root)) {
-            document.body.removeChild(this.root);
-        }
-        this.root = null;
-        this.panel = null;
-        this.btn = null;
     }
 }
