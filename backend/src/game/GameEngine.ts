@@ -21,7 +21,7 @@ export class GameEngine {
   private readonly BALL_SPEED_INIT = 5;
   private readonly WIN_SCORE = 5;
 
-  constructor(broadcast: BroadcastFn, width = 800, height = 600, tickMs = 50) {
+  constructor(broadcast: BroadcastFn, width = 800, height = 600, tickMs = 33) { // ~30Hz
     this.width = width;
     this.height = height;
     this.broadcasterFn = broadcast;
@@ -47,13 +47,26 @@ export class GameEngine {
   public start(): void {
     if (this.running) return;
     this.running = true;
-    this.timer = setInterval(() => this.step(), this.tickInterval);
+    // schedule loop with setTimeout to avoid overlapping step() calls if event loop is busy
+    const loop = () => {
+      if (!this.running) return;
+      const start = Date.now();
+      try {
+        this.step();
+      } catch (e) {
+        // swallow errors to keep loop alive
+      }
+      const elapsed = Date.now() - start;
+      const delay = Math.max(0, this.tickInterval - elapsed);
+      this.timer = setTimeout(loop, delay);
+    };
+    this.timer = setTimeout(loop, this.tickInterval);
     this.broadcastState();
   }
 
   public stop(): void {
     if (this.timer) {
-      clearInterval(this.timer);
+      clearTimeout(this.timer);
       this.timer = null;
     }
     this.running = false;
@@ -94,6 +107,9 @@ export class GameEngine {
         this.ball.dx = Math.abs(this.ball.dx) * 1.03;
         const hit = (this.ball.y - (p1Top + this.PADDLE_HEIGHT / 2)) / (this.PADDLE_HEIGHT / 2);
         this.ball.dy = hit * 5;
+        const maxSpeed = 12;
+        if (Math.abs(this.ball.dx) > maxSpeed) this.ball.dx = Math.sign(this.ball.dx) * maxSpeed;
+        if (Math.abs(this.ball.dy) > maxSpeed) this.ball.dy = Math.sign(this.ball.dy) * maxSpeed;
       }
     }
 
@@ -105,6 +121,9 @@ export class GameEngine {
         this.ball.dx = -Math.abs(this.ball.dx) * 1.03;
         const hit = (this.ball.y - (p2Top + this.PADDLE_HEIGHT / 2)) / (this.PADDLE_HEIGHT / 2);
         this.ball.dy = hit * 5;
+        const maxSpeed = 12;
+        if (Math.abs(this.ball.dx) > maxSpeed) this.ball.dx = Math.sign(this.ball.dx) * maxSpeed;
+        if (Math.abs(this.ball.dy) > maxSpeed) this.ball.dy = Math.sign(this.ball.dy) * maxSpeed;
       }
     }
 
