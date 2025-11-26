@@ -8,10 +8,46 @@ export class NotificationWidget {
     private intervalId: number | null = null;
     private visible = false;
     private unreadCount = 0;
+    private authWatcherId: number | null = null;
 
     mount(): void {
-        if (document.getElementById('notification-widget-root')) return;
+        // If already present, ensure polling runs only when authenticated
+        const existing = document.getElementById('notification-widget-root');
+        if (existing) {
+            this.root = existing as HTMLElement;
+            this.panel = this.root.querySelector('#notification-widget-panel') as HTMLElement | null;
+            this.btn = this.root.querySelector('#notification-widget-btn') as HTMLElement | null;
+            if (AuthService.isAuthenticated()) this.startPolling();
+            this.startAuthWatcher();
+            return;
+        }
 
+        if (AuthService.isAuthenticated()) {
+            this.createUI();
+        } else {
+            // wait for authentication before creating UI
+            this.authWatcherId = window.setInterval(() => {
+                if (AuthService.isAuthenticated()) {
+                    if (this.authWatcherId) { clearInterval(this.authWatcherId); this.authWatcherId = null; }
+                    this.createUI();
+                }
+            }, 1500) as unknown as number;
+        }
+        this.startAuthWatcher();
+    }
+
+    private startAuthWatcher(): void {
+        if (this.authWatcherId) return;
+        this.authWatcherId = window.setInterval(() => {
+            if (!AuthService.isAuthenticated()) {
+                if (this.root && document.body.contains(this.root)) {
+                    this.unmount();
+                }
+            }
+        }, 2000) as unknown as number;
+    }
+
+    private createUI(): void {
         this.root = document.createElement('div');
         this.root.id = 'notification-widget-root';
         this.root.style.position = 'fixed';
@@ -200,6 +236,10 @@ export class NotificationWidget {
         if (this.intervalId) {
             clearInterval(this.intervalId);
             this.intervalId = null;
+        }
+        if (this.authWatcherId) {
+            clearInterval(this.authWatcherId);
+            this.authWatcherId = null;
         }
         if (this.root && document.body.contains(this.root)) {
             document.body.removeChild(this.root);

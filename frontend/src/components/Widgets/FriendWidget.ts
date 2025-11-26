@@ -8,9 +8,11 @@ export class FriendWidget {
     private visible = false;
     private searchInput: HTMLInputElement | null = null;
     private searchBtn: HTMLButtonElement | null = null;
+    private authWatcherId: number | null = null;
 
 
     mount(): void {
+        // If already created (e.g., SSR or remount), reuse existing root elements
         const existing = document.getElementById('friend-widget-root');
         if (existing) {
             this.root = existing as HTMLElement;
@@ -18,10 +20,43 @@ export class FriendWidget {
             this.btn = this.root.querySelector('#friend-widget-btn') as HTMLElement | null;
             this.searchInput = this.root.querySelector('#friend-widget-search-input') as HTMLInputElement | null;
             this.searchBtn = this.root.querySelector('#friend-widget-search-btn') as HTMLButtonElement | null;
-            this.startPolling();
+            // start background polling only if authenticated
+            if (AuthService.isAuthenticated()) this.startPolling();
+            // watch for auth changes to unmount on logout
+            this.startAuthWatcher();
             return;
         }
 
+        // Defer creating UI until user is authenticated
+        if (AuthService.isAuthenticated()) {
+            this.createUI();
+        } else {
+            // poll for auth; when authenticated create UI
+            this.authWatcherId = window.setInterval(() => {
+                if (AuthService.isAuthenticated()) {
+                    if (this.authWatcherId) { clearInterval(this.authWatcherId); this.authWatcherId = null; }
+                    this.createUI();
+                }
+            }, 1500) as unknown as number;
+        }
+        this.startAuthWatcher();
+    }
+
+    private startAuthWatcher(): void {
+        // ensure we unmount UI on logout
+        if (this.authWatcherId) return;
+        this.authWatcherId = window.setInterval(() => {
+            if (!AuthService.isAuthenticated()) {
+                // user logged out -> remove UI if present
+                if (this.root && document.body.contains(this.root)) {
+                    this.unmount();
+                }
+            }
+        }, 2000) as unknown as number;
+    }
+
+    private createUI(): void {
+        // create widget root and elements (extracted from previous mount logic)
         this.root = document.createElement('div');
         this.root.id = 'friend-widget-root';
         this.root.style.position = 'fixed';
@@ -52,7 +87,6 @@ export class FriendWidget {
 
         const header = document.createElement('div');
         header.className = 'flex items-center justify-between mb-3 gap-2';
-        
         const h = document.createElement('h4');
         h.textContent = 'Friends';
         h.className = 'text-lg font-semibold text-white';
@@ -75,10 +109,7 @@ export class FriendWidget {
         this.searchBtn.className = 'bg-accent-pink text-white rounded px-2 py-1 text-sm';
         this.searchBtn.onclick = async () => {
             const val = this.searchInput?.value?.trim();
-            if (!val) { 
-                alert('Enter a username'); 
-                return; 
-            }
+            if (!val) { alert('Enter a username'); return; }
             try {
                 await AuthService.sendFriendRequestByUsername(val);
                 this.searchInput!.value = '';
@@ -93,7 +124,6 @@ export class FriendWidget {
         header.appendChild(searchContainer);
         this.panel.appendChild(header);
 
-        // Friends list container
         const list = document.createElement('div');
         list.id = 'friend-list';
         this.panel.appendChild(list);
@@ -102,7 +132,6 @@ export class FriendWidget {
         this.startPolling();
     }
 
- 
     private async fetchAndRender(): Promise<void> {
         const listEl = this.panel ? this.panel.querySelector('#friend-list') as HTMLElement | null : null;
         if (!listEl) return;
@@ -215,6 +244,10 @@ export class FriendWidget {
         if (this.intervalId) {
             clearInterval(this.intervalId);
             this.intervalId = null;
+        }
+        if (this.authWatcherId) {
+            clearInterval(this.authWatcherId);
+            this.authWatcherId = null;
         }
         if (this.root && document.body.contains(this.root)) {
             document.body.removeChild(this.root);
