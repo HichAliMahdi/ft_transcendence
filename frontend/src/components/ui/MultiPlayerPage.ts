@@ -1,6 +1,6 @@
 import { OnlinePongGame } from '../game/OnlinePongGame';
 import { AuthService } from '../game/AuthService';
-import { FriendWidget } from './FriendWidget';
+import { FriendWidget } from '../Widgets/FriendWidget';
 
 export class MultiplayerPage {
     private game: OnlinePongGame | null = null;

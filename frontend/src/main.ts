@@ -1,7 +1,8 @@
 import { Router } from './router/Router';
 import { AuthService } from './components/game/AuthService';
 import './styles/main.css';
-import { FriendWidget, NotificationWidget } from './components/ui/MultiPlayerPage'; // added import
+import { FriendWidget } from './components/Widgets/FriendWidget';
+import { NotificationWidget } from './components/Widgets/NotificationWidget';
 
 class App {
     private router: Router;
