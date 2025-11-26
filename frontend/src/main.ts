@@ -129,15 +129,14 @@ class App {
             }, { passive: true });
 
             // watch auth status and show/hide nav accordingly
-            let authNavWatcherId: number | null = null;
-            authNavWatcherId = window.setInterval(() => {
+            window.setInterval(() => {
                 const curAuth = AuthService.isAuthenticated();
                 if (curAuth !== prevAuth) {
                     prevAuth = curAuth;
                     if (curAuth) showNav();
                     else hideNav();
                 }
-            }, 1500) as unknown as number;
+            }, 1500);
 
             // Note: we intentionally do not clear this interval for the lifetime of the app.
         }
