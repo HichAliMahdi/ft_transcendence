@@ -174,6 +174,19 @@ export class AuthService {
         }
     }
 
+    static async sendFriendRequestByUsername(username: string): Promise<void> {
+        const token = this.getToken();
+        if (!token) throw new Error('Not authenticated');
+        const resp = await fetch(`${API_BASE}/users/friends`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username })
+        });
+        if (!resp.ok) {
+            await this.parseResponseError(resp);
+        }
+    }
+
     static async removeFriend(userId: number, friendId: number): Promise<void> {
         const token = this.getToken();
         if (!token) throw new Error('Not authenticated');
