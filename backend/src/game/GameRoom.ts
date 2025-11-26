@@ -11,20 +11,31 @@ export class GameRoom {
   constructor(id: string) {
     this.id = id;
 
+    // safe send helper: avoid blocking/large buffers from slow clients.
+    // If a client's bufferedAmount grows beyond a threshold, skip messages and eventually terminate.
+    const MAX_BUFFERED = 64 * 1024; // 64KB
     const safeSend = (s: WS, data: string) => {
       try {
-        if ((s as any).readyState === 1) {
-          try {
-            (s as any).send(data, (err: any) => {
-              if (err) {
-                try { (s as any).terminate?.(); } catch (_) {}
-              }
-            });
-          } catch (e) {
-            try { (s as any).terminate?.(); } catch (_) {}
+        const wsAny = s as any;
+        if (wsAny.readyState !== 1) return;
+        // if the OS/socket send buffer is large, skip this send to avoid backpressure
+        if (typeof wsAny.bufferedAmount === 'number' && wsAny.bufferedAmount > MAX_BUFFERED) {
+          // optional: count/skipping logic could be added per-socket; here we drop this frame
+          // if bufferedAmount is extremely large, terminate the socket to free resources
+          if (wsAny.bufferedAmount > MAX_BUFFERED * 8) {
+            try { wsAny.terminate?.(); } catch (_) {}
           }
+          return;
         }
-      } catch (e) { /* ignore */ }
+        // use send with callback to make it asynchronous and catch errors
+        wsAny.send(data, (err: any) => {
+          if (err) {
+            try { wsAny.terminate?.(); } catch (_) {}
+          }
+        });
+      } catch (e) {
+        try { (s as any).terminate?.(); } catch (_) {}
+      }
     };
 
     const broadcaster = (msg: any) => {
@@ -40,6 +51,7 @@ export class GameRoom {
   public addClient(socket: WS): { player: 1 | 2 | null; isHost: boolean } {
     if (this.clients.has(socket)) return { player: this.playerMap.get(socket) ?? null, isHost: false };
 
+    // allow up to 2 players (others become spectators)
     this.clients.add(socket);
 
     const existingPlayers = Array.from(this.playerMap.values()).filter(v => v === 1 || v === 2) as Array<1 | 2>;
@@ -48,18 +60,25 @@ export class GameRoom {
       assigned = existingPlayers.includes(1) ? 2 : 1;
       this.playerMap.set(socket, assigned);
     } else {
-      this.playerMap.set(socket, null);
+      this.playerMap.set(socket, null); // spectator
     }
 
     const isHost = assigned === 1;
 
     try {
       const data = JSON.stringify({ type: 'joined', roomId: this.id, isHost, player: assigned ?? null });
-      if ((socket as any).readyState === 1) (socket as any).send(data, () => {});
+      // non-blocking send - reuse same safety logic as broadcaster
+      try {
+        if ((socket as any).readyState === 1) (socket as any).send(data, () => {});
+      } catch (e) {
+        try { (socket as any).terminate?.(); } catch (_) {}
+      }
     } catch (e) {}
 
+    // Start engine when there are two players connected
     if (this.getPlayerCount() >= 2) {
       this.engine.start();
+      // notify players that both are present
       this.broadcastToAll({ type: 'peerJoined', roomId: this.id });
     }
 
@@ -72,8 +91,10 @@ export class GameRoom {
     this.clients.delete(socket);
     this.playerMap.delete(socket);
 
+    // notify remaining
     this.broadcastToAll({ type: 'peerLeft', roomId: this.id });
 
+    // if fewer than 2 players, stop engine
     if (this.getPlayerCount() < 2) this.engine.stop();
   }
 
@@ -87,8 +108,10 @@ export class GameRoom {
         break;
       case 'create':
       case 'join':
+        // handled at connection level by route logic
         break;
       default:
+        // ignore or broadcast to spectators
         break;
     }
   }
@@ -115,7 +138,13 @@ export class GameRoom {
   private broadcastToAll(msg: any): void {
     const data = JSON.stringify(msg);
     for (const s of this.clients) {
-      try { if ((s as any).readyState === 1) (s as any).send(data, () => {}); } catch (e) {}
+      try { 
+        const wsAny = s as any;
+        if (wsAny.readyState === 1) {
+          // reuse non-blocking send
+          try { wsAny.send(data, () => {}); } catch (e) { try { wsAny.terminate?.(); } catch (_) {} }
+        }
+      } catch (e) {}
     }
   }
 }
