@@ -10,6 +10,13 @@ export class OnlinePongGame {
     private ctx: CanvasRenderingContext2D;
     private socket: WebSocket;
     private gameState: OnlineGameState | null = null;
+
+    // render interpolation state
+    private renderState: OnlineGameState | null = null;
+    private targetState: OnlineGameState | null = null;
+    private lastStateTime = 0;
+    private serverTickMs = 33; // expected server broadcast interval
+
     private keys: { [key: string]: boolean } = {};
     private animationId: number | null = null;
     private isRunning: boolean = false;
@@ -24,16 +31,30 @@ export class OnlinePongGame {
         this.ctx = context;
         this.socket = socket;
 
+        // initialize logical state using CSS size (not backing store)
+        const cssRect = canvas.getBoundingClientRect();
+        const logicalW = Math.max(1, Math.round(cssRect.width || canvas.width));
+        const logicalH = Math.max(1, Math.round(cssRect.height || canvas.height));
+
         this.gameState = {
-            ball: { x: canvas.width / 2, y: canvas.height / 2, dx: 0, dy: 0 },
-            paddles: { player1: canvas.height / 2 - 50, player2: canvas.height / 2 - 50 },
+            ball: { x: logicalW / 2, y: logicalH / 2, dx: 0, dy: 0 },
+            paddles: { player1: logicalH / 2 - 50, player2: logicalH / 2 - 50 },
             score: { player1: 0, player2: 0 },
-            width: canvas.width,
-            height: canvas.height
+            width: logicalW,
+            height: logicalH
         };
+
+        // copy initial to render/target
+        this.renderState = JSON.parse(JSON.stringify(this.gameState));
+        this.targetState = JSON.parse(JSON.stringify(this.gameState));
+        this.lastStateTime = performance.now();
+
+        // ensure canvas backing store matches DPR for crisp rendering
+        this.updateCanvasDPR(canvas);
 
         this.setupControls();
 
+        // allow direct forwarding from MultipayerPage: export hook
         (this as any).onSocketMessage = (msg: any) => {
             this.handleSocketMessage(msg);
         };
@@ -49,6 +70,19 @@ export class OnlinePongGame {
         this.start();
     }
 
+    // ensure canvas backing store is scaled to devicePixelRatio and uses CSS size for logical coords
+    private updateCanvasDPR(canvas: HTMLCanvasElement): void {
+        const rect = canvas.getBoundingClientRect();
+        const cssW = Math.max(1, Math.round(rect.width)) || 800;
+        const cssH = Math.max(1, Math.round(rect.height)) || 600;
+        const dpr = Math.max(1, window.devicePixelRatio || 1);
+        canvas.style.width = `${cssW}px`;
+        canvas.style.height = `${cssH}px`;
+        canvas.width = Math.floor(cssW * dpr);
+        canvas.height = Math.floor(cssH * dpr);
+        this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+
     private setupControls(): void {
         this.removeEventListeners();
 
@@ -58,11 +92,13 @@ export class OnlinePongGame {
                 const down = e.type === 'keydown';
                 this.keys[e.key] = down;
                 if (this.socket && (this.socket as any).readyState === 1) {
-                    this.socket.send(JSON.stringify({
-                        type: 'paddleMove',
-                        direction: e.key === 'w' ? 'up' : 'down',
-                        keydown: down
-                    }));
+                    try {
+                        this.socket.send(JSON.stringify({
+                            type: 'paddleMove',
+                            direction: e.key === 'w' ? 'up' : 'down',
+                            keydown: down
+                        }));
+                    } catch (e) { /* ignore send errors */ }
                 }
             }
         };
@@ -79,7 +115,7 @@ export class OnlinePongGame {
     }
 
     private draw(): void {
-        const state = this.gameState;
+        const state = this.renderState || this.targetState;
         if (!state) return;
 
         this.ctx.fillStyle = '#000';
@@ -136,6 +172,28 @@ export class OnlinePongGame {
     }
 
     private gameLoop = (_timestamp?: number): void => {
+        // interpolation step
+        const now = performance.now();
+        if (this.renderState && this.targetState) {
+            const dt = now - this.lastStateTime;
+            // alpha: how far between last state and target we should be.
+            const alpha = Math.min(1, dt / (this.serverTickMs || 33));
+            // lerp helper
+            const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+            // interpolate ball
+            this.renderState.ball.x = lerp(this.renderState.ball.x, this.targetState.ball.x, alpha);
+            this.renderState.ball.y = lerp(this.renderState.ball.y, this.targetState.ball.y, alpha);
+            this.renderState.ball.dx = lerp(this.renderState.ball.dx, this.targetState.ball.dx, alpha);
+            this.renderState.ball.dy = lerp(this.renderState.ball.dy, this.targetState.ball.dy, alpha);
+            // interpolate paddles
+            this.renderState.paddles.player1 = lerp(this.renderState.paddles.player1, this.targetState.paddles.player1, alpha);
+            this.renderState.paddles.player2 = lerp(this.renderState.paddles.player2, this.targetState.paddles.player2, alpha);
+            // scores and sizes snap immediately
+            this.renderState.score = { ...this.targetState.score };
+            this.renderState.width = this.targetState.width;
+            this.renderState.height = this.targetState.height;
+        }
+
         this.draw();
         this.animationId = requestAnimationFrame(this.gameLoop);
     };
@@ -171,9 +229,25 @@ export class OnlinePongGame {
         if (msg.type === 'paddleMove') {
             return;
         } else if (msg.type === 'gameState' && msg.state) {
-            this.gameState = msg.state as OnlineGameState;
+            // update target state and timestamp for interpolation
+            const st = msg.state as OnlineGameState;
+            this.targetState = {
+                ball: { x: st.ball.x, y: st.ball.y, dx: st.ball.dx, dy: st.ball.dy },
+                paddles: { player1: st.paddles.player1, player2: st.paddles.player2 },
+                score: { player1: st.score.player1, player2: st.score.player2 },
+                width: st.width,
+                height: st.height
+            };
+            // initialize renderState if missing
+            if (!this.renderState) this.renderState = JSON.parse(JSON.stringify(this.targetState));
+            this.lastStateTime = performance.now();
+            // adjust serverTickMs if server sends a measured interval (optional)
+            // this.serverTickMs = msg.tickMs || this.serverTickMs;
         } else if (msg.type === 'gameOver' && msg.state) {
-            this.gameState = msg.state as OnlineGameState;
+            const st = msg.state as OnlineGameState;
+            this.targetState = JSON.parse(JSON.stringify(st));
+            if (!this.renderState) this.renderState = JSON.parse(JSON.stringify(st));
+            this.lastStateTime = performance.now();
         }
     }
 }
