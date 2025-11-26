@@ -75,6 +75,18 @@ export class RegisterPage {
             submitButton.disabled = true;
             submitButton.textContent = 'Registering...';
 
+            const pwd = passwordInput.value;
+            const hasUpper = /[A-Z]/.test(pwd);
+            const hasNumber = /\d/.test(pwd);
+            const hasSpecial = /[!@#$%^&*(),.?":{}|<>\\\/\[\];'`~_\-+=]/.test(pwd);
+            if (pwd.length < 8 || !hasUpper || !hasNumber || !hasSpecial) {
+                errorMsg.textContent = 'Password must be at least 8 characters and include one uppercase letter, one number and one special character';
+                errorMsg.classList.remove('hidden');
+                submitButton.disabled = false;
+                submitButton.textContent = 'Register';
+                return;
+            }
+
             try {
                 await AuthService.register(
                     usernameInput.value,

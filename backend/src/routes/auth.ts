@@ -30,6 +30,11 @@ export default async function authRoutes(fastify: FastifyInstance) {
                 return reply.status(400).send({ message: 'Password must be at least 8 characters long' });
             }
 
+            const passwordPolicy = /(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>\\\/\[\];'`~_\-+=])/;
+            if (!passwordPolicy.test(password)) {
+                return reply.status(400).send({ message: 'Password must contain at least one uppercase letter, one number and one special character' });
+            }
+
             try {
                 const existingUser = db.prepare('SELECT * FROM users WHERE username = ? OR email = ? OR display_name = ?').get(username, email, display_name);
                 if (existingUser) {

@@ -38,18 +38,18 @@ export default async function tournamentRoutes(fastify: FastifyInstance) {
         const { name, maxPlayers } = request.body;
         
         if (!name || name.trim().length === 0) {
-          return reply.code(400).send({ error: 'Tournament name is required' });
+          return reply.code(400).send({ message: 'Tournament name is required' });
         }
 
         if (![4, 8, 16].includes(maxPlayers)) {
-          return reply.code(400).send({ error: 'Max players must be 4, 8, or 16' });
+          return reply.code(400).send({ message: 'Max players must be 4, 8, or 16' });
         }
 
         const tournament = TournamentService.createTournament(name.trim(), maxPlayers);
         return reply.code(201).send({ tournament });
       } catch (error) {
         fastify.log.error(error);
-        return reply.code(500).send({ error: 'Failed to create tournament' });
+        return reply.code(500).send({ message: 'Failed to create tournament' });
       }
     }
   );
@@ -61,7 +61,7 @@ export default async function tournamentRoutes(fastify: FastifyInstance) {
       return reply.send({ tournaments });
     } catch (error) {
       fastify.log.error(error);
-      return reply.code(500).send({ error: 'Failed to fetch joinable tournaments' });
+      return reply.code(500).send({ message: 'Failed to fetch joinable tournaments' });
     }
   });
 
@@ -73,13 +73,13 @@ export default async function tournamentRoutes(fastify: FastifyInstance) {
         const tournamentId = parseInt(id);
 
         if (isNaN(tournamentId)) {
-          return reply.code(400).send({ error: 'Invalid tournament ID' });
+          return reply.code(400).send({ message: 'Invalid tournament ID' });
         }
 
         const tournament = TournamentService.getTournamentById(tournamentId);
         
         if (!tournament) {
-          return reply.code(404).send({ error: 'Tournament not found' });
+          return reply.code(404).send({ message: 'Tournament not found' });
         }
 
         const participants = TournamentService.getParticipants(tournamentId);
@@ -92,7 +92,7 @@ export default async function tournamentRoutes(fastify: FastifyInstance) {
         });
       } catch (error) {
         fastify.log.error(error);
-        return reply.code(500).send({ error: 'Failed to fetch tournament' });
+        return reply.code(500).send({ message: 'Failed to fetch tournament' });
       }
     }
   );
@@ -103,7 +103,7 @@ export default async function tournamentRoutes(fastify: FastifyInstance) {
       return reply.send({ tournaments });
     } catch (error) {
       fastify.log.error(error);
-      return reply.code(500).send({ error: 'Failed to fetch tournaments' });
+      return reply.code(500).send({ message: 'Failed to fetch tournaments' });
     }
   });
 
@@ -116,20 +116,20 @@ export default async function tournamentRoutes(fastify: FastifyInstance) {
         const tournamentId = parseInt(id);
 
         if (isNaN(tournamentId)) {
-          return reply.code(400).send({ error: 'Invalid tournament ID' });
+          return reply.code(400).send({ message: 'Invalid tournament ID' });
         }
 
         if (!alias || alias.trim().length === 0) {
-          return reply.code(400).send({ error: 'Player alias is required' });
+          return reply.code(400).send({ message: 'Player alias is required' });
         }
 
         if (alias.length > 20) {
-          return reply.code(400).send({ error: 'Alias must be 20 characters or less' });
+          return reply.code(400).send({ message: 'Alias must be 20 characters or less' });
         }
 
         if (!/^[a-zA-Z0-9\s_-]+$/.test(alias)) {
           return reply.code(400).send({ 
-            error: 'Only letters, numbers, spaces, - and _ are allowed' 
+            message: 'Only letters, numbers, spaces, - and _ are allowed' 
           });
         }
 
@@ -137,7 +137,7 @@ export default async function tournamentRoutes(fastify: FastifyInstance) {
         
         if (!success) {
           return reply.code(400).send({ 
-            error: 'Could not add player. Tournament may be full, already started, or alias is taken.' 
+            message: 'Could not add player. Tournament may be full, already started, or alias is taken.' 
           });
         }
 
@@ -145,7 +145,7 @@ export default async function tournamentRoutes(fastify: FastifyInstance) {
         return reply.code(201).send({ participants });
       } catch (error) {
         fastify.log.error(error);
-        return reply.code(500).send({ error: 'Failed to add player' });
+        return reply.code(500).send({ message: 'Failed to add player' });
       }
     }
   );
@@ -159,14 +159,14 @@ export default async function tournamentRoutes(fastify: FastifyInstance) {
         const playerIdNum = parseInt(playerId);
 
         if (isNaN(tournamentId) || isNaN(playerIdNum)) {
-          return reply.code(400).send({ error: 'Invalid ID' });
+          return reply.code(400).send({ message: 'Invalid ID' });
         }
 
         const success = TournamentService.removePlayer(tournamentId, playerIdNum);
         
         if (!success) {
           return reply.code(400).send({ 
-            error: 'Could not remove player. Tournament may have already started.' 
+            message: 'Could not remove player. Tournament may have already started.' 
           });
         }
 
@@ -174,7 +174,7 @@ export default async function tournamentRoutes(fastify: FastifyInstance) {
         return reply.send({ participants });
       } catch (error) {
         fastify.log.error(error);
-        return reply.code(500).send({ error: 'Failed to remove player' });
+        return reply.code(500).send({ message: 'Failed to remove player' });
       }
     }
   );
@@ -187,14 +187,14 @@ export default async function tournamentRoutes(fastify: FastifyInstance) {
         const tournamentId = parseInt(id);
 
         if (isNaN(tournamentId)) {
-          return reply.code(400).send({ error: 'Invalid tournament ID' });
+          return reply.code(400).send({ message: 'Invalid tournament ID' });
         }
 
         const success = TournamentService.startTournament(tournamentId);
         
         if (!success) {
           return reply.code(400).send({ 
-            error: 'Could not start tournament. Ensure all player slots are filled.' 
+            message: 'Could not start tournament. Ensure all player slots are filled.' 
           });
         }
 
@@ -207,7 +207,7 @@ export default async function tournamentRoutes(fastify: FastifyInstance) {
         });
       } catch (error) {
         fastify.log.error(error);
-        return reply.code(500).send({ error: 'Failed to start tournament' });
+        return reply.code(500).send({ message: 'Failed to start tournament' });
       }
     }
   );
@@ -220,19 +220,19 @@ export default async function tournamentRoutes(fastify: FastifyInstance) {
         const tournamentId = parseInt(id);
 
         if (isNaN(tournamentId)) {
-          return reply.code(400).send({ error: 'Invalid tournament ID' });
+          return reply.code(400).send({ message: 'Invalid tournament ID' });
         }
 
         const currentMatch = TournamentService.getCurrentMatch(tournamentId);
         
         if (!currentMatch) {
-          return reply.code(404).send({ error: 'No current match available' });
+          return reply.code(404).send({ message: 'No current match available' });
         }
 
         return reply.send({ match: currentMatch });
       } catch (error) {
         fastify.log.error(error);
-        return reply.code(500).send({ error: 'Failed to fetch current match' });
+        return reply.code(500).send({ message: 'Failed to fetch current match' });
       }
     }
   );
@@ -246,11 +246,11 @@ export default async function tournamentRoutes(fastify: FastifyInstance) {
         const matchIdNum = parseInt(matchId);
 
         if (isNaN(matchIdNum)) {
-          return reply.code(400).send({ error: 'Invalid match ID' });
+          return reply.code(400).send({ message: 'Invalid match ID' });
         }
 
         if (!winnerId || typeof score1 !== 'number' || typeof score2 !== 'number') {
-          return reply.code(400).send({ error: 'Winner ID and scores are required' });
+          return reply.code(400).send({ message: 'Winner ID and scores are required' });
         }
 
         const success = TournamentService.recordMatchResult(
@@ -261,7 +261,7 @@ export default async function tournamentRoutes(fastify: FastifyInstance) {
         );
         
         if (!success) {
-          return reply.code(400).send({ error: 'Failed to record match result' });
+          return reply.code(400).send({ message: 'Failed to record match result' });
         }
 
         return reply.send({ 
@@ -270,7 +270,7 @@ export default async function tournamentRoutes(fastify: FastifyInstance) {
         });
       } catch (error) {
         fastify.log.error(error);
-        return reply.code(500).send({ error: 'Failed to record match result' });
+        return reply.code(500).send({ message: 'Failed to record match result' });
       }
     }
   );
@@ -283,14 +283,14 @@ export default async function tournamentRoutes(fastify: FastifyInstance) {
         const tournamentId = parseInt(id);
 
         if (isNaN(tournamentId)) {
-          return reply.code(400).send({ error: 'Invalid tournament ID' });
+          return reply.code(400).send({ message: 'Invalid tournament ID' });
         }
 
         const matches = TournamentService.getAllMatches(tournamentId);
         return reply.send({ matches });
       } catch (error) {
         fastify.log.error(error);
-        return reply.code(500).send({ error: 'Failed to fetch matches' });
+        return reply.code(500).send({ message: 'Failed to fetch matches' });
       }
     }
   );
@@ -303,19 +303,19 @@ export default async function tournamentRoutes(fastify: FastifyInstance) {
         const tournamentId = parseInt(id);
 
         if (isNaN(tournamentId)) {
-          return reply.code(400).send({ error: 'Invalid tournament ID' });
+          return reply.code(400).send({ message: 'Invalid tournament ID' });
         }
 
         const success = TournamentService.deleteTournament(tournamentId);
         
         if (!success) {
-          return reply.code(404).send({ error: 'Tournament not found' });
+          return reply.code(404).send({ message: 'Tournament not found' });
         }
 
         return reply.send({ success: true, message: 'Tournament deleted successfully' });
       } catch (error) {
         fastify.log.error(error);
-        return reply.code(500).send({ error: 'Failed to delete tournament' });
+        return reply.code(500).send({ message: 'Failed to delete tournament' });
       }
     }
   );
@@ -328,14 +328,14 @@ export default async function tournamentRoutes(fastify: FastifyInstance) {
         const tournamentId = parseInt(id);
 
         if (isNaN(tournamentId)) {
-          return reply.code(400).send({ error: 'Invalid tournament ID' });
+          return reply.code(400).send({ message: 'Invalid tournament ID' });
         }
 
         const success = TournamentService.resetTournament(tournamentId);
         
         if (!success) {
           return reply.code(400).send({ 
-            error: 'Could not reset tournament' 
+            message: 'Could not reset tournament' 
           });
         }
 
@@ -347,7 +347,7 @@ export default async function tournamentRoutes(fastify: FastifyInstance) {
         });
       } catch (error) {
         fastify.log.error(error);
-        return reply.code(500).send({ error: 'Failed to reset tournament' });
+        return reply.code(500).send({ message: 'Failed to reset tournament' });
       }
     }
   );
