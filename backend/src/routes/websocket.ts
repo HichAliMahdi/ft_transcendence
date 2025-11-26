@@ -6,6 +6,13 @@ import { config } from '../config';
 
 type WS = any;
 
+// Define the database row type
+interface UserRow {
+  id: number;
+  username: string;
+  display_name: string;
+}
+
 export default async function websocketRoutes(fastify: FastifyInstance) {
   const rooms = new Map<string, GameRoom>();
 
@@ -17,15 +24,21 @@ export default async function websocketRoutes(fastify: FastifyInstance) {
     // Attempt to decode JWT from the request headers and attach basic user info to socket
     try {
       const authHeader = (request.headers.authorization || '') as string;
-      if (authHeader.startsWith('Bearer ')) {
-        const token = authHeader.split(' ')[1];
-        const decoded = jwt.verify(token, config.jwt.secret) as any;
-        const userId = Number(decoded.userId);
-        if (!Number.isNaN(userId)) {
-          const row = db.prepare('SELECT id, username, display_name FROM users WHERE id = ?').get(userId);
-          if (row) {
-            (socket as any).user = { id: row.id, username: row.username, display_name: row.display_name };
+      const parts = authHeader.split(' ');
+      if (parts.length === 2 && parts[0] === 'Bearer' && parts[1]) {
+        const token = parts[1];
+        try {
+          const decoded = jwt.verify(token, config.jwt.secret) as any;
+          const userId = Number(decoded.userId);
+          if (!Number.isNaN(userId)) {
+            const row = db.prepare('SELECT id, username, display_name FROM users WHERE id = ?').get(userId) as UserRow | undefined;
+            if (row) {
+              (socket as any).user = { id: row.id, username: row.username, display_name: row.display_name };
+            }
           }
+        } catch (err2) {
+          fastify.log.debug('WS token verify failed', err2 as any);
+          // continue without user info
         }
       }
     } catch (err) {
