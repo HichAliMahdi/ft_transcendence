@@ -1,5 +1,8 @@
 import { FastifyInstance, FastifyRequest } from 'fastify';
 import { GameRoom } from '../game/GameRoom';
+import jwt from 'jsonwebtoken';
+import { db } from '../database/db';
+import { config } from '../config';
 
 type WS = any;
 
@@ -10,6 +13,25 @@ export default async function websocketRoutes(fastify: FastifyInstance) {
     const socket: WS = connection.socket;
     const params = (request.params as any) || {};
     let roomId: string | null = params.room || null;
+
+    // Attempt to decode JWT from the request headers and attach basic user info to socket
+    try {
+      const authHeader = (request.headers.authorization || '') as string;
+      if (authHeader.startsWith('Bearer ')) {
+        const token = authHeader.split(' ')[1];
+        const decoded = jwt.verify(token, config.jwt.secret) as any;
+        const userId = Number(decoded.userId);
+        if (!Number.isNaN(userId)) {
+          const row = db.prepare('SELECT id, username, display_name FROM users WHERE id = ?').get(userId);
+          if (row) {
+            (socket as any).user = { id: row.id, username: row.username, display_name: row.display_name };
+          }
+        }
+      }
+    } catch (err) {
+      fastify.log.debug('WS auth decode failed', err as any);
+      // continue without user info
+    }
 
     if (!roomId) {
       roomId = Math.random().toString(36).substring(2, 8).toUpperCase();
