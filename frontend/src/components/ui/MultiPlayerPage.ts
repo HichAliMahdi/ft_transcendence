@@ -17,10 +17,9 @@ export class MultiplayerPage {
         this.container.className = 'container mx-auto p-8 fade-in'
         this.renderConnectionScreen();
 
-        // ensure friend widget exists while this page is active
+        // Use global friend widget if present (mounted in main.ts)
         if (!this.friendWidget) {
-            this.friendWidget = new FriendWidget();
-            this.friendWidget.mount();
+            this.friendWidget = (window as any)._friendWidget || null;
         }
 
         return this.container;
@@ -239,17 +238,17 @@ export class MultiplayerPage {
         disconnectButton.className = 'bg-game-red hover:bg-red-600 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-300 mt-4';
         disconnectButton.onclick = () => this.disconnect();
 
-        // Quick Add Friend while in-game - opens prompt to enter user id or auto-add opponent
+        // Quick Add Friend while in-game - uses opponent username when available
         const addFriendButton = document.createElement('button');
         addFriendButton.textContent = '➕ Add Friend';
         addFriendButton.className = 'bg-accent-purple hover:bg-purple-600 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-300 mt-4 ml-4';
         addFriendButton.onclick = async () => {
-            // If we know opponent's id from server, use it directly
-            const oppId = this.opponentUser?.id;
-            if (oppId && !isNaN(Number(oppId))) {
+            // If we know opponent's username from server, use it directly
+            const oppUsername = this.opponentUser?.username;
+            if (oppUsername) {
                 try {
-                    await AuthService.sendFriendRequest(Number(oppId));
-                    alert('Friend request sent to your opponent');
+                    await AuthService.sendFriendRequestByUsername(oppUsername);
+                    alert(`Friend request sent to ${oppUsername}`);
                     this.friendWidget?.refreshNow();
                     return;
                 } catch (err: any) {
@@ -258,18 +257,14 @@ export class MultiplayerPage {
                 }
             }
 
-            // fallback: prompt for id (legacy behavior)
-            const input = prompt('Enter the user ID of the player you want to add as friend:');
+            // fallback: prompt (legacy) - kept minimal
+            const input = prompt('Enter the username of the player you want to add as friend:');
             if (!input) return;
-            const id = Number(input.trim());
-            if (isNaN(id) || id <= 0) {
-                alert('Please enter a valid numeric user ID');
-                return;
-            }
+            const username = input.trim();
+            if (!username) { alert('Please enter a valid username'); return; }
             try {
-                await AuthService.sendFriendRequest(id);
-                alert('Friend request sent');
-                // refresh widget if present
+                await AuthService.sendFriendRequestByUsername(username);
+                alert(`Friend request sent to ${username}`);
                 this.friendWidget?.refreshNow();
             } catch (err: any) {
                 alert(`Failed to send friend request: ${err?.message || err}`);
@@ -562,16 +557,30 @@ export class MultiplayerPage {
     }
  }
  
- // --- FriendWidget implementation (kept inside this file for simplicity) ---
- class FriendWidget {
+ // --- FriendWidget (exported) ---
+ export class FriendWidget {
     private root: HTMLElement | null = null;
     private panel: HTMLElement | null = null;
     private btn: HTMLElement | null = null;
     private intervalId: number | null = null;
     private visible = false;
+    private searchInput: HTMLInputElement | null = null;
+    private searchBtn: HTMLButtonElement | null = null;
 
     mount(): void {
-        if (this.root) return;
+        // If a widget root is already on the page, reuse it
+        const existing = document.getElementById('friend-widget-root');
+        if (existing) {
+            this.root = existing as HTMLElement;
+            this.panel = this.root.querySelector('#friend-widget-panel') as HTMLElement | null;
+            this.btn = this.root.querySelector('#friend-widget-btn') as HTMLElement | null;
+            this.searchInput = this.root.querySelector('#friend-widget-search-input') as HTMLInputElement | null;
+            this.searchBtn = this.root.querySelector('#friend-widget-search-btn') as HTMLButtonElement | null;
+            // ensure polling started
+            this.startPolling();
+            return;
+        }
+
         this.root = document.createElement('div');
         this.root.id = 'friend-widget-root';
         this.root.style.position = 'fixed';
@@ -582,6 +591,7 @@ export class MultiplayerPage {
 
         // toggle button
         this.btn = document.createElement('button');
+        this.btn.id = 'friend-widget-btn';
         this.btn.title = 'Friends';
         this.btn.className = 'bg-game-dark hover:bg-blue-800 text-white rounded-full w-14 h-14 flex items-center justify-center shadow-lg';
         this.btn.style.cursor = 'pointer';
@@ -591,6 +601,7 @@ export class MultiplayerPage {
 
         // panel (hidden by default)
         this.panel = document.createElement('div');
+        this.panel.id = 'friend-widget-panel';
         this.panel.className = 'glass-effect p-4 rounded-2xl shadow-xl';
         this.panel.style.width = '320px';
         this.panel.style.maxHeight = '70vh';
@@ -600,35 +611,44 @@ export class MultiplayerPage {
         this.panel.style.boxShadow = '0 8px 30px rgba(0,0,0,0.6)';
         this.root.appendChild(this.panel);
 
-        // header + add form
+        // header + inline add-by-username form (no browser prompt)
         const header = document.createElement('div');
-        header.className = 'flex items-center justify-between mb-3';
+        header.className = 'flex items-center justify-between mb-3 gap-2';
         const h = document.createElement('h4');
         h.textContent = 'Friends';
         h.className = 'text-lg font-semibold text-white';
         header.appendChild(h);
 
-        const addBtn = document.createElement('button');
-        addBtn.textContent = '+';
-        addBtn.title = 'Add by ID';
-        addBtn.className = 'bg-accent-pink text-white rounded px-2 py-1';
-        addBtn.onclick = async () => {
-            const input = prompt('Enter user ID to send friend request:');
-            if (!input) return;
-            const id = Number(input.trim());
-            if (isNaN(id) || id <= 0) {
-                alert('Invalid user ID');
-                return;
-            }
+        const searchContainer = document.createElement('div');
+        searchContainer.className = 'flex gap-2 items-center';
+
+        this.searchInput = document.createElement('input');
+        this.searchInput.id = 'friend-widget-search-input';
+        this.searchInput.type = 'text';
+        this.searchInput.placeholder = 'Add by username';
+        this.searchInput.className = 'px-2 py-1 rounded bg-game-dark text-white text-sm';
+        searchContainer.appendChild(this.searchInput);
+
+        this.searchBtn = document.createElement('button');
+        this.searchBtn.id = 'friend-widget-search-btn';
+        this.searchBtn.textContent = '+';
+        this.searchBtn.title = 'Send friend request by username';
+        this.searchBtn.className = 'bg-accent-pink text-white rounded px-2 py-1 text-sm';
+        this.searchBtn.onclick = async () => {
+            const val = this.searchInput?.value?.trim();
+            if (!val) { alert('Enter a username'); return; }
             try {
-                await AuthService.sendFriendRequest(id);
-                alert('Friend request sent');
+                await AuthService.sendFriendRequestByUsername(val);
+                this.searchInput!.value = '';
                 this.refreshNow();
+                alert(`Friend request sent to ${val}`);
             } catch (err: any) {
                 alert(`Failed to send request: ${err?.message || err}`);
             }
         };
-        header.appendChild(addBtn);
+        searchContainer.appendChild(this.searchBtn);
+
+        header.appendChild(searchContainer);
         this.panel.appendChild(header);
 
         const list = document.createElement('div');

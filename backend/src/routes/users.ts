@@ -277,4 +277,45 @@ export default async function userRoutes(fastify: FastifyInstance) {
       return reply.code(500).send({ message: 'Failed to fetch match history' });
     }
   });
+
+  // Send friend request by username (authenticated)
+  fastify.post('/users/friends', async (request: FastifyRequest, reply: FastifyReply) => {
+    const auth = verifyAuth(request, reply);
+    if (!auth) return;
+
+    try {
+      const body = (request.body || {}) as any;
+      const username = (body.username || '').toString().trim();
+      if (!username) {
+        return reply.status(400).send({ message: 'Username is required' });
+      }
+
+      const target = db.prepare('SELECT id FROM users WHERE username = ?').get(username) as { id?: number } | undefined;
+      if (!target || !target.id) {
+        return reply.status(404).send({ message: 'User not found' });
+      }
+      const targetId = Number(target.id);
+      const senderId = auth.userId;
+
+      if (senderId === targetId) {
+        return reply.status(400).send({ message: 'Cannot friend yourself' });
+      }
+
+      // Check existing relation
+      const existing = db.prepare(
+        'SELECT status FROM friends WHERE (user_id = ? AND friend_id = ?) OR (user_id = ? AND friend_id = ?)'
+      ).get(senderId, targetId, targetId, senderId) as { status?: string } | undefined;
+
+      if (existing) {
+        if (existing.status === 'pending') return reply.status(409).send({ message: 'Friend request already pending' });
+        if (existing.status === 'accepted') return reply.status(409).send({ message: 'Already friends' });
+      }
+
+      db.prepare('INSERT INTO friends (user_id, friend_id, status) VALUES (?, ?, ?)').run(senderId, targetId, 'pending');
+      return reply.code(201).send({ message: 'Friend request sent' });
+    } catch (err) {
+      request.log.error(err);
+      return reply.code(500).send({ message: 'Failed to send friend request' });
+    }
+  });
 }
