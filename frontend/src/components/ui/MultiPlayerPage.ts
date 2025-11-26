@@ -566,4 +566,62 @@ export class MultiplayerPage {
         overlay.setAttribute('aria-modal', 'true');
 
         const modal = document.createElement('div');
-        modal.className = 'glass-effect p-6 rounded-2xl max-w-md w
+        modal.className = 'glass-effect p-6 rounded-2xl max-w-md w-full mx-4 relative text-left border-2 border-white/5';
+
+        const h = document.createElement('h2');
+        h.className = 'text-2xl font-bold text-white mb-2 gradient-text';
+        h.textContent = title;
+
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.placeholder = placeholder;
+        input.className = 'w-full px-4 py-3 rounded-lg bg-game-dark text-white border-2 border-gray-600 focus:border-accent-pink focus:outline-none mb-4';
+
+        const error = document.createElement('p');
+        error.className = 'text-red-400 text-sm mb-4 hidden';
+
+        const btnRow = document.createElement('div');
+        btnRow.className = 'flex gap-4 justify-end';
+
+        const cancelBtn = document.createElement('button');
+        cancelBtn.className = 'px-4 py-2 rounded-lg bg-game-dark hover:bg-blue-800 text-white';
+        cancelBtn.textContent = 'Cancel';
+        cancelBtn.onclick = () => { if (document.body.contains(overlay)) document.body.removeChild(overlay); };
+
+        const submitBtn = document.createElement('button');
+        submitBtn.className = 'px-4 py-2 rounded-lg btn-primary';
+        submitBtn.textContent = submitLabel;
+        submitBtn.onclick = async () => {
+            error.classList.add('hidden');
+            const val = (input.value || '').trim();
+            if (!val) {
+                error.textContent = 'Please enter a username';
+                error.classList.remove('hidden');
+                input.focus();
+                return;
+            }
+            try {
+                await Promise.resolve(onSubmit(val));
+                if (document.body.contains(overlay)) document.body.removeChild(overlay);
+            } catch (e: any) {
+                error.textContent = e?.message || 'Failed to perform action';
+                error.classList.remove('hidden');
+            }
+        };
+
+        input.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') submitBtn.click();
+        });
+
+        modal.appendChild(h);
+        modal.appendChild(input);
+        modal.appendChild(error);
+        btnRow.appendChild(cancelBtn);
+        btnRow.appendChild(submitBtn);
+        modal.appendChild(btnRow);
+        overlay.appendChild(modal);
+        document.body.appendChild(overlay);
+
+        setTimeout(() => input.focus(), 50);
+    }
+}
