@@ -101,3 +101,126 @@ export class FriendWidget {
         this.refreshNow();
         this.startPolling();
     }
+
+ 
+    private async fetchAndRender(): Promise<void> {
+        const listEl = this.panel ? this.panel.querySelector('#friend-list') as HTMLElement | null : null;
+        if (!listEl) return;
+        
+        listEl.innerHTML = '<p class="text-gray-400">Loading...</p>';
+
+        try {
+            const me = AuthService.getUser();
+            if (!me) {
+                listEl.innerHTML = '<p class="text-gray-400">Not signed in</p>';
+                return;
+            }
+
+            const friends = await AuthService.getFriends(me.id);
+            if (!friends || friends.length === 0) {
+                listEl.innerHTML = '<p class="text-gray-400">No friends yet</p>';
+                return;
+            }
+
+            listEl.innerHTML = '';
+            friends.forEach(f => {
+                const row = document.createElement('div');
+                row.className = 'flex items-center justify-between p-2 rounded hover:bg-blue-800';
+                
+                // Left side: status dot + name
+                const left = document.createElement('div');
+                left.className = 'flex items-center gap-3';
+                
+                const dot = document.createElement('span');
+                dot.style.width = '10px';
+                dot.style.height = '10px';
+                dot.style.borderRadius = '50%';
+                dot.style.display = 'inline-block';
+                dot.style.marginRight = '6px';
+                dot.style.background = f.is_online ? '#22c55e' : '#94a3b8';
+                
+                const name = document.createElement('div');
+                name.className = 'text-white';
+                name.textContent = f.display_name || f.username;
+                
+                left.appendChild(dot);
+                left.appendChild(name);
+
+                // Right side: status text + remove button
+                const actions = document.createElement('div');
+                actions.className = 'flex items-center gap-2';
+                
+                const status = document.createElement('span');
+                status.className = 'text-sm text-gray-300';
+                status.textContent = f.status === 'pending' ? 'Pending' : (f.is_online ? 'Online' : 'Offline');
+                
+                const remove = document.createElement('button');
+                remove.className = 'ml-2 bg-game-red text-white px-2 py-1 rounded text-xs';
+                remove.textContent = 'Remove';
+                remove.onclick = async () => {
+                    const me = AuthService.getUser();
+                    if (!me) { 
+                        alert('Not authenticated'); 
+                        return; 
+                    }
+                    if (!confirm(`Remove ${f.display_name || f.username} from friends?`)) return;
+                    
+                    try {
+                        await AuthService.removeFriend(me.id, f.id);
+                        this.refreshNow();
+                    } catch (err: any) {
+                        alert(`Failed to remove friend: ${err?.message || err}`);
+                    }
+                };
+
+                actions.appendChild(status);
+                actions.appendChild(remove);
+
+                row.appendChild(left);
+                row.appendChild(actions);
+                listEl.appendChild(row);
+            });
+        } catch (err) {
+            listEl.innerHTML = `<p class="text-red-400">Error loading friends</p>`;
+            console.error(err);
+        }
+    }
+
+    toggle(): void {
+        this.visible = !this.visible;
+        if (!this.panel || !this.btn) return;
+        
+        this.panel.style.display = this.visible ? 'block' : 'none';
+        this.btn.classList.toggle('bg-accent-pink', this.visible);
+        
+        if (this.visible) this.refreshNow();
+    }
+
+
+    async refreshNow(): Promise<void> {
+        await this.fetchAndRender();
+    }
+
+
+    private startPolling(): void {
+        if (this.intervalId) return;
+        
+        this.intervalId = window.setInterval(() => {
+            if (this.visible) this.refreshNow();
+        }, 15000) as unknown as number;
+    }
+
+
+    unmount(): void {
+        if (this.intervalId) {
+            clearInterval(this.intervalId);
+            this.intervalId = null;
+        }
+        if (this.root && document.body.contains(this.root)) {
+            document.body.removeChild(this.root);
+        }
+        this.root = null;
+        this.panel = null;
+        this.btn = null;
+    }
+}

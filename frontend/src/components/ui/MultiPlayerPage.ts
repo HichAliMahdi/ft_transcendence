@@ -18,7 +18,6 @@ export class MultiplayerPage {
         this.container.className = 'container mx-auto p-8 fade-in'
         this.renderConnectionScreen();
 
-        // Use global friend widget if present (mounted in main.ts)
         if (!this.friendWidget) {
             this.friendWidget = (window as any)._friendWidget || null;
         }
