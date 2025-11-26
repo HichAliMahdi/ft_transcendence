@@ -1,5 +1,3 @@
-// Move the multiplayer game logic here
-
 export type BroadcastFn = (msg: any) => void;
 
 interface Ball { x: number; y: number; dx: number; dy: number; radius: number; }
@@ -17,14 +15,13 @@ export class GameEngine {
   private broadcasterFn: BroadcastFn;
   private running = false;
   private readonly PADDLE_HEIGHT = 100;
-  // speeds are now pixels per second
-  private readonly PADDLE_SPEED = 420; // px/s
-  private readonly BALL_SPEED_INIT = 350; // px/s
+  private readonly PADDLE_SPEED = 420;
+  private readonly BALL_SPEED_INIT = 350;
   private readonly WIN_SCORE = 5;
 
   private lastTick = 0;
 
-  constructor(broadcast: BroadcastFn, width = 800, height = 600, tickMs = 33) { // ~30Hz
+  constructor(broadcast: BroadcastFn, width = 800, height = 600, tickMs = 33) {
     this.width = width;
     this.height = height;
     this.broadcasterFn = broadcast;
@@ -60,10 +57,7 @@ export class GameEngine {
       this.lastTick = now;
       try {
         this.step(delta);
-      } catch (e) {
-        // swallow errors
-      }
-      // schedule next loop adaptively
+      } catch (e) {}
       const elapsed = Date.now() - now;
       const delay = Math.max(0, this.tickInterval - elapsed);
       this.timer = setTimeout(loop, delay);
@@ -91,7 +85,6 @@ export class GameEngine {
     else target.down = keydown;
   }
 
-  // deltaMs is elapsed time since last step
   private step(deltaMs: number): void {
     const s = deltaMs / 1000;
 
@@ -116,7 +109,6 @@ export class GameEngine {
       const p1Bottom = p1Top + this.PADDLE_HEIGHT;
       if (this.ball.y >= p1Top && this.ball.y <= p1Bottom) {
         this.ball.x = 30 + this.ball.radius;
-        // increase speed proportionally
         const speed = Math.sqrt(this.ball.dx * this.ball.dx + this.ball.dy * this.ball.dy) * 1.03;
         const hit = (this.ball.y - (p1Top + this.PADDLE_HEIGHT / 2)) / (this.PADDLE_HEIGHT / 2);
         const angle = hit * (Math.PI / 4);
@@ -188,10 +180,10 @@ export class GameEngine {
   }
 
   private broadcastState(): void {
-    try { this.broadcasterFn({ type: 'gameState', state: this.serializeState() }); } catch (e) { /* ignore */ }
+    try { this.broadcasterFn({ type: 'gameState', state: this.serializeState() }); } catch (e) {}
   }
 
   private broadcast(msg: any): void {
-    try { this.broadcasterFn && this.broadcasterFn(msg); } catch (e) { /* ignore */ }
+    try { this.broadcasterFn && this.broadcasterFn(msg); } catch (e) {}
   }
 }
