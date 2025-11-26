@@ -198,4 +198,31 @@ export class AuthService {
             await this.parseResponseError(resp);
         }
     }
+
+    // --- added notification API helpers ---
+
+    static async getNotifications(): Promise<Array<{ id: number; user_id: number; actor_id?: number; type: string; payload?: any; is_read: number; created_at: string }>> {
+        const token = this.getToken();
+        if (!token) throw new Error('Not authenticated');
+        const resp = await fetch(`${API_BASE}/notifications`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!resp.ok) {
+            await this.parseResponseError(resp);
+        }
+        const data = await resp.json();
+        return data.notifications || [];
+    }
+
+    static async markNotificationRead(notificationId: number): Promise<void> {
+        const token = this.getToken();
+        if (!token) throw new Error('Not authenticated');
+        const resp = await fetch(`${API_BASE}/notifications/${notificationId}/read`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!resp.ok) {
+            await this.parseResponseError(resp);
+        }
+    }
 }
