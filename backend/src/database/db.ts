@@ -96,6 +96,20 @@ export function initializeDatabase(): void {
             FOREIGN KEY (source_match_id_2) REFERENCES games (id)
         )
     `);
+
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS notifications (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            actor_id INTEGER,
+            type TEXT NOT NULL,
+            payload TEXT,
+            is_read INTEGER DEFAULT 0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY (actor_id) REFERENCES users(id) ON DELETE SET NULL
+        )
+    `);
     
     console.log('Database initialized successfully');
 }
