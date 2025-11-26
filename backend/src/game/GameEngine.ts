@@ -1,5 +1,3 @@
-// Move the multiplayer game logic here
-
 export type BroadcastFn = (msg: any) => void;
 
 interface Ball { x: number; y: number; dx: number; dy: number; radius: number; }
@@ -17,11 +15,13 @@ export class GameEngine {
   private broadcasterFn: BroadcastFn;
   private running = false;
   private readonly PADDLE_HEIGHT = 100;
-  private readonly PADDLE_SPEED = 6;
-  private readonly BALL_SPEED_INIT = 5;
+  private readonly PADDLE_SPEED = 420;
+  private readonly BALL_SPEED_INIT = 350;
   private readonly WIN_SCORE = 5;
 
-  constructor(broadcast: BroadcastFn, width = 800, height = 600, tickMs = 33) { // ~30Hz
+  private lastTick = 0;
+
+  constructor(broadcast: BroadcastFn, width = 800, height = 600, tickMs = 33) {
     this.width = width;
     this.height = height;
     this.broadcasterFn = broadcast;
@@ -31,7 +31,7 @@ export class GameEngine {
       x: width / 2,
       y: height / 2,
       dx: (Math.random() > 0.5 ? 1 : -1) * this.BALL_SPEED_INIT,
-      dy: (Math.random() - 0.5) * 4,
+      dy: (Math.random() - 0.5) * 200,
       radius: 8
     };
 
@@ -42,24 +42,27 @@ export class GameEngine {
 
     this.inputs = { p1: { up: false, down: false }, p2: { up: false, down: false } };
     this.scores = { player1: 0, player2: 0 };
+    this.lastTick = Date.now();
   }
 
   public start(): void {
     if (this.running) return;
     this.running = true;
-    // schedule loop with setTimeout to avoid overlapping step() calls if event loop is busy
+    this.lastTick = Date.now();
+
     const loop = () => {
       if (!this.running) return;
-      const start = Date.now();
+      const now = Date.now();
+      const delta = Math.max(0, now - this.lastTick);
+      this.lastTick = now;
       try {
-        this.step();
-      } catch (e) {
-        // swallow errors to keep loop alive
-      }
-      const elapsed = Date.now() - start;
+        this.step(delta);
+      } catch (e) {}
+      const elapsed = Date.now() - now;
       const delay = Math.max(0, this.tickInterval - elapsed);
       this.timer = setTimeout(loop, delay);
     };
+
     this.timer = setTimeout(loop, this.tickInterval);
     this.broadcastState();
   }
@@ -82,14 +85,16 @@ export class GameEngine {
     else target.down = keydown;
   }
 
-  private step(): void {
-    if (this.inputs.p1.up) this.paddles.p1 = Math.max(0, this.paddles.p1 - this.PADDLE_SPEED);
-    if (this.inputs.p1.down) this.paddles.p1 = Math.min(this.height - this.PADDLE_HEIGHT, this.paddles.p1 + this.PADDLE_SPEED);
-    if (this.inputs.p2.up) this.paddles.p2 = Math.max(0, this.paddles.p2 - this.PADDLE_SPEED);
-    if (this.inputs.p2.down) this.paddles.p2 = Math.min(this.height - this.PADDLE_HEIGHT, this.paddles.p2 + this.PADDLE_SPEED);
+  private step(deltaMs: number): void {
+    const s = deltaMs / 1000;
 
-    this.ball.x += this.ball.dx;
-    this.ball.y += this.ball.dy;
+    if (this.inputs.p1.up) this.paddles.p1 = Math.max(0, this.paddles.p1 - this.PADDLE_SPEED * s);
+    if (this.inputs.p1.down) this.paddles.p1 = Math.min(this.height - this.PADDLE_HEIGHT, this.paddles.p1 + this.PADDLE_SPEED * s);
+    if (this.inputs.p2.up) this.paddles.p2 = Math.max(0, this.paddles.p2 - this.PADDLE_SPEED * s);
+    if (this.inputs.p2.down) this.paddles.p2 = Math.min(this.height - this.PADDLE_HEIGHT, this.paddles.p2 + this.PADDLE_SPEED * s);
+
+    this.ball.x += this.ball.dx * s;
+    this.ball.y += this.ball.dy * s;
 
     if (this.ball.y - this.ball.radius <= 0) {
       this.ball.y = this.ball.radius;
@@ -104,12 +109,19 @@ export class GameEngine {
       const p1Bottom = p1Top + this.PADDLE_HEIGHT;
       if (this.ball.y >= p1Top && this.ball.y <= p1Bottom) {
         this.ball.x = 30 + this.ball.radius;
-        this.ball.dx = Math.abs(this.ball.dx) * 1.03;
+        const speed = Math.sqrt(this.ball.dx * this.ball.dx + this.ball.dy * this.ball.dy) * 1.03;
         const hit = (this.ball.y - (p1Top + this.PADDLE_HEIGHT / 2)) / (this.PADDLE_HEIGHT / 2);
-        this.ball.dy = hit * 5;
-        const maxSpeed = 12;
-        if (Math.abs(this.ball.dx) > maxSpeed) this.ball.dx = Math.sign(this.ball.dx) * maxSpeed;
-        if (Math.abs(this.ball.dy) > maxSpeed) this.ball.dy = Math.sign(this.ball.dy) * maxSpeed;
+        const angle = hit * (Math.PI / 4);
+        const dir = Math.abs(this.ball.dx) > 0 ? 1 : 1;
+        this.ball.dx = Math.cos(angle) * speed * dir;
+        this.ball.dy = Math.sin(angle) * speed * Math.sign(this.ball.dy || 1);
+        const maxSpeed = 1200;
+        const curSpeed = Math.sqrt(this.ball.dx * this.ball.dx + this.ball.dy * this.ball.dy);
+        if (curSpeed > maxSpeed) {
+          const ratio = maxSpeed / curSpeed;
+          this.ball.dx *= ratio;
+          this.ball.dy *= ratio;
+        }
       }
     }
 
@@ -118,12 +130,18 @@ export class GameEngine {
       const p2Bottom = p2Top + this.PADDLE_HEIGHT;
       if (this.ball.y >= p2Top && this.ball.y <= p2Bottom) {
         this.ball.x = this.width - 30 - this.ball.radius;
-        this.ball.dx = -Math.abs(this.ball.dx) * 1.03;
+        const speed = Math.sqrt(this.ball.dx * this.ball.dx + this.ball.dy * this.ball.dy) * 1.03;
         const hit = (this.ball.y - (p2Top + this.PADDLE_HEIGHT / 2)) / (this.PADDLE_HEIGHT / 2);
-        this.ball.dy = hit * 5;
-        const maxSpeed = 12;
-        if (Math.abs(this.ball.dx) > maxSpeed) this.ball.dx = Math.sign(this.ball.dx) * maxSpeed;
-        if (Math.abs(this.ball.dy) > maxSpeed) this.ball.dy = Math.sign(this.ball.dy) * maxSpeed;
+        const angle = hit * (Math.PI / 4);
+        this.ball.dx = -Math.cos(angle) * speed;
+        this.ball.dy = Math.sin(angle) * speed * Math.sign(this.ball.dy || 1);
+        const maxSpeed = 1200;
+        const curSpeed = Math.sqrt(this.ball.dx * this.ball.dx + this.ball.dy * this.ball.dy);
+        if (curSpeed > maxSpeed) {
+          const ratio = maxSpeed / curSpeed;
+          this.ball.dx *= ratio;
+          this.ball.dy *= ratio;
+        }
       }
     }
 
@@ -148,7 +166,7 @@ export class GameEngine {
     this.ball.y = this.height / 2;
     const dir = direction ?? (Math.random() > 0.5 ? 1 : -1);
     this.ball.dx = dir * this.BALL_SPEED_INIT;
-    this.ball.dy = (Math.random() - 0.5) * 4;
+    this.ball.dy = (Math.random() - 0.5) * 200;
   }
 
   private serializeState() {
@@ -162,10 +180,10 @@ export class GameEngine {
   }
 
   private broadcastState(): void {
-    try { this.broadcasterFn({ type: 'gameState', state: this.serializeState() }); } catch (e) { /* ignore */ }
+    try { this.broadcasterFn({ type: 'gameState', state: this.serializeState() }); } catch (e) {}
   }
 
   private broadcast(msg: any): void {
-    try { this.broadcasterFn && this.broadcasterFn(msg); } catch (e) { /* ignore */ }
+    try { this.broadcasterFn && this.broadcasterFn(msg); } catch (e) {}
   }
 }

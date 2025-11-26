@@ -24,6 +24,16 @@ export class AuthService {
     private static TOKEN_KEY = 'auth_token';
     private static USER_KEY = 'user_data';
 
+    private static async parseResponseError(response: Response): Promise<never> {
+        try {
+            const data = await response.json();
+            const msg = data?.message || data?.error || (typeof data === 'string' ? data : null);
+            throw new Error(msg || `${response.status} ${response.statusText}`);
+        } catch (err) {
+            throw new Error(`${response.status} ${response.statusText}`);
+        }
+    }
+
     static async register(username: string, email: string, password: string, displayName: string): Promise<AuthResponse> {
         const response = await fetch(`${API_BASE}/auth/register`, {
             method: 'POST',
@@ -34,7 +44,7 @@ export class AuthService {
         });
 
         if (!response.ok) {
-            throw new Error('Registration failed');
+            await this.parseResponseError(response);
         }
 
         const data: AuthResponse = await response.json();
@@ -52,7 +62,7 @@ export class AuthService {
         });
 
         if (!response.ok) {
-            throw new Error('Login failed');
+            await this.parseResponseError(response);
         }
 
         const data: AuthResponse = await response.json();
@@ -64,12 +74,16 @@ export class AuthService {
         const token = this.getToken();
         if (token) {
             try {
-                await fetch(`${API_BASE}/auth/logout`, {
+                const response = await fetch(`${API_BASE}/auth/logout`, {
                     method: 'POST',
                     headers: {
                         'Authorization': `Bearer ${token}`
                     }
                 });
+                if (!response.ok) {
+                    // best-effort: parse server message but continue clearing local auth
+                    try { const data = await response.json(); console.warn('Logout server message:', data?.message || data?.error); } catch (_) {}
+                }
             } catch (error) {
                 console.error('Logout request failed:', error);
             }
@@ -90,12 +104,12 @@ export class AuthService {
             });
 
             if (!response.ok) {
-                throw new Error('Failed to fetch user data');
+                await this.parseResponseError(response);
             }
 
             const data = await response.json();
             return data.user;
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error fetching current user:', error);
             this.clearAuth();
             return null;

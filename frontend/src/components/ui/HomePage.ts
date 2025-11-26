@@ -93,7 +93,14 @@ export class HomePage {
 				headers: token ? { Authorization: `Bearer ${token}` } : undefined
 			});
 
-			if (!res.ok) throw new Error('Stats endpoint not available');
+			if (!res.ok) {
+				let errMsg = `${res.status} ${res.statusText}`;
+				try {
+					const errBody = await res.json();
+					errMsg = errBody?.message || errBody?.error || errMsg;
+				} catch (_) {}
+				throw new Error(errMsg);
+			}
 
 			const data: any = await res.json();
 			const games = data.games_played ?? data.games ?? 0;
@@ -113,12 +120,12 @@ export class HomePage {
 				<div>|</div>
 				<div>Win Rate: ${this.formatWinRate(wins, losses)}</div>
 			`;
-		} catch (e) {
+		} catch (e: any) {
 			console.warn('Could not load server stats, using defaults.', e);
 			sGames.val.textContent = '0';
 			sWins.val.textContent = '0';
 			sTournaments.val.textContent = '0';
-			extra.textContent = 'Server stats unavailable.';
+			extra.textContent = e?.message || 'Server stats unavailable.';
 		}
 	}
 
