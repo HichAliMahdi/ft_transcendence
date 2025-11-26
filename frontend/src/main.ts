@@ -1,6 +1,7 @@
 import { Router } from './router/Router';
 import { AuthService } from './components/game/AuthService';
 import './styles/main.css';
+import { FriendWidget, NotificationWidget } from './components/ui/MultiPlayerPage'; // added import
 
 class App {
     private router: Router;
@@ -11,6 +12,28 @@ class App {
     }
 
     private init(): void {
+        // Mount global friend widget so it's available on every page
+        try {
+            if (!(window as any)._friendWidget) {
+                const fw = new FriendWidget();
+                fw.mount();
+                (window as any)._friendWidget = fw;
+            }
+        } catch (e) {
+            console.error('Failed to mount FriendWidget:', e);
+        }
+
+        // Mount global notification widget
+        try {
+            if (!(window as any)._notificationWidget) {
+                const nw = new NotificationWidget();
+                nw.mount();
+                (window as any)._notificationWidget = nw;
+            }
+        } catch (e) {
+            console.error('Failed to mount NotificationWidget:', e);
+        }
+
         this.updateAuthSection();
 
         document.addEventListener('click', (e: MouseEvent) => {

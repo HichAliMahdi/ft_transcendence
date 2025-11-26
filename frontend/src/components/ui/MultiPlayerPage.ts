@@ -1,4 +1,5 @@
 import { OnlinePongGame } from '../game/OnlinePongGame';
+import { AuthService } from '../game/AuthService'; // added import
 
 export class MultiplayerPage {
     private game: OnlinePongGame | null = null;
@@ -7,11 +8,20 @@ export class MultiplayerPage {
     private roomId: string | null = null;
     private status: 'disconnected' | 'connecting' | 'waiting' | 'playing' = 'disconnected';
     private isHost: boolean = false;
+    private friendWidget: FriendWidget | null = null; // new
+    private playerNumber: 1 | 2 | null = null; // new
+    private opponentUser: { id?: number; username?: string; display_name?: string } | null = null; // new
 
     public render(): HTMLElement {
         this.container = document.createElement('div');
         this.container.className = 'container mx-auto p-8 fade-in'
         this.renderConnectionScreen();
+
+        // Use global friend widget if present (mounted in main.ts)
+        if (!this.friendWidget) {
+            this.friendWidget = (window as any)._friendWidget || null;
+        }
+
         return this.container;
     }
 
@@ -228,10 +238,48 @@ export class MultiplayerPage {
         disconnectButton.className = 'bg-game-red hover:bg-red-600 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-300 mt-4';
         disconnectButton.onclick = () => this.disconnect();
 
+        // Quick Add Friend while in-game - uses opponent username when available
+        const addFriendButton = document.createElement('button');
+        addFriendButton.textContent = '➕ Add Friend';
+        addFriendButton.className = 'bg-accent-purple hover:bg-purple-600 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-300 mt-4 ml-4';
+        addFriendButton.onclick = async () => {
+            // If we know opponent's username from server, use it directly
+            const oppUsername = this.opponentUser?.username;
+            if (oppUsername) {
+                try {
+                    await AuthService.sendFriendRequestByUsername(oppUsername);
+                    alert(`Friend request sent to ${oppUsername}`);
+                    this.friendWidget?.refreshNow();
+                    return;
+                } catch (err: any) {
+                    alert(`Failed to send friend request: ${err?.message || err}`);
+                    return;
+                }
+            }
+
+            // fallback: prompt (legacy) - kept minimal
+            const input = prompt('Enter the username of the player you want to add as friend:');
+            if (!input) return;
+            const username = input.trim();
+            if (!username) { alert('Please enter a valid username'); return; }
+            try {
+                await AuthService.sendFriendRequestByUsername(username);
+                alert(`Friend request sent to ${username}`);
+                this.friendWidget?.refreshNow();
+            } catch (err: any) {
+                alert(`Failed to send friend request: ${err?.message || err}`);
+            }
+        };
+
+        const topRow = document.createElement('div');
+        topRow.className = 'flex justify-center gap-4';
+        topRow.appendChild(disconnectButton);
+        topRow.appendChild(addFriendButton);
+
         this.container.appendChild(title);
         this.container.appendChild(gameInfo);
         this.container.appendChild(canvas);
-        this.container.appendChild(disconnectButton);
+        this.container.appendChild(topRow);
 
         if (this.socket) {
             this.game = new OnlinePongGame(canvas, this.socket);
@@ -328,6 +376,10 @@ export class MultiplayerPage {
 
                 switch (msg.type) {
                     case 'joined':
+                        // store our player number and optional user info (server may echo it)
+                        this.playerNumber = msg.player ?? null;
+                        // If server included user info in joined message, optionally store (not required)
+                        // this.meUser = msg.user || this.meUser;
                         this.roomId = msg.roomId;
                         this.isHost = !!msg.isHost;
                         this.status = this.isHost ? 'waiting' : 'playing';
@@ -341,11 +393,20 @@ export class MultiplayerPage {
                         this.renderConnectionScreen();
                         break;
                     case 'peerJoined':
+                        // server now sends players array with attached user info when available
+                        if (Array.isArray(msg.players)) {
+                            const players: Array<{ player: number; user?: any | null }> = msg.players;
+                            const opponent = players.find(p => p.player !== this.playerNumber);
+                            if (opponent && opponent.user) {
+                                this.opponentUser = { id: opponent.user.id, username: opponent.user.username, display_name: opponent.user.display_name };
+                            }
+                        }
                         this.status = 'playing';
                         this.renderGameScreen();
                         break;
                     case 'peerLeft':
                         this.status = 'disconnected';
+                        this.opponentUser = null;
                         this.showInfoModal(
                             'Opponent Left',
                             'Your opponent has left the room. You can return to the lobby or try reconnecting to the same room.',
@@ -432,6 +493,10 @@ export class MultiplayerPage {
  
      public cleanup(): void {
          this.disconnect();
+         if (this.friendWidget) {
+             this.friendWidget.unmount();
+             this.friendWidget = null;
+         }
      }
 
      private showInfoModal(title: string, message: string, actions: Array<{ label: string; style?: 'primary' | 'danger' | 'default'; action: () => void }>): void {
@@ -491,3 +556,206 @@ export class MultiplayerPage {
         }, 50);
     }
  }
+ 
+ // --- FriendWidget (exported) ---
+ export class FriendWidget {
+    private root: HTMLElement | null = null;
+    private panel: HTMLElement | null = null;
+    private btn: HTMLElement | null = null;
+    private intervalId: number | null = null;
+    private visible = false;
+    private searchInput: HTMLInputElement | null = null;
+    private searchBtn: HTMLButtonElement | null = null;
+
+    mount(): void {
+        // If a widget root is already on the page, reuse it
+        const existing = document.getElementById('friend-widget-root');
+        if (existing) {
+            this.root = existing as HTMLElement;
+            this.panel = this.root.querySelector('#friend-widget-panel') as HTMLElement | null;
+            this.btn = this.root.querySelector('#friend-widget-btn') as HTMLElement | null;
+            this.searchInput = this.root.querySelector('#friend-widget-search-input') as HTMLInputElement | null;
+            this.searchBtn = this.root.querySelector('#friend-widget-search-btn') as HTMLButtonElement | null;
+            // ensure polling started
+            this.startPolling();
+            return;
+        }
+
+        this.root = document.createElement('div');
+        this.root.id = 'friend-widget-root';
+        this.root.style.position = 'fixed';
+        this.root.style.bottom = '20px';
+        this.root.style.right = '20px';
+        this.root.style.zIndex = '9999';
+        document.body.appendChild(this.root);
+
+        // toggle button
+        this.btn = document.createElement('button');
+        this.btn.id = 'friend-widget-btn';
+        this.btn.title = 'Friends';
+        this.btn.className = 'bg-game-dark hover:bg-blue-800 text-white rounded-full w-14 h-14 flex items-center justify-center shadow-lg';
+        this.btn.style.cursor = 'pointer';
+        this.btn.innerHTML = '👥';
+        this.btn.onclick = () => this.toggle();
+        this.root.appendChild(this.btn);
+
+        // panel (hidden by default)
+        this.panel = document.createElement('div');
+        this.panel.id = 'friend-widget-panel';
+        this.panel.className = 'glass-effect p-4 rounded-2xl shadow-xl';
+        this.panel.style.width = '320px';
+        this.panel.style.maxHeight = '70vh';
+        this.panel.style.overflow = 'auto';
+        this.panel.style.marginBottom = '12px';
+        this.panel.style.display = 'none';
+        this.panel.style.boxShadow = '0 8px 30px rgba(0,0,0,0.6)';
+        this.root.appendChild(this.panel);
+
+        // header + inline add-by-username form (no browser prompt)
+        const header = document.createElement('div');
+        header.className = 'flex items-center justify-between mb-3 gap-2';
+        const h = document.createElement('h4');
+        h.textContent = 'Friends';
+        h.className = 'text-lg font-semibold text-white';
+        header.appendChild(h);
+
+        const searchContainer = document.createElement('div');
+        searchContainer.className = 'flex gap-2 items-center';
+
+        this.searchInput = document.createElement('input');
+        this.searchInput.id = 'friend-widget-search-input';
+        this.searchInput.type = 'text';
+        this.searchInput.placeholder = 'Add by username';
+        this.searchInput.className = 'px-2 py-1 rounded bg-game-dark text-white text-sm';
+        searchContainer.appendChild(this.searchInput);
+
+        this.searchBtn = document.createElement('button');
+        this.searchBtn.id = 'friend-widget-search-btn';
+        this.searchBtn.textContent = '+';
+        this.searchBtn.title = 'Send friend request by username';
+        this.searchBtn.className = 'bg-accent-pink text-white rounded px-2 py-1 text-sm';
+        this.searchBtn.onclick = async () => {
+            const val = this.searchInput?.value?.trim();
+            if (!val) { alert('Enter a username'); return; }
+            try {
+                await AuthService.sendFriendRequestByUsername(val);
+                this.searchInput!.value = '';
+                this.refreshNow();
+                alert(`Friend request sent to ${val}`);
+            } catch (err: any) {
+                alert(`Failed to send request: ${err?.message || err}`);
+            }
+        };
+        searchContainer.appendChild(this.searchBtn);
+
+        header.appendChild(searchContainer);
+        this.panel.appendChild(header);
+
+        const list = document.createElement('div');
+        list.id = 'friend-list';
+        this.panel.appendChild(list);
+
+        this.refreshNow();
+        this.startPolling();
+    }
+
+    private async fetchAndRender(): Promise<void> {
+        const listEl = this.panel ? this.panel.querySelector('#friend-list') as HTMLElement | null : null;
+        if (!listEl) return;
+        listEl.innerHTML = '<p class="text-gray-400">Loading...</p>';
+
+        try {
+            const me = AuthService.getUser();
+            if (!me) {
+                listEl.innerHTML = '<p class="text-gray-400">Not signed in</p>';
+                return;
+            }
+            const friends = await AuthService.getFriends(me.id);
+            if (!friends || friends.length === 0) {
+                listEl.innerHTML = '<p class="text-gray-400">No friends yet</p>';
+                return;
+            }
+            listEl.innerHTML = '';
+            friends.forEach(f => {
+                const row = document.createElement('div');
+                row.className = 'flex items-center justify-between p-2 rounded hover:bg-blue-800';
+                const left = document.createElement('div');
+                left.className = 'flex items-center gap-3';
+                const dot = document.createElement('span');
+                dot.style.width = '10px';
+                dot.style.height = '10px';
+                dot.style.borderRadius = '50%';
+                dot.style.display = 'inline-block';
+                dot.style.marginRight = '6px';
+                dot.style.background = f.is_online ? '#22c55e' : '#94a3b8';
+                const name = document.createElement('div');
+                name.className = 'text-white';
+                name.textContent = f.display_name || f.username;
+                left.appendChild(dot);
+                left.appendChild(name);
+
+                const actions = document.createElement('div');
+                actions.className = 'flex items-center gap-2';
+                const status = document.createElement('span');
+                status.className = 'text-sm text-gray-300';
+                status.textContent = f.status === 'pending' ? 'Pending' : (f.is_online ? 'Online' : 'Offline');
+                const remove = document.createElement('button');
+                remove.className = 'ml-2 bg-game-red text-white px-2 py-1 rounded';
+                remove.textContent = 'Remove';
+                remove.onclick = async () => {
+                    const me = AuthService.getUser();
+                    if (!me) { alert('Not authenticated'); return; }
+                    if (!confirm(`Remove ${f.display_name || f.username} from friends?`)) return;
+                    try {
+                        await AuthService.removeFriend(me.id, f.id);
+                        this.refreshNow();
+                    } catch (err: any) {
+                        alert(`Failed to remove friend: ${err?.message || err}`);
+                    }
+                };
+
+                actions.appendChild(status);
+                actions.appendChild(remove);
+
+                row.appendChild(left);
+                row.appendChild(actions);
+                listEl.appendChild(row);
+            });
+        } catch (err) {
+            listEl.innerHTML = `<p class="text-red-400">Error loading friends</p>`;
+            console.error(err);
+        }
+    }
+
+    toggle(): void {
+        this.visible = !this.visible;
+        if (!this.panel || !this.btn) return;
+        this.panel.style.display = this.visible ? 'block' : 'none';
+        this.btn.classList.toggle('bg-accent-pink', this.visible);
+        if (this.visible) this.refreshNow();
+    }
+
+    async refreshNow(): Promise<void> {
+        await this.fetchAndRender();
+    }
+
+    private startPolling(): void {
+        if (this.intervalId) return;
+        this.intervalId = window.setInterval(() => {
+            if (this.visible) this.refreshNow();
+        }, 15000) as unknown as number;
+    }
+
+    unmount(): void {
+        if (this.intervalId) {
+            clearInterval(this.intervalId);
+            this.intervalId = null;
+        }
+        if (this.root && document.body.contains(this.root)) {
+            document.body.removeChild(this.root);
+        }
+        this.root = null;
+        this.panel = null;
+        this.btn = null;
+    }
+}

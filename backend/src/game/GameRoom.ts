@@ -127,13 +127,25 @@ export class GameRoom {
     const isHost = assigned === 1;
 
     try {
-      const joinedMsg = JSON.stringify({ type: 'joined', roomId: this.id, isHost, player: assigned ?? null });
+      // include socket-attached user info if present
+      const wsAny = socket as any;
+      const userInfo = wsAny.user ? { id: wsAny.user.id, username: wsAny.user.username, display_name: wsAny.user.display_name } : null;
+      const joinedMsg = JSON.stringify({ type: 'joined', roomId: this.id, isHost, player: assigned ?? null, user: userInfo });
       this.enqueueSend(socket, joinedMsg);
     } catch (e) {}
 
+    // if both players present, broadcast peerJoined with player -> user mapping so clients can learn opponent info
     if (this.getPlayerCount() >= 2) {
+      // collect player sockets and attached user info
+      const playersInfo: Array<{ player: number; user: { id?: number; username?: string; display_name?: string } | null }> = [];
+      for (const [s, p] of this.playerMap.entries()) {
+        if (p === 1 || p === 2) {
+          const su = (s as any).user || null;
+          playersInfo.push({ player: p, user: su ? { id: su.id, username: su.username, display_name: su.display_name } : null });
+        }
+      }
       this.engine.start();
-      this.broadcastToAll({ type: 'peerJoined', roomId: this.id });
+      this.broadcastToAll({ type: 'peerJoined', roomId: this.id, players: playersInfo });
     }
 
     return { player: assigned, isHost };
