@@ -1,7 +1,8 @@
 import { Router } from './router/Router';
 import { AuthService } from './components/game/AuthService';
 import './styles/main.css';
-import { FriendWidget, NotificationWidget } from './components/ui/MultiPlayerPage'; // added import
+import { FriendWidget } from './components/Widgets/FriendWidget';
+import { NotificationWidget } from './components/Widgets/NotificationWidget';
 
 class App {
     private router: Router;
@@ -12,7 +13,6 @@ class App {
     }
 
     private init(): void {
-        // Mount global friend widget so it's available on every page
         try {
             if (!(window as any)._friendWidget) {
                 const fw = new FriendWidget();
@@ -23,7 +23,6 @@ class App {
             console.error('Failed to mount FriendWidget:', e);
         }
 
-        // Mount global notification widget
         try {
             if (!(window as any)._notificationWidget) {
                 const nw = new NotificationWidget();
@@ -73,39 +72,63 @@ class App {
             console.error('Unhandled promise rejection:', event.reason);
         });
 
-        // Sidebar toggle logic (replaces mouse-based behavior)
         const nav = document.getElementById('main-nav');
         const toggleBtn = document.getElementById('nav-toggle-btn');
 
         if (nav) {
-            // Initialize collapsed state on small screens
-            if (window.innerWidth < 768) {
-                nav.classList.add('collapsed');
-                document.body.classList.add('nav-collapsed');
-                if (toggleBtn) toggleBtn.setAttribute('aria-expanded', 'false');
-            }
-
-            if (toggleBtn) {
-                toggleBtn.addEventListener('click', () => {
-                    const collapsed = nav.classList.toggle('collapsed');
-                    document.body.classList.toggle('nav-collapsed', collapsed);
-                    toggleBtn.setAttribute('aria-expanded', String(!collapsed));
-                });
-            }
-
-            // Make resize responsive: ensure desktop shows sidebar by default
-            window.addEventListener('resize', () => {
-                if (window.innerWidth >= 768) {
-                    nav.classList.remove('collapsed');
-                    document.body.classList.remove('nav-collapsed');
-                    if (toggleBtn) toggleBtn.setAttribute('aria-expanded', 'true');
-                } else {
-                    // keep small screens collapsed by default
+            const applyResponsiveCollapsed = () => {
+                if (window.innerWidth < 768) {
                     nav.classList.add('collapsed');
                     document.body.classList.add('nav-collapsed');
                     if (toggleBtn) toggleBtn.setAttribute('aria-expanded', 'false');
+                } else {
+                    nav.classList.remove('collapsed');
+                    document.body.classList.remove('nav-collapsed');
+                    if (toggleBtn) toggleBtn.setAttribute('aria-expanded', 'true');
+                }
+            };
+
+            const showNav = () => {
+                nav.style.display = '';
+                if (toggleBtn) toggleBtn.style.display = '';
+                applyResponsiveCollapsed();
+                if (toggleBtn && !toggleBtn.getAttribute('data-nav-listener')) {
+                    toggleBtn.addEventListener('click', () => {
+                        const collapsed = nav.classList.toggle('collapsed');
+                        document.body.classList.toggle('nav-collapsed', collapsed);
+                        toggleBtn.setAttribute('aria-expanded', String(!collapsed));
+                    });
+                    toggleBtn.setAttribute('data-nav-listener', '1');
+                }
+            };
+
+            const hideNav = () => {
+                nav.style.display = 'none';
+                if (toggleBtn) toggleBtn.style.display = 'none';
+            };
+
+            let prevAuth = AuthService.isAuthenticated();
+            if (prevAuth) {
+                showNav();
+            } else {
+                hideNav();
+            }
+
+            window.addEventListener('resize', () => {
+                if (nav.style.display === '' || nav.style.display === 'block' || nav.style.display === '') {
+                    applyResponsiveCollapsed();
                 }
             }, { passive: true });
+
+            window.setInterval(() => {
+                const curAuth = AuthService.isAuthenticated();
+                if (curAuth !== prevAuth) {
+                    prevAuth = curAuth;
+                    if (curAuth) showNav();
+                    else hideNav();
+                }
+            }, 1500);
+
         }
 
         this.router.handleRoute();
