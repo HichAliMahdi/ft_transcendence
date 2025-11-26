@@ -152,8 +152,12 @@ export default async function userRoutes(fastify: FastifyInstance) {
     }
 
     try {
-      // Check if already exists in either direction
-      const existing = db.prepare('SELECT * FROM friends WHERE (user_id = ? AND friend_id = ?) OR (user_id = ? AND friend_id = ?)').get(senderId, targetId, targetId, senderId);
+      // Check if already exists in either direction - explicitly type the result
+      type ExistingFriend = { status: string } | undefined;
+      const existing = db.prepare(
+        'SELECT status FROM friends WHERE (user_id = ? AND friend_id = ?) OR (user_id = ? AND friend_id = ?)'
+      ).get(senderId, targetId, targetId, senderId) as ExistingFriend;
+      
       if (existing) {
         if (existing.status === 'pending') return reply.status(409).send({ message: 'Friend request already pending' });
         if (existing.status === 'accepted') return reply.status(409).send({ message: 'Already friends' });
@@ -180,7 +184,11 @@ export default async function userRoutes(fastify: FastifyInstance) {
     }
 
     try {
-      const row = db.prepare('SELECT * FROM friends WHERE user_id = ? AND friend_id = ? AND status = ?').get(requesterId, targetId, 'pending');
+      type PendingRequest = { status: string } | undefined;
+      const row = db.prepare(
+        'SELECT status FROM friends WHERE user_id = ? AND friend_id = ? AND status = ?'
+      ).get(requesterId, targetId, 'pending') as PendingRequest;
+      
       if (!row) {
         return reply.status(404).send({ message: 'Friend request not found' });
       }
