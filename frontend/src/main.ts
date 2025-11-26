@@ -74,39 +74,72 @@ class App {
             console.error('Unhandled promise rejection:', event.reason);
         });
 
-        // Sidebar toggle logic (replaces mouse-based behavior)
+        // Sidebar: show only when authenticated, keep collapse/toggle behavior otherwise
         const nav = document.getElementById('main-nav');
         const toggleBtn = document.getElementById('nav-toggle-btn');
 
         if (nav) {
-            // Initialize collapsed state on small screens
-            if (window.innerWidth < 768) {
-                nav.classList.add('collapsed');
-                document.body.classList.add('nav-collapsed');
-                if (toggleBtn) toggleBtn.setAttribute('aria-expanded', 'false');
-            }
-
-            if (toggleBtn) {
-                toggleBtn.addEventListener('click', () => {
-                    const collapsed = nav.classList.toggle('collapsed');
-                    document.body.classList.toggle('nav-collapsed', collapsed);
-                    toggleBtn.setAttribute('aria-expanded', String(!collapsed));
-                });
-            }
-
-            // Make resize responsive: ensure desktop shows sidebar by default
-            window.addEventListener('resize', () => {
-                if (window.innerWidth >= 768) {
-                    nav.classList.remove('collapsed');
-                    document.body.classList.remove('nav-collapsed');
-                    if (toggleBtn) toggleBtn.setAttribute('aria-expanded', 'true');
-                } else {
-                    // keep small screens collapsed by default
+            // helper to add/remove collapsed state based on width
+            const applyResponsiveCollapsed = () => {
+                if (window.innerWidth < 768) {
                     nav.classList.add('collapsed');
                     document.body.classList.add('nav-collapsed');
                     if (toggleBtn) toggleBtn.setAttribute('aria-expanded', 'false');
+                } else {
+                    nav.classList.remove('collapsed');
+                    document.body.classList.remove('nav-collapsed');
+                    if (toggleBtn) toggleBtn.setAttribute('aria-expanded', 'true');
+                }
+            };
+
+            // show/hide functions
+            const showNav = () => {
+                nav.style.display = '';
+                if (toggleBtn) toggleBtn.style.display = '';
+                applyResponsiveCollapsed();
+                // attach toggle listener once
+                if (toggleBtn && !toggleBtn.getAttribute('data-nav-listener')) {
+                    toggleBtn.addEventListener('click', () => {
+                        const collapsed = nav.classList.toggle('collapsed');
+                        document.body.classList.toggle('nav-collapsed', collapsed);
+                        toggleBtn.setAttribute('aria-expanded', String(!collapsed));
+                    });
+                    toggleBtn.setAttribute('data-nav-listener', '1');
+                }
+            };
+
+            const hideNav = () => {
+                nav.style.display = 'none';
+                if (toggleBtn) toggleBtn.style.display = 'none';
+            };
+
+            // initial visibility based on auth
+            let prevAuth = AuthService.isAuthenticated();
+            if (prevAuth) {
+                showNav();
+            } else {
+                hideNav();
+            }
+
+            // respond to window resize to keep responsive collapsed state when visible
+            window.addEventListener('resize', () => {
+                if (nav.style.display === '' || nav.style.display === 'block' || nav.style.display === '') {
+                    applyResponsiveCollapsed();
                 }
             }, { passive: true });
+
+            // watch auth status and show/hide nav accordingly
+            let authNavWatcherId: number | null = null;
+            authNavWatcherId = window.setInterval(() => {
+                const curAuth = AuthService.isAuthenticated();
+                if (curAuth !== prevAuth) {
+                    prevAuth = curAuth;
+                    if (curAuth) showNav();
+                    else hideNav();
+                }
+            }, 1500) as unknown as number;
+
+            // Note: we intentionally do not clear this interval for the lifetime of the app.
         }
 
         this.router.handleRoute();
