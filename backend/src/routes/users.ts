@@ -164,6 +164,11 @@ export default async function userRoutes(fastify: FastifyInstance) {
       }
 
       db.prepare('INSERT INTO friends (user_id, friend_id, status) VALUES (?, ?, ?)').run(senderId, targetId, 'pending');
+      // create notification for recipient
+      try {
+        db.prepare('INSERT INTO notifications (user_id, actor_id, type, payload) VALUES (?, ?, ?, ?)')
+          .run(targetId, senderId, 'friend_request', JSON.stringify({ senderId }));
+      } catch (e) { /* non-fatal */ }
       return reply.code(201).send({ message: 'Friend request sent' });
     } catch (err) {
       request.log.error(err);
@@ -301,7 +306,6 @@ export default async function userRoutes(fastify: FastifyInstance) {
         return reply.status(400).send({ message: 'Cannot friend yourself' });
       }
 
-      // Check existing relation
       const existing = db.prepare(
         'SELECT status FROM friends WHERE (user_id = ? AND friend_id = ?) OR (user_id = ? AND friend_id = ?)'
       ).get(senderId, targetId, targetId, senderId) as { status?: string } | undefined;
@@ -312,10 +316,55 @@ export default async function userRoutes(fastify: FastifyInstance) {
       }
 
       db.prepare('INSERT INTO friends (user_id, friend_id, status) VALUES (?, ?, ?)').run(senderId, targetId, 'pending');
+
+      // notify recipient
+      try {
+        db.prepare('INSERT INTO notifications (user_id, actor_id, type, payload) VALUES (?, ?, ?, ?)')
+          .run(targetId, senderId, 'friend_request', JSON.stringify({ senderId }));
+      } catch (e) { /* ignore */ }
+
       return reply.code(201).send({ message: 'Friend request sent' });
     } catch (err) {
       request.log.error(err);
       return reply.code(500).send({ message: 'Failed to send friend request' });
+    }
+  });
+
+  // Get notifications for authenticated user
+  fastify.get('/notifications', async (request: FastifyRequest, reply: FastifyReply) => {
+    const auth = verifyAuth(request, reply);
+    if (!auth) return;
+    try {
+      const rows = db.prepare(`
+        SELECT id, user_id, actor_id, type, payload, is_read, created_at
+        FROM notifications
+        WHERE user_id = ?
+        ORDER BY created_at DESC
+        LIMIT 100
+      `).all(auth.userId);
+      return reply.send({ notifications: rows });
+    } catch (err) {
+      request.log.error(err);
+      return reply.code(500).send({ message: 'Failed to fetch notifications' });
+    }
+  });
+
+  // Mark notification as read
+  fastify.post('/notifications/:id/read', async (request: FastifyRequest, reply: FastifyReply) => {
+    const auth = verifyAuth(request, reply);
+    if (!auth) return;
+    try {
+      const nid = Number((request.params as any).id);
+      if (isNaN(nid)) return reply.code(400).send({ message: 'Invalid notification id' });
+
+      const info = db.prepare('UPDATE notifications SET is_read = 1 WHERE id = ? AND user_id = ?').run(nid, auth.userId);
+      if (info.changes === 0) {
+        return reply.code(404).send({ message: 'Notification not found' });
+      }
+      return reply.send({ success: true });
+    } catch (err) {
+      request.log.error(err);
+      return reply.code(500).send({ message: 'Failed to mark notification read' });
     }
   });
 }
