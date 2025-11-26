@@ -1,7 +1,7 @@
 import { Router } from './router/Router';
 import { AuthService } from './components/game/AuthService';
 import './styles/main.css';
-import { FriendWidget } from './components/ui/MultiPlayerPage'; // added import
+import { FriendWidget, NotificationWidget } from './components/ui/MultiPlayerPage'; // added import
 
 class App {
     private router: Router;
@@ -21,6 +21,17 @@ class App {
             }
         } catch (e) {
             console.error('Failed to mount FriendWidget:', e);
+        }
+
+        // Mount global notification widget
+        try {
+            if (!(window as any)._notificationWidget) {
+                const nw = new NotificationWidget();
+                nw.mount();
+                (window as any)._notificationWidget = nw;
+            }
+        } catch (e) {
+            console.error('Failed to mount NotificationWidget:', e);
         }
 
         this.updateAuthSection();
