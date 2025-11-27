@@ -58,6 +58,9 @@ export class NotificationWidget {
         this.root.style.zIndex = '10000';
         document.body.appendChild(this.root);
 
+        // expose global reference so other widgets can interact with notification widget
+        (window as any)._notificationWidget = this;
+
         this.btn = document.createElement('button');
         this.btn.id = 'notification-widget-btn';
         this.btn.title = 'Notifications';

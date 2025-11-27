@@ -24,6 +24,9 @@ export class FriendWidget {
             if (AuthService.isAuthenticated()) this.startPolling();
             // watch for auth changes to unmount on logout
             this.startAuthWatcher();
+
+            // expose global ref so other widgets can interact
+            (window as any)._friendWidget = this;
             return;
         }
 
@@ -64,6 +67,9 @@ export class FriendWidget {
         this.root.style.right = '20px';
         this.root.style.zIndex = '9999';
         document.body.appendChild(this.root);
+
+        // set global reference so other widgets (notification) can close this panel
+        (window as any)._friendWidget = this;
 
         this.btn = document.createElement('button');
         this.btn.id = 'friend-widget-btn';
@@ -133,6 +139,13 @@ export class FriendWidget {
 
         this.refreshNow();
         this.startPolling();
+    }
+
+    // Close the panel without unmounting (used to avoid overlapping widgets)
+    closePanel(): void {
+        this.visible = false;
+        if (this.panel) this.panel.style.display = 'none';
+        if (this.btn) (this.btn as HTMLElement).classList.remove('bg-accent-pink');
     }
 
     private async fetchAndRender(): Promise<void> {
@@ -223,6 +236,14 @@ export class FriendWidget {
         this.visible = !this.visible;
         if (!this.panel || !this.btn) return;
         
+        // If opening, ask notification widget to close to avoid overlap
+        if (this.visible) {
+            const nw = (window as any)._notificationWidget;
+            if (nw && nw !== this && typeof nw.closePanel === 'function') {
+                try { nw.closePanel(); } catch (e) { /* ignore */ }
+            }
+        }
+
         this.panel.style.display = this.visible ? 'block' : 'none';
         this.btn.classList.toggle('bg-accent-pink', this.visible);
         
@@ -256,8 +277,10 @@ export class FriendWidget {
         if (this.root && document.body.contains(this.root)) {
             document.body.removeChild(this.root);
         }
-        this.root = null;
-        this.panel = null;
-        this.btn = null;
+
+        // clean global reference if it points to this instance
+        try {
+            if ((window as any)._friendWidget === this) delete (window as any)._friendWidget;
+        } catch (e) {}
     }
 }
