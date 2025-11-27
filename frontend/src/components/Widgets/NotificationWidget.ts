@@ -103,10 +103,27 @@ export class NotificationWidget {
         header.appendChild(h);
 
         const clearAll = document.createElement('button');
+        // left: refresh, right: clear all
         clearAll.textContent = 'Refresh';
-        clearAll.className = 'text-sm text-gray-300 hover:text-white';
+        clearAll.className = 'text-sm text-gray-300 hover:text-white mr-3';
         clearAll.onclick = () => this.refreshNow();
         header.appendChild(clearAll);
+
+        const clearAllBtn = document.createElement('button');
+        clearAllBtn.textContent = 'Clear All';
+        clearAllBtn.className = 'text-sm text-red-400 hover:text-red-200';
+        clearAllBtn.title = 'Clear all notifications';
+        clearAllBtn.onclick = async () => {
+            try {
+                const ok = await (window as any).app.confirm('Clear all notifications', 'Are you sure you want to delete all notifications? This cannot be undone.');
+                if (!ok) return;
+                await AuthService.clearNotifications();
+                this.refreshNow();
+            } catch (err: any) {
+                await (window as any).app.showInfo('Clear failed', AuthService.extractErrorMessage(err) || 'Failed to clear notifications');
+            }
+        };
+        header.appendChild(clearAllBtn);
 
         this.panel.appendChild(header);
 
@@ -203,7 +220,23 @@ export class NotificationWidget {
                     }
                 };
                 
+                const clearBtn = document.createElement('button');
+                clearBtn.className = 'bg-game-dark text-white px-2 py-1 rounded text-sm';
+                clearBtn.title = 'Delete notification';
+                clearBtn.textContent = 'Clear';
+                clearBtn.onclick = async () => {
+                    try {
+                        const ok = await (window as any).app.confirm('Delete notification', 'Are you sure you want to delete this notification?');
+                        if (!ok) return;
+                        await AuthService.deleteNotification(n.id);
+                        this.refreshNow();
+                    } catch (err: any) {
+                        (window as any).app.showInfo('Delete failed', AuthService.extractErrorMessage(err) || 'Failed to delete notification');
+                    }
+                };
+                
                 actions.appendChild(markBtn);
+                actions.appendChild(clearBtn);
                 row.appendChild(left);
                 row.appendChild(actions);
                 listEl.appendChild(row);
