@@ -206,11 +206,15 @@ export class AuthService {
     private static storeAuthData(token: string, user: User): void {
         localStorage.setItem(this.TOKEN_KEY, token);
         localStorage.setItem(this.USER_KEY, JSON.stringify(user));
+        // notify app that authentication state changed (login)
+        try { window.dispatchEvent(new Event('auth:change')); } catch (e) {}
     }
 
     private static clearAuth(): void {
         localStorage.removeItem(this.TOKEN_KEY);
         localStorage.removeItem(this.USER_KEY);
+        // notify app that authentication state changed (logout)
+        try { window.dispatchEvent(new Event('auth:change')); } catch (e) {}
     }
 
     // --- added friend API helpers ---

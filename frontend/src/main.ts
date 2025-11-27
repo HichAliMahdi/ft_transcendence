@@ -295,7 +295,7 @@ class App {
                     if (curAuth) showNav();
                     else hideNav();
                 }
-            }, 1500);
+            }, 500); // check auth faster so nav responds quickly
 
         }
 

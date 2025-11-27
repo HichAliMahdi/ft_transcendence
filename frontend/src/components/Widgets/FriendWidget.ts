@@ -9,6 +9,7 @@ export class FriendWidget {
     private searchInput: HTMLInputElement | null = null;
     private searchBtn: HTMLButtonElement | null = null;
     private authWatcherId: number | null = null;
+    private authChangeHandler: ((e: Event) => void) | null = null;
 
 
     mount(): void {
@@ -30,6 +31,20 @@ export class FriendWidget {
             return;
         }
 
+        // fast-path: listen for auth change (login) and create UI immediately when it happens
+        if (!AuthService.isAuthenticated()) {
+            this.authChangeHandler = () => {
+                if (AuthService.isAuthenticated()) {
+                    if (this.authChangeHandler) {
+                        try { window.removeEventListener('auth:change', this.authChangeHandler); } catch (e) {}
+                        this.authChangeHandler = null;
+                    }
+                    this.createUI();
+                }
+            };
+            window.addEventListener('auth:change', this.authChangeHandler);
+        }
+
         // Defer creating UI until user is authenticated
         if (AuthService.isAuthenticated()) {
             this.createUI();
@@ -40,7 +55,7 @@ export class FriendWidget {
                     if (this.authWatcherId) { clearInterval(this.authWatcherId); this.authWatcherId = null; }
                     this.createUI();
                 }
-            }, 1500) as unknown as number;
+            }, 500) as unknown as number; // faster fallback polling
         }
         this.startAuthWatcher();
     }
@@ -55,7 +70,7 @@ export class FriendWidget {
                     this.unmount();
                 }
             }
-        }, 2000) as unknown as number;
+        }, 1000) as unknown as number; // quicker response to logout
     }
 
     private createUI(): void {
@@ -320,6 +335,10 @@ export class FriendWidget {
         if (this.authWatcherId) {
             clearInterval(this.authWatcherId);
             this.authWatcherId = null;
+        }
+        if (this.authChangeHandler) {
+            try { window.removeEventListener('auth:change', this.authChangeHandler); } catch (e) {}
+            this.authChangeHandler = null;
         }
         if (this.root && document.body.contains(this.root)) {
             document.body.removeChild(this.root);

@@ -9,6 +9,7 @@ export class NotificationWidget {
     private visible = false;
     private unreadCount = 0;
     private authWatcherId: number | null = null;
+    private authChangeHandler: ((e: Event) => void) | null = null;
 
     mount(): void {
         // If already present, ensure polling runs only when authenticated
@@ -24,6 +25,20 @@ export class NotificationWidget {
             return;
         }
 
+        // fast-path: mount immediately when auth event fires
+        if (!AuthService.isAuthenticated()) {
+            this.authChangeHandler = () => {
+                if (AuthService.isAuthenticated()) {
+                    if (this.authChangeHandler) {
+                        try { window.removeEventListener('auth:change', this.authChangeHandler); } catch (e) {}
+                        this.authChangeHandler = null;
+                    }
+                    this.createUI();
+                }
+            };
+            window.addEventListener('auth:change', this.authChangeHandler);
+        }
+
         if (AuthService.isAuthenticated()) {
             this.createUI();
         } else {
@@ -33,7 +48,7 @@ export class NotificationWidget {
                     if (this.authWatcherId) { clearInterval(this.authWatcherId); this.authWatcherId = null; }
                     this.createUI();
                 }
-            }, 1500) as unknown as number;
+            }, 500) as unknown as number; // faster fallback polling
         }
         this.startAuthWatcher();
     }
@@ -46,7 +61,7 @@ export class NotificationWidget {
                     this.unmount();
                 }
             }
-        }, 2000) as unknown as number;
+        }, 1000) as unknown as number; // quicker logout unmount
     }
 
     private createUI(): void {
@@ -322,12 +337,16 @@ export class NotificationWidget {
             clearInterval(this.authWatcherId);
             this.authWatcherId = null;
         }
+        if (this.authChangeHandler) {
+            try { window.removeEventListener('auth:change', this.authChangeHandler); } catch (e) {}
+            this.authChangeHandler = null;
+        }
         if (this.root && document.body.contains(this.root)) {
             document.body.removeChild(this.root);
         }
         // clean global reference if it points to this instance
         try {
-            if ((window as any)._notificationWidget === this) delete (window as any)._notificationWidget;
+            if ((window as any)._notificationWidget === this) delete (window as any)._notification_widget;
         } catch (e) {}
         this.root = null;
         this.panel = null;
