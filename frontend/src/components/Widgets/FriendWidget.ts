@@ -19,7 +19,10 @@ export class FriendWidget {
                 if (AuthService.isAuthenticated()) {
                     if (!this.root) this.createUI();
                 } else {
-                    if (this.root && document.body.contains(this.root)) this.unmount();
+                    // IMMEDIATELY unmount when logged out
+                    if (this.root && document.body.contains(this.root)) {
+                        this.unmount();
+                    }
                 }
             };
             window.addEventListener('auth:change', this.authChangeHandler);
@@ -35,8 +38,7 @@ export class FriendWidget {
             this.searchBtn = this.root.querySelector('#friend-widget-search-btn') as HTMLButtonElement | null;
             // start background polling only if authenticated
             if (AuthService.isAuthenticated()) this.startPolling();
-            // watch for auth changes to unmount on logout
-            this.startAuthWatcher();
+            else this.unmount(); // Remove if not authenticated
 
             // expose global ref so other widgets can interact
             (window as any)._friendWidget = this;
@@ -46,29 +48,8 @@ export class FriendWidget {
         // Defer creating UI until user is authenticated
         if (AuthService.isAuthenticated()) {
             this.createUI();
-        } else {
-            // poll for auth; when authenticated create UI
-            this.authWatcherId = window.setInterval(() => {
-                if (AuthService.isAuthenticated()) {
-                    if (this.authWatcherId) { clearInterval(this.authWatcherId); this.authWatcherId = null; }
-                    this.createUI();
-                }
-            }, 500) as unknown as number; // faster fallback polling
         }
-        this.startAuthWatcher();
-    }
-
-    private startAuthWatcher(): void {
-        // ensure we unmount UI on logout
-        if (this.authWatcherId) return;
-        this.authWatcherId = window.setInterval(() => {
-            if (!AuthService.isAuthenticated()) {
-                // user logged out -> remove UI if present
-                if (this.root && document.body.contains(this.root)) {
-                    this.unmount();
-                }
-            }
-        }, 1000) as unknown as number; // quicker response to logout
+        // No need for polling to check auth - auth:change event will handle it
     }
 
     private createUI(): void {
@@ -347,5 +328,12 @@ export class FriendWidget {
         try {
             if ((window as any)._friendWidget === this) delete (window as any)._friendWidget;
         } catch (e) {}
+        
+        // Clear all references
+        this.root = null;
+        this.panel = null;
+        this.btn = null;
+        this.searchInput = null;
+        this.searchBtn = null;
     }
 }

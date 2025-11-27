@@ -18,7 +18,10 @@ export class NotificationWidget {
                 if (AuthService.isAuthenticated()) {
                     if (!this.root) this.createUI();
                 } else {
-                    if (this.root && document.body.contains(this.root)) this.unmount();
+                    // IMMEDIATELY unmount when logged out
+                    if (this.root && document.body.contains(this.root)) {
+                        this.unmount();
+                    }
                 }
             };
             window.addEventListener('auth:change', this.authChangeHandler);
@@ -33,33 +36,14 @@ export class NotificationWidget {
             // Ensure global instance is set so other widgets can interact
             (window as any)._notificationWidget = this;
             if (AuthService.isAuthenticated()) this.startPolling();
-            this.startAuthWatcher();
+            else this.unmount(); // Remove if not authenticated
             return;
         }
 
         if (AuthService.isAuthenticated()) {
             this.createUI();
-        } else {
-            // wait for authentication before creating UI
-            this.authWatcherId = window.setInterval(() => {
-                if (AuthService.isAuthenticated()) {
-                    if (this.authWatcherId) { clearInterval(this.authWatcherId); this.authWatcherId = null; }
-                    this.createUI();
-                }
-            }, 500) as unknown as number; // faster fallback polling
         }
-        this.startAuthWatcher();
-    }
-
-    private startAuthWatcher(): void {
-        if (this.authWatcherId) return;
-        this.authWatcherId = window.setInterval(() => {
-            if (!AuthService.isAuthenticated()) {
-                if (this.root && document.body.contains(this.root)) {
-                    this.unmount();
-                }
-            }
-        }, 1000) as unknown as number; // quicker logout unmount
+        // No need for polling to check auth - auth:change event will handle it
     }
 
     private createUI(): void {
@@ -347,6 +331,8 @@ export class NotificationWidget {
         try {
             if ((window as any)._notificationWidget === this) delete (window as any)._notificationWidget;
         } catch (e) {}
+        
+        // Clear all references
         this.root = null;
         this.panel = null;
         this.btn = null;
