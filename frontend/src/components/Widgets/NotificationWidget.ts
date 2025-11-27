@@ -16,9 +16,28 @@ export class NotificationWidget {
         if (!this.authChangeHandler) {
             this.authChangeHandler = () => {
                 if (AuthService.isAuthenticated()) {
-                    if (!this.root) this.createUI();
+                    // Create UI if it doesn't exist
+                    if (!this.root || !document.body.contains(this.root)) {
+                        this.createUI();
+                    }
                 } else {
-                    if (this.root && document.body.contains(this.root)) this.unmount();
+                    // IMMEDIATELY unmount when logged out (but keep the handler!)
+                    if (this.root && document.body.contains(this.root)) {
+                        // Only remove DOM elements, not the event listener
+                        if (this.intervalId) {
+                            clearInterval(this.intervalId);
+                            this.intervalId = null;
+                        }
+                        if (this.root && document.body.contains(this.root)) {
+                            document.body.removeChild(this.root);
+                        }
+                        if ((window as any)._notificationWidget === this) {
+                            delete (window as any)._notificationWidget;
+                        }
+                        this.root = null;
+                        this.panel = null;
+                        this.btn = null;
+                    }
                 }
             };
             window.addEventListener('auth:change', this.authChangeHandler);
@@ -33,33 +52,22 @@ export class NotificationWidget {
             // Ensure global instance is set so other widgets can interact
             (window as any)._notificationWidget = this;
             if (AuthService.isAuthenticated()) this.startPolling();
-            this.startAuthWatcher();
+            else {
+                // Remove if not authenticated but keep listener
+                if (document.body.contains(existing)) {
+                    document.body.removeChild(existing);
+                }
+                this.root = null;
+                this.panel = null;
+                this.btn = null;
+            }
             return;
         }
 
         if (AuthService.isAuthenticated()) {
             this.createUI();
-        } else {
-            // wait for authentication before creating UI
-            this.authWatcherId = window.setInterval(() => {
-                if (AuthService.isAuthenticated()) {
-                    if (this.authWatcherId) { clearInterval(this.authWatcherId); this.authWatcherId = null; }
-                    this.createUI();
-                }
-            }, 500) as unknown as number; // faster fallback polling
         }
-        this.startAuthWatcher();
-    }
-
-    private startAuthWatcher(): void {
-        if (this.authWatcherId) return;
-        this.authWatcherId = window.setInterval(() => {
-            if (!AuthService.isAuthenticated()) {
-                if (this.root && document.body.contains(this.root)) {
-                    this.unmount();
-                }
-            }
-        }, 1000) as unknown as number; // quicker logout unmount
+        // No need for polling to check auth - auth:change event will handle it
     }
 
     private createUI(): void {
@@ -327,6 +335,7 @@ export class NotificationWidget {
     }
 
     unmount(): void {
+        // Stop polling
         if (this.intervalId) {
             clearInterval(this.intervalId);
             this.intervalId = null;
@@ -335,20 +344,21 @@ export class NotificationWidget {
             clearInterval(this.authWatcherId);
             this.authWatcherId = null;
         }
-        // remove the single auth listener
-        if (this.authChangeHandler) {
-            try { window.removeEventListener('auth:change', this.authChangeHandler); } catch (e) {}
-            this.authChangeHandler = null;
-        }
+        
+        // Remove DOM elements
         if (this.root && document.body.contains(this.root)) {
             document.body.removeChild(this.root);
         }
+        
         // clean global reference if it points to this instance
         try {
             if ((window as any)._notificationWidget === this) delete (window as any)._notificationWidget;
         } catch (e) {}
+        
+        // Clear all references
         this.root = null;
         this.panel = null;
         this.btn = null;
+        
     }
 }

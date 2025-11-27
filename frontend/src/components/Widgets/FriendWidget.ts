@@ -17,9 +17,30 @@ export class FriendWidget {
         if (!this.authChangeHandler) {
             this.authChangeHandler = () => {
                 if (AuthService.isAuthenticated()) {
-                    if (!this.root) this.createUI();
+                    // Create UI if it doesn't exist
+                    if (!this.root || !document.body.contains(this.root)) {
+                        this.createUI();
+                    }
                 } else {
-                    if (this.root && document.body.contains(this.root)) this.unmount();
+                    // IMMEDIATELY unmount when logged out (but keep the handler!)
+                    if (this.root && document.body.contains(this.root)) {
+                        // Only remove DOM elements, not the event listener
+                        if (this.intervalId) {
+                            clearInterval(this.intervalId);
+                            this.intervalId = null;
+                        }
+                        if (this.root && document.body.contains(this.root)) {
+                            document.body.removeChild(this.root);
+                        }
+                        if ((window as any)._friendWidget === this) {
+                            delete (window as any)._friendWidget;
+                        }
+                        this.root = null;
+                        this.panel = null;
+                        this.btn = null;
+                        this.searchInput = null;
+                        this.searchBtn = null;
+                    }
                 }
             };
             window.addEventListener('auth:change', this.authChangeHandler);
@@ -35,8 +56,17 @@ export class FriendWidget {
             this.searchBtn = this.root.querySelector('#friend-widget-search-btn') as HTMLButtonElement | null;
             // start background polling only if authenticated
             if (AuthService.isAuthenticated()) this.startPolling();
-            // watch for auth changes to unmount on logout
-            this.startAuthWatcher();
+            else {
+                // Remove if not authenticated but keep listener
+                if (document.body.contains(existing)) {
+                    document.body.removeChild(existing);
+                }
+                this.root = null;
+                this.panel = null;
+                this.btn = null;
+                this.searchInput = null;
+                this.searchBtn = null;
+            }
 
             // expose global ref so other widgets can interact
             (window as any)._friendWidget = this;
@@ -46,29 +76,8 @@ export class FriendWidget {
         // Defer creating UI until user is authenticated
         if (AuthService.isAuthenticated()) {
             this.createUI();
-        } else {
-            // poll for auth; when authenticated create UI
-            this.authWatcherId = window.setInterval(() => {
-                if (AuthService.isAuthenticated()) {
-                    if (this.authWatcherId) { clearInterval(this.authWatcherId); this.authWatcherId = null; }
-                    this.createUI();
-                }
-            }, 500) as unknown as number; // faster fallback polling
         }
-        this.startAuthWatcher();
-    }
-
-    private startAuthWatcher(): void {
-        // ensure we unmount UI on logout
-        if (this.authWatcherId) return;
-        this.authWatcherId = window.setInterval(() => {
-            if (!AuthService.isAuthenticated()) {
-                // user logged out -> remove UI if present
-                if (this.root && document.body.contains(this.root)) {
-                    this.unmount();
-                }
-            }
-        }, 1000) as unknown as number; // quicker response to logout
+        // No need for polling to check auth - auth:change event will handle it
     }
 
     private createUI(): void {
@@ -326,6 +335,7 @@ export class FriendWidget {
 
 
     unmount(): void {
+        // Stop polling
         if (this.intervalId) {
             clearInterval(this.intervalId);
             this.intervalId = null;
@@ -334,11 +344,8 @@ export class FriendWidget {
             clearInterval(this.authWatcherId);
             this.authWatcherId = null;
         }
-        // remove the single auth listener
-        if (this.authChangeHandler) {
-            try { window.removeEventListener('auth:change', this.authChangeHandler); } catch (e) {}
-            this.authChangeHandler = null;
-        }
+        
+        // Remove DOM elements
         if (this.root && document.body.contains(this.root)) {
             document.body.removeChild(this.root);
         }
@@ -347,5 +354,13 @@ export class FriendWidget {
         try {
             if ((window as any)._friendWidget === this) delete (window as any)._friendWidget;
         } catch (e) {}
+        
+        // Clear all references
+        this.root = null;
+        this.panel = null;
+        this.btn = null;
+        this.searchInput = null;
+        this.searchBtn = null;
+
     }
 }
