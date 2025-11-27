@@ -163,18 +163,23 @@ export default async function userRoutes(fastify: FastifyInstance) {
         if (existing.status === 'accepted') return reply.status(409).send({ message: 'Already friends' });
       }
 
-      db.prepare('INSERT INTO friends (user_id, friend_id, status) VALUES (?, ?, ?)').run(senderId, targetId, 'pending');
-      // create notification for recipient
       try {
-        db.prepare('INSERT INTO notifications (user_id, actor_id, type, payload) VALUES (?, ?, ?, ?)')
-          .run(targetId, senderId, 'friend_request', JSON.stringify({ senderId }));
-      } catch (e) { /* non-fatal */ }
-      return reply.code(201).send({ message: 'Friend request sent' });
-    } catch (err) {
-      request.log.error(err);
-      return reply.code(500).send({ message: 'Failed to send friend request' });
-    }
-  });
+        // Get sender username for payload
+        const senderRow = db.prepare('SELECT username FROM users WHERE id = ?').get(senderId) as { username?: string } | undefined;
+        const senderUsername = senderRow?.username || null;
+
+        db.prepare('INSERT INTO friends (user_id, friend_id, status) VALUES (?, ?, ?)').run(senderId, targetId, 'pending');
+        // create notification for recipient
+        try {
+          db.prepare('INSERT INTO notifications (user_id, actor_id, type, payload) VALUES (?, ?, ?, ?)')
+            .run(targetId, senderId, 'friend_request', JSON.stringify({ senderId, senderUsername }));
+        } catch (e) { /* non-fatal */ }
+        return reply.code(201).send({ message: 'Friend request sent' });
+      } catch (err) {
+        request.log.error(err);
+        return reply.code(500).send({ message: 'Failed to send friend request' });
+      }
+    });
 
   // Accept a friend request: target user (userId param) accepts a request sent by friendId
   fastify.post('/users/:userId/friends/:friendId/accept', async (request: FastifyRequest, reply: FastifyReply) => {
@@ -319,8 +324,11 @@ export default async function userRoutes(fastify: FastifyInstance) {
 
       // notify recipient
       try {
+        // include sender username in notification payload
+        const senderRow = db.prepare('SELECT username FROM users WHERE id = ?').get(senderId) as { username?: string } | undefined;
+        const senderUsername = senderRow?.username || null;
         db.prepare('INSERT INTO notifications (user_id, actor_id, type, payload) VALUES (?, ?, ?, ?)')
-          .run(targetId, senderId, 'friend_request', JSON.stringify({ senderId }));
+          .run(targetId, senderId, 'friend_request', JSON.stringify({ senderId, senderUsername }));
       } catch (e) { /* ignore */ }
 
       return reply.code(201).send({ message: 'Friend request sent' });

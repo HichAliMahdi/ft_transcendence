@@ -164,16 +164,27 @@ export class NotificationWidget {
                     }
                 })();
                 
-                let text = '';
                 if (n.type === 'friend_request') {
-                    const senderId = payload?.senderId;
-                    text = `Friend request`;
-                    if (senderId) text += ` (from user #${senderId})`;
+                    // prefer username when available, fallback to id
+                    const senderName = (payload && (payload.senderUsername || payload.sender_name || payload.sender || null))
+                        || (payload && payload.senderId ? `#${payload.senderId}` : 'Someone');
+
+                    const titleLine = document.createElement('div');
+                    titleLine.className = 'text-white font-medium';
+                    const strong = document.createElement('strong');
+                    strong.textContent = String(senderName);
+                    titleLine.appendChild(strong);
+                    titleLine.appendChild(document.createTextNode(' sent you a friend request'));
+
+                    const timeLine = document.createElement('div');
+                    timeLine.className = 'text-gray-400 text-xs mt-1';
+                    timeLine.textContent = new Date(n.created_at).toLocaleString();
+
+                    left.appendChild(titleLine);
+                    left.appendChild(timeLine);
                 } else {
-                    text = n.type || 'Notification';
+                    left.textContent = (n.type || 'Notification') + ` • ${new Date(n.created_at).toLocaleString()}`;
                 }
-                
-                left.textContent = text + ` • ${new Date(n.created_at).toLocaleString()}`;
                 
                 // Right side: mark read button
                 const actions = document.createElement('div');
