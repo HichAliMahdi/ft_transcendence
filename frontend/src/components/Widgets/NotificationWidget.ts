@@ -17,6 +17,8 @@ export class NotificationWidget {
             this.root = existing as HTMLElement;
             this.panel = this.root.querySelector('#notification-widget-panel') as HTMLElement | null;
             this.btn = this.root.querySelector('#notification-widget-btn') as HTMLElement | null;
+            // Ensure global instance is set so other widgets can interact
+            (window as any)._notificationWidget = this;
             if (AuthService.isAuthenticated()) this.startPolling();
             this.startAuthWatcher();
             return;
@@ -113,6 +115,13 @@ export class NotificationWidget {
         this.startPolling();
     }
 
+    // Close the panel without unmounting (used to avoid overlapping widgets)
+    closePanel(): void {
+        this.visible = false;
+        if (this.panel) this.panel.style.display = 'none';
+        if (this.btn) (this.btn as HTMLElement).classList.remove('bg-accent-pink');
+    }
+
     private async fetchAndRender(): Promise<void> {
         const listEl = this.panel ? this.panel.querySelector('#notification-list') as HTMLElement | null : null;
         if (!listEl || !this.btn) return;
@@ -196,6 +205,14 @@ export class NotificationWidget {
         this.visible = !this.visible;
         if (!this.panel || !this.btn) return;
         
+        // If opening, ask friend widget to close its panel to avoid overlap
+        if (this.visible) {
+            const fw = (window as any)._friendWidget;
+            if (fw && fw !== this && typeof fw.closePanel === 'function') {
+                try { fw.closePanel(); } catch (e) { /* ignore */ }
+            }
+        }
+
         this.panel.style.display = this.visible ? 'block' : 'none';
         (this.btn as HTMLElement).classList.toggle('bg-accent-pink', this.visible);
         
@@ -245,6 +262,10 @@ export class NotificationWidget {
         if (this.root && document.body.contains(this.root)) {
             document.body.removeChild(this.root);
         }
+        // clean global reference if it points to this instance
+        try {
+            if ((window as any)._notificationWidget === this) delete (window as any)._notificationWidget;
+        } catch (e) {}
         this.root = null;
         this.panel = null;
         this.btn = null;
