@@ -299,4 +299,30 @@ export class AuthService {
             await this.parseResponseError(resp);
         }
     }
+
+    // Delete a single notification
+    static async deleteNotification(notificationId: number): Promise<void> {
+        const token = this.getToken();
+        if (!token) throw new Error('Not authenticated');
+        const resp = await fetch(`${API_BASE}/notifications/${notificationId}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!resp.ok) {
+            await this.parseResponseError(resp);
+        }
+    }
+
+    // Clear all notifications for current user
+    static async clearNotifications(): Promise<void> {
+        const token = this.getToken();
+        if (!token) throw new Error('Not authenticated');
+        const resp = await fetch(`${API_BASE}/notifications`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!resp.ok) {
+            await this.parseResponseError(resp);
+        }
+    }
 }
