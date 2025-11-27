@@ -191,36 +191,83 @@ export class FriendWidget {
                 left.appendChild(dot);
                 left.appendChild(name);
 
-                // Right side: status text + remove button
+                // Right side: status text + action buttons
                 const actions = document.createElement('div');
                 actions.className = 'flex items-center gap-2';
-                
+
                 const status = document.createElement('span');
                 status.className = 'text-sm text-gray-300';
                 status.textContent = f.status === 'pending' ? 'Pending' : (f.is_online ? 'Online' : 'Offline');
-                
-                const remove = document.createElement('button');
-                remove.className = 'ml-2 bg-game-red text-white px-2 py-1 rounded text-xs';
-                remove.textContent = 'Remove';
-                remove.onclick = async () => {
-                    const me = AuthService.getUser();
-                    if (!me) { 
-                        await (window as any).app.showInfo('Not authenticated', 'You must be logged in to remove a friend.');
-                        return; 
-                    }
-                    // Use global site-styled confirm modal (keeps UI consistent & sanitized)
-                    const ok = await (window as any).app.confirm(`Remove ${f.display_name || f.username}`, 'Are you sure you want to remove this friend?');
-                     if (!ok) return;
-                     try {
-                         await AuthService.removeFriend(me.id, f.id);
-                         this.refreshNow();
-                     } catch (err: any) {
-                         await (window as any).app.showInfo('Failed to remove friend', AuthService.extractErrorMessage(err) || String(err));
-                     }
-                 };
 
-                actions.appendChild(status);
-                actions.appendChild(remove);
+                // If the relation is 'incoming' and status is pending, show accept/decline
+                if (f.status === 'pending' && f.relation === 'incoming') {
+                    const accept = document.createElement('button');
+                    accept.className = 'bg-game-dark text-white px-2 py-1 rounded text-sm';
+                    accept.title = 'Accept';
+                    accept.textContent = '✔';
+                    accept.onclick = async () => {
+                        try {
+                            await AuthService.acceptFriend(me.id, f.id);
+                            this.refreshNow();
+                            await (window as any).app.showInfo('Friend Request Accepted', `${f.display_name || f.username} is now your friend`);
+                        } catch (err: any) {
+                            await (window as any).app.showInfo('Accept failed', AuthService.extractErrorMessage(err) || 'Failed to accept friend request');
+                        }
+                    };
+
+                    const decline = document.createElement('button');
+                    decline.className = 'bg-game-dark text-white px-2 py-1 rounded text-sm';
+                    decline.title = 'Decline';
+                    decline.textContent = '✖';
+                    decline.onclick = async () => {
+                        const ok = await (window as any).app.confirm('Decline friend request', `Decline friend request from ${f.display_name || f.username}?`);
+                        if (!ok) return;
+                        try {
+                            await AuthService.removeFriend(me.id, f.id);
+                            this.refreshNow();
+                        } catch (err: any) {
+                            await (window as any).app.showInfo('Decline failed', AuthService.extractErrorMessage(err) || 'Failed to decline request');
+                        }
+                    };
+
+                    actions.appendChild(status);
+                    actions.appendChild(accept);
+                    actions.appendChild(decline);
+                } else if (f.status === 'pending' && f.relation === 'outgoing') {
+                    // outgoing pending -> allow cancel
+                    const cancel = document.createElement('button');
+                    cancel.className = 'ml-2 bg-game-dark text-white px-2 py-1 rounded text-sm';
+                    cancel.textContent = 'Cancel';
+                    cancel.onclick = async () => {
+                        const ok = await (window as any).app.confirm('Cancel request', `Cancel friend request to ${f.display_name || f.username}?`);
+                        if (!ok) return;
+                        try {
+                            await AuthService.removeFriend(me.id, f.id);
+                            this.refreshNow();
+                        } catch (err: any) {
+                            await (window as any).app.showInfo('Cancel failed', AuthService.extractErrorMessage(err) || 'Failed to cancel request');
+                        }
+                    };
+                    actions.appendChild(status);
+                    actions.appendChild(cancel);
+                } else {
+                    // accepted friend -> show remove
+                    const remove = document.createElement('button');
+                    remove.className = 'ml-2 bg-game-red text-white px-2 py-1 rounded text-xs';
+                    remove.textContent = 'Remove';
+                    remove.onclick = async () => {
+                        const ok = await (window as any).app.confirm(`Remove ${f.display_name || f.username}`, 'Are you sure you want to remove this friend?');
+                        if (!ok) return;
+                        try {
+                            await AuthService.removeFriend(me.id, f.id);
+                            this.refreshNow();
+                        } catch (err: any) {
+                            await (window as any).app.showInfo('Failed to remove friend', AuthService.extractErrorMessage(err) || String(err));
+                        }
+                    };
+                    actions.appendChild(status);
+                    actions.appendChild(remove);
+                }
 
                 row.appendChild(left);
                 row.appendChild(actions);
