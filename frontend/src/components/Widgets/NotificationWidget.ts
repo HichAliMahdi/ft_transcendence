@@ -176,7 +176,7 @@ export class NotificationWidget {
                         await AuthService.markNotificationRead(n.id);
                         this.refreshNow();
                     } catch (err: any) {
-                        alert('Failed to mark read');
+                        alert(AuthService.extractErrorMessage(err) || 'Failed to mark read');
                     }
                 };
                 
@@ -185,10 +185,11 @@ export class NotificationWidget {
                 row.appendChild(actions);
                 listEl.appendChild(row);
             });
-        } catch (err) {
-            listEl.innerHTML = '<p class="text-red-400">Error loading notifications</p>';
-            console.error(err);
-        }
+        } catch (err: any) {
+            const msg = AuthService.extractErrorMessage(err) || 'Error loading notifications';
+             listEl.innerHTML = `<p class="text-red-400">${msg}</p>`;
+             console.error(err);
+         }
     }
 
     toggle(): void {

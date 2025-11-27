@@ -22,7 +22,7 @@ export default async function healthRoutes(fastify: FastifyInstance) {
         service: 'ft_transcendence-backend',
         version: '1.0.0',
         database: 'disconnected',
-        error: 'Database connection failed'
+        error: error instanceof Error ? error.message : String(error)
       });
     }
   });
@@ -56,7 +56,7 @@ export default async function healthRoutes(fastify: FastifyInstance) {
         timestamp: new Date().toISOString(),
         service: 'ft_transcendence-backend',
         version: '1.0.0',
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: error instanceof Error ? error.message : String(error)
       });
     }
   });

@@ -13,6 +13,34 @@ class App {
     }
 
     private init(): void {
+        // Helper: visible overlay for fatal runtime errors (useful during development)
+        const showFatalErrorOverlay = (title: string, err: any) => {
+            try {
+                const existing = document.getElementById('fatal-error-overlay');
+                if (existing) return;
+                const overlay = document.createElement('div');
+                overlay.id = 'fatal-error-overlay';
+                overlay.style.position = 'fixed';
+                overlay.style.top = '0';
+                overlay.style.left = '0';
+                overlay.style.width = '100vw';
+                overlay.style.height = '100vh';
+                overlay.style.background = 'rgba(0,0,0,0.9)';
+                overlay.style.color = '#fff';
+                overlay.style.zIndex = '99999';
+                overlay.style.padding = '24px';
+                overlay.style.overflow = 'auto';
+                overlay.innerHTML = `<h2 style="margin-top:0;color:#ff7b7b">${title}</h2>
+                    <pre style="white-space:pre-wrap;font-size:13px;color:#fff;margin-top:12px;">${(err && err.stack) ? (err.stack) : (typeof err === 'string' ? err : JSON.stringify(err, null, 2))}</pre>
+                    <div style="margin-top:18px;"><button id="fatal-error-close" style="padding:8px 12px;border-radius:6px;border:none;background:#ef4444;color:#fff;cursor:pointer">Close overlay</button></div>`;
+                document.body.appendChild(overlay);
+                const closeBtn = document.getElementById('fatal-error-close');
+                if (closeBtn) closeBtn.addEventListener('click', () => { overlay.remove(); });
+            } catch (e) {
+                // nothing
+            }
+        };
+
         try {
             if (!(window as any)._friendWidget) {
                 const fw = new FriendWidget();
@@ -21,6 +49,7 @@ class App {
             }
         } catch (e) {
             console.error('Failed to mount FriendWidget:', e);
+            showFatalErrorOverlay('Failed to mount FriendWidget', e);
         }
 
         try {
@@ -31,6 +60,7 @@ class App {
             }
         } catch (e) {
             console.error('Failed to mount NotificationWidget:', e);
+            showFatalErrorOverlay('Failed to mount NotificationWidget', e);
         }
 
         this.updateAuthSection();
@@ -62,14 +92,20 @@ class App {
         });
 
         window.addEventListener('error', (event) => {
-            console.error('Global error caught:', event.error);
-            if (event.error?.message?.includes('Canvas')) {
-                event.preventDefault();
-            }
+            console.error('Global error caught:', event.error || event.message);
+            try {
+                showFatalErrorOverlay('Unhandled Error', event.error || event.message || 'Unknown error');
+            } catch (e) {}
+            // prevent default browser error UI (keeps overlay visible)
+            try { event.preventDefault(); } catch (e) {}
         });
 
         window.addEventListener('unhandledrejection', (event) => {
             console.error('Unhandled promise rejection:', event.reason);
+            try {
+                showFatalErrorOverlay('Unhandled Promise Rejection', event.reason);
+            } catch (e) {}
+            try { event.preventDefault(); } catch (e) {}
         });
 
         const nav = document.getElementById('main-nav');

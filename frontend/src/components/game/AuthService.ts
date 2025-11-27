@@ -24,14 +24,82 @@ export class AuthService {
     private static TOKEN_KEY = 'auth_token';
     private static USER_KEY = 'user_data';
 
-    private static async parseResponseError(response: Response): Promise<never> {
-        try {
-            const data = await response.json();
-            const msg = data?.message || data?.error || (typeof data === 'string' ? data : null);
-            throw new Error(msg || `${response.status} ${response.statusText}`);
-        } catch (err) {
-            throw new Error(`${response.status} ${response.statusText}`);
+    // Normalize various error shapes into a user-friendly single-line message
+    static extractErrorMessage(err: any): string {
+        if (!err) return 'Unknown error';
+
+        // If it's an Error instance, use its message
+        if (err instanceof Error) {
+            return AuthService.extractErrorMessage(err.message);
         }
+
+        // If it's a string, try to parse JSON or strip quotes/braces
+        if (typeof err === 'string') {
+            const s = err.trim();
+            try {
+                const parsed = JSON.parse(s);
+                if (parsed?.message) return String(parsed.message);
+                if (parsed?.error) return String(parsed.error);
+                // If parsed is primitive, return it
+                if (typeof parsed === 'string' || typeof parsed === 'number') return String(parsed);
+            } catch (_) {
+                // Not JSON - remove surrounding quotes if any
+                if ((s.startsWith('"') && s.endsWith('"')) || (s.startsWith("'") && s.endsWith("'"))) {
+                    return s.slice(1, -1);
+                }
+                // Remove outer braces if someone passed raw JSON-like string
+                if (s.startsWith('{') && s.endsWith('}')) {
+                    try {
+                        const pj = JSON.parse(s);
+                        if (pj?.message) return String(pj.message);
+                    } catch (_) {}
+                }
+                return s;
+            }
+        }
+
+        // If it's an object, try common fields
+        if (typeof err === 'object') {
+            if (err.message) return AuthService.extractErrorMessage(err.message);
+            if (err.error) return AuthService.extractErrorMessage(err.error);
+            // Try to pull readable string values
+            const vals = Object.values(err).filter(v => typeof v === 'string' || typeof v === 'number').join(' | ');
+            if (vals) return String(vals);
+            try {
+                return JSON.stringify(err);
+            } catch (_) {
+                return 'Unknown error';
+            }
+        }
+
+        return String(err);
+    }
+
+    private static async parseResponseError(response: Response): Promise<never> {
+        // Try to read the body as text and parse JSON if possible.
+        let bodyText = '';
+        try {
+            bodyText = await response.text();
+        } catch (e) {
+            // ignore
+        }
+
+        // Try parse JSON body to extract a message/error field.
+        try {
+            if (bodyText) {
+                const json = JSON.parse(bodyText);
+                const msg = json?.message || json?.error || (typeof json === 'string' ? json : null);
+                if (msg) throw new Error(String(msg));
+            }
+        } catch (e) {
+            // If parsing failed, fall back to using bodyText directly.
+            if (bodyText && bodyText.trim().length > 0) {
+                throw new Error(bodyText.trim());
+            }
+        }
+
+        // Fallback to status text if no body provided
+        throw new Error(`${response.status} ${response.statusText}`);
     }
 
     static async register(username: string, email: string, password: string, displayName: string): Promise<AuthResponse> {
