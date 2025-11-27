@@ -339,4 +339,17 @@ export class AuthService {
             await this.parseResponseError(resp);
         }
     }
+
+    // Mark all notifications as read
+    static async markAllNotificationsRead(): Promise<void> {
+        const token = this.getToken();
+        if (!token) throw new Error('Not authenticated');
+        const resp = await fetch(`${API_BASE}/notifications/read-all`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!resp.ok) {
+            await this.parseResponseError(resp);
+        }
+    }
 }

@@ -109,6 +109,22 @@ export class NotificationWidget {
         clearAll.onclick = () => this.refreshNow();
         header.appendChild(clearAll);
 
+        const markAllBtn = document.createElement('button');
+        markAllBtn.textContent = 'Mark All Read';
+        markAllBtn.className = 'text-sm text-green-300 hover:text-green-200 mr-3';
+        markAllBtn.title = 'Mark all notifications as read';
+        markAllBtn.onclick = async () => {
+            try {
+                await AuthService.markAllNotificationsRead();
+                await this.refreshNow();
+                // optional small feedback
+                try { (window as any).app.showInfo('Notifications', 'All notifications marked as read'); } catch (e) {}
+            } catch (err: any) {
+                (window as any).app.showInfo('Error', AuthService.extractErrorMessage(err) || 'Failed to mark all as read');
+            }
+        };
+        header.appendChild(markAllBtn);
+
         const clearAllBtn = document.createElement('button');
         clearAllBtn.textContent = 'Clear All';
         clearAllBtn.className = 'text-sm text-red-400 hover:text-red-200';

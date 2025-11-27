@@ -393,6 +393,19 @@ return reply.code(200).send({ message: 'Friend request accepted' });
     }
   });
 
+  // Mark all notifications as read for the authenticated user
+  fastify.post('/notifications/read-all', async (request: FastifyRequest, reply: FastifyReply) => {
+    const auth = verifyAuth(request, reply);
+    if (!auth) return;
+    try {
+      db.prepare('UPDATE notifications SET is_read = 1 WHERE user_id = ? AND is_read = 0').run(auth.userId);
+      return reply.code(200).send({ success: true });
+    } catch (err) {
+      request.log.error(err);
+      return reply.code(500).send({ message: 'Failed to mark notifications as read' });
+    }
+  });
+
   // Mark notification as read
   fastify.post('/notifications/:id/read', async (request: FastifyRequest, reply: FastifyReply) => {
     const auth = verifyAuth(request, reply);
