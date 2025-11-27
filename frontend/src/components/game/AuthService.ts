@@ -215,7 +215,7 @@ export class AuthService {
 
     // --- added friend API helpers ---
 
-    static async getFriends(userId: number): Promise<Array<{ id: number; username: string; display_name?: string; avatar_url?: string | null; is_online?: boolean; status?: string }>> {
+    static async getFriends(userId: number): Promise<Array<{ id: number; username: string; display_name?: string; avatar_url?: string | null; is_online?: boolean; status?: string; relation?: string }>> {
         const token = this.getToken();
         if (!token) throw new Error('Not authenticated');
         const resp = await fetch(`${API_BASE}/users/${userId}/friends`, {
@@ -225,14 +225,15 @@ export class AuthService {
             await this.parseResponseError(resp);
         }
         const data = await resp.json();
-        // normalize online flag to boolean
+        // normalize online flag to boolean and preserve relation from backend
         return (data.friends || []).map((f: any) => ({
             id: f.id,
             username: f.username,
             display_name: f.display_name,
             avatar_url: f.avatar_url || null,
             is_online: !!f.is_online,
-            status: f.status
+            status: f.status,
+            relation: f.relation || undefined
         }));
     }
 
@@ -266,6 +267,19 @@ export class AuthService {
         if (!token) throw new Error('Not authenticated');
         const resp = await fetch(`${API_BASE}/users/${userId}/friends/${friendId}`, {
             method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!resp.ok) {
+            await this.parseResponseError(resp);
+        }
+    }
+
+    // Accept an incoming friend request (userId is the accepter/recipient, friendId is the original requester)
+    static async acceptFriend(userId: number, friendId: number): Promise<void> {
+        const token = this.getToken();
+        if (!token) throw new Error('Not authenticated');
+        const resp = await fetch(`${API_BASE}/users/${userId}/friends/${friendId}/accept`, {
+            method: 'POST',
             headers: { 'Authorization': `Bearer ${token}` }
         });
         if (!resp.ok) {
