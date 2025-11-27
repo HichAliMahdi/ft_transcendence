@@ -12,15 +12,13 @@ export class NotificationWidget {
     private authChangeHandler: ((e?: Event) => void) | null = null;
 
     mount(): void {
-        // react immediately to auth state changes
+        // Single stable auth change handler: mount on login, unmount on logout.
         if (!this.authChangeHandler) {
             this.authChangeHandler = () => {
                 if (AuthService.isAuthenticated()) {
                     if (!this.root) this.createUI();
                 } else {
-                    if (this.root && document.body.contains(this.root)) {
-                        this.unmount();
-                    }
+                    if (this.root && document.body.contains(this.root)) this.unmount();
                 }
             };
             window.addEventListener('auth:change', this.authChangeHandler);
@@ -37,20 +35,6 @@ export class NotificationWidget {
             if (AuthService.isAuthenticated()) this.startPolling();
             this.startAuthWatcher();
             return;
-        }
-
-        // fast-path: mount immediately when auth event fires
-        if (!AuthService.isAuthenticated()) {
-            this.authChangeHandler = () => {
-                if (AuthService.isAuthenticated()) {
-                    if (this.authChangeHandler) {
-                        try { window.removeEventListener('auth:change', this.authChangeHandler); } catch (e) {}
-                        this.authChangeHandler = null;
-                    }
-                    this.createUI();
-                }
-            };
-            window.addEventListener('auth:change', this.authChangeHandler);
         }
 
         if (AuthService.isAuthenticated()) {
@@ -351,6 +335,7 @@ export class NotificationWidget {
             clearInterval(this.authWatcherId);
             this.authWatcherId = null;
         }
+        // remove the single auth listener
         if (this.authChangeHandler) {
             try { window.removeEventListener('auth:change', this.authChangeHandler); } catch (e) {}
             this.authChangeHandler = null;

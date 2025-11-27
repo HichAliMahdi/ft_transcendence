@@ -13,17 +13,13 @@ export class FriendWidget {
 
 
     mount(): void {
-        // ensure we react immediately to login/logout events
+        // Single stable auth change handler: mount on login, unmount on logout.
         if (!this.authChangeHandler) {
             this.authChangeHandler = () => {
                 if (AuthService.isAuthenticated()) {
-                    // if not created yet, create immediately
                     if (!this.root) this.createUI();
                 } else {
-                    // on logout -> unmount immediately if present
-                    if (this.root && document.body.contains(this.root)) {
-                        this.unmount();
-                    }
+                    if (this.root && document.body.contains(this.root)) this.unmount();
                 }
             };
             window.addEventListener('auth:change', this.authChangeHandler);
@@ -45,20 +41,6 @@ export class FriendWidget {
             // expose global ref so other widgets can interact
             (window as any)._friendWidget = this;
             return;
-        }
-
-        // fast-path: listen for auth change (login) and create UI immediately when it happens
-        if (!AuthService.isAuthenticated()) {
-            this.authChangeHandler = () => {
-                if (AuthService.isAuthenticated()) {
-                    if (this.authChangeHandler) {
-                        try { window.removeEventListener('auth:change', this.authChangeHandler); } catch (e) {}
-                        this.authChangeHandler = null;
-                    }
-                    this.createUI();
-                }
-            };
-            window.addEventListener('auth:change', this.authChangeHandler);
         }
 
         // Defer creating UI until user is authenticated
@@ -352,6 +334,7 @@ export class FriendWidget {
             clearInterval(this.authWatcherId);
             this.authWatcherId = null;
         }
+        // remove the single auth listener
         if (this.authChangeHandler) {
             try { window.removeEventListener('auth:change', this.authChangeHandler); } catch (e) {}
             this.authChangeHandler = null;
