@@ -17,6 +17,8 @@ interface LoginBody {
 }
 
 export default async function authRoutes(fastify: FastifyInstance) {
+    const formatErr = (e: any) => (e instanceof Error ? e.message : String(e));
+
     fastify.post<{ Body: RegisterBody }>(
         '/auth/register',
         async (request, reply) => {
@@ -58,7 +60,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
                 });
             } catch (error) {
                 fastify.log.error(error);
-                reply.code(500).send({ message: 'Internal Server Error' });
+                reply.code(500).send({ message: formatErr(error) });
             }
         }
     );
@@ -97,7 +99,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
                 });
             } catch (error) {
                 fastify.log.error(error);
-                reply.code(500).send({ message: 'Internal Server Error' });
+                reply.code(500).send({ message: formatErr(error) });
             }
         }
     );
@@ -122,7 +124,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
             reply.code(200).send({ message: 'Logout successful' });
         } catch (error) {
             fastify.log.error(error);
-            reply.code(500).send({ message: 'Internal Server Error' });
+            reply.code(500).send({ message: formatErr(error) });
         }
     });
     
@@ -149,7 +151,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
             reply.code(200).send({ user });
         } catch (error) {
             fastify.log.error(error);
-            reply.code(500).send({ message: 'Internal Server Error' });
+            reply.code(500).send({ message: formatErr(error) });
         }
     });
 }

@@ -96,7 +96,7 @@ export class RegisterPage {
                 );
                 window.location.hash = '#/dashboard';
             } catch (error: any) {
-                errorMsg.textContent = error.message;
+                errorMsg.textContent = AuthService.extractErrorMessage(error);
                 errorMsg.classList.remove('hidden');
                 submitButton.disabled = false;
                 submitButton.textContent = 'Register';

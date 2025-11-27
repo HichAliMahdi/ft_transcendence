@@ -1,4 +1,5 @@
 import { TournamentAPI, Tournament, Player, Match, TournamentSize } from '../game/Tournament';
+import { AuthService } from '../game/AuthService';
 import { PongGame } from '../game/PongGame';
 
 export class TournamentPage {
@@ -137,7 +138,7 @@ export class TournamentPage {
                         await this.refreshTournamentData();
                         await this.updateUI();
                     } catch (error: any) {
-                        alert(`Error: ${error.message}`);
+                        alert(`Error: ${AuthService.extractErrorMessage(error)}`);
                     }
                 }, 'Enter your alias to create tournament');
             };
@@ -261,7 +262,7 @@ export class TournamentPage {
                 input.focus();
                 await this.updateUI();
             } catch (error: any) {
-                errorMsg.textContent = error.message;
+                errorMsg.textContent = AuthService.extractErrorMessage(error);
                 errorMsg.classList.remove('hidden');
             }
         };
@@ -313,7 +314,7 @@ export class TournamentPage {
                         this.participants = await TournamentAPI.removePlayer(this.tournament!.id, player.id);
                         await this.updateUI();
                     } catch (error: any) {
-                        alert(`Error: ${error.message}`);
+                        alert(`Error: ${AuthService.extractErrorMessage(error)}`);
                     }
                 };
                 
@@ -345,7 +346,7 @@ export class TournamentPage {
                 await this.refreshTournamentData();
                 await this.updateUI();
             } catch (error: any) {
-                alert(`Error: ${error.message}`);
+                alert(`Error: ${AuthService.extractErrorMessage(error)}`);
             }
         };
         
@@ -483,8 +484,9 @@ export class TournamentPage {
             }
         };
         
-        leaveButton.onclick = () => {
-            if (confirm('Are you sure you want to leave the tournament? This action cannot be undone.')) {
+        leaveButton.onclick = async () => {
+            const ok = await (window as any).app.confirm('Leave Tournament', 'Are you sure you want to leave the tournament? This action cannot be undone.');
+            if (ok) {
                 this.cleanupCurrentGame();
                 this.tournament = null;
                 this.participants = [];
@@ -561,7 +563,7 @@ export class TournamentPage {
                     await TournamentAPI.recordMatchResult(matchId, winnerId, finalScore1, finalScore2);
                     await this.refreshTournamentData();
                 } catch (error: any) {
-                    alert(`Error recording match result: ${error.message}`);
+                    alert(`Error recording match result: ${AuthService.extractErrorMessage(error)}`);
                 }
                 
                 setTimeout(() => {
@@ -683,7 +685,7 @@ export class TournamentPage {
         } catch (error: any) {
             availableSection.removeChild(loading);
             const errorMsg = document.createElement('p');
-            errorMsg.textContent = `Error: ${error.message}`;
+            errorMsg.textContent = `Error: ${AuthService.extractErrorMessage(error)}`;
             errorMsg.className = 'text-red-500 text-center';
             availableSection.appendChild(errorMsg);
         }
@@ -707,7 +709,7 @@ export class TournamentPage {
                 await this.refreshTournamentData();
                 await this.updateUI();
             } catch (error: any) {
-                alert(`Error: ${error.message}`);
+                alert(`Error: ${AuthService.extractErrorMessage(error)}`);
                 this.tournament = null;
                 this.clearTournamentId();
             }
@@ -914,8 +916,9 @@ export class TournamentPage {
         const leaveButton = document.createElement('button');
         leaveButton.textContent = 'Leave Tournament';
         leaveButton.className = 'bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-200 mt-8';
-        leaveButton.onclick = () => {
-            if (confirm('Are you sure you want to leave the tournament? This action cannot be undone.')) {
+        leaveButton.onclick = async () => {
+            const ok = await (window as any).app.confirm('Leave Tournament', 'Are you sure you want to leave the tournament? This action cannot be undone.');
+            if (ok) {
                 this.tournament = null;
                 this.participants = [];
                 this.matches = [];

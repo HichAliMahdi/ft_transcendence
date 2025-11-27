@@ -24,6 +24,9 @@ export class FriendWidget {
             if (AuthService.isAuthenticated()) this.startPolling();
             // watch for auth changes to unmount on logout
             this.startAuthWatcher();
+
+            // expose global ref so other widgets can interact
+            (window as any)._friendWidget = this;
             return;
         }
 
@@ -64,6 +67,9 @@ export class FriendWidget {
         this.root.style.right = '20px';
         this.root.style.zIndex = '9999';
         document.body.appendChild(this.root);
+
+        // set global reference so other widgets (notification) can close this panel
+        (window as any)._friendWidget = this;
 
         this.btn = document.createElement('button');
         this.btn.id = 'friend-widget-btn';
@@ -109,14 +115,17 @@ export class FriendWidget {
         this.searchBtn.className = 'bg-accent-pink text-white rounded px-2 py-1 text-sm';
         this.searchBtn.onclick = async () => {
             const val = this.searchInput?.value?.trim();
-            if (!val) { alert('Enter a username'); return; }
+            if (!val) { 
+                await (window as any).app.showInfo('Add Friend', 'Enter a username');
+                return;
+            }
             try {
                 await AuthService.sendFriendRequestByUsername(val);
                 this.searchInput!.value = '';
                 this.refreshNow();
-                alert(`Friend request sent to ${val}`);
+                await (window as any).app.showInfo('Friend Request Sent', `Friend request sent to ${val}`);
             } catch (err: any) {
-                alert(`Failed to send request: ${err?.message || err}`);
+                await (window as any).app.showInfo('Failed to send request', AuthService.extractErrorMessage(err) || String(err));
             }
         };
         searchContainer.appendChild(this.searchBtn);
@@ -130,6 +139,13 @@ export class FriendWidget {
 
         this.refreshNow();
         this.startPolling();
+    }
+
+    // Close the panel without unmounting (used to avoid overlapping widgets)
+    closePanel(): void {
+        this.visible = false;
+        if (this.panel) this.panel.style.display = 'none';
+        if (this.btn) (this.btn as HTMLElement).classList.remove('bg-accent-pink');
     }
 
     private async fetchAndRender(): Promise<void> {
@@ -189,18 +205,19 @@ export class FriendWidget {
                 remove.onclick = async () => {
                     const me = AuthService.getUser();
                     if (!me) { 
-                        alert('Not authenticated'); 
+                        await (window as any).app.showInfo('Not authenticated', 'You must be logged in to remove a friend.');
                         return; 
                     }
-                    const ok = await this.showConfirmModal(`Remove ${f.display_name || f.username}`, 'Are you sure you want to remove this friend?');
-                    if (!ok) return;
-                    try {
-                        await AuthService.removeFriend(me.id, f.id);
-                        this.refreshNow();
-                    } catch (err: any) {
-                        alert(`Failed to remove friend: ${err?.message || err}`);
-                    }
-                };
+                    // Use global site-styled confirm modal (keeps UI consistent & sanitized)
+                    const ok = await (window as any).app.confirm(`Remove ${f.display_name || f.username}`, 'Are you sure you want to remove this friend?');
+                     if (!ok) return;
+                     try {
+                         await AuthService.removeFriend(me.id, f.id);
+                         this.refreshNow();
+                     } catch (err: any) {
+                         await (window as any).app.showInfo('Failed to remove friend', AuthService.extractErrorMessage(err) || String(err));
+                     }
+                 };
 
                 actions.appendChild(status);
                 actions.appendChild(remove);
@@ -219,6 +236,14 @@ export class FriendWidget {
         this.visible = !this.visible;
         if (!this.panel || !this.btn) return;
         
+        // If opening, ask notification widget to close to avoid overlap
+        if (this.visible) {
+            const nw = (window as any)._notificationWidget;
+            if (nw && nw !== this && typeof nw.closePanel === 'function') {
+                try { nw.closePanel(); } catch (e) { /* ignore */ }
+            }
+        }
+
         this.panel.style.display = this.visible ? 'block' : 'none';
         this.btn.classList.toggle('bg-accent-pink', this.visible);
         
@@ -252,55 +277,10 @@ export class FriendWidget {
         if (this.root && document.body.contains(this.root)) {
             document.body.removeChild(this.root);
         }
-        this.root = null;
-        this.panel = null;
-        this.btn = null;
-    }
 
-    private showConfirmModal(title: string, message: string): Promise<boolean> {
-        return new Promise((resolve) => {
-            const overlay = document.createElement('div');
-            overlay.className = 'fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50';
-
-            const modal = document.createElement('div');
-            modal.className = 'glass-effect p-6 rounded-2xl max-w-sm w-full mx-4 relative text-left border-2 border-white/5';
-
-            const h = document.createElement('h3');
-            h.className = 'text-lg font-bold text-white mb-2';
-            h.textContent = title;
-
-            const p = document.createElement('p');
-            p.className = 'text-gray-300 mb-4';
-            p.textContent = message;
-
-            const row = document.createElement('div');
-            row.className = 'flex gap-3 justify-end';
-
-            const cancel = document.createElement('button');
-            cancel.className = 'px-4 py-2 rounded bg-game-dark text-white';
-            cancel.textContent = 'Cancel';
-            cancel.onclick = () => {
-                if (document.body.contains(overlay)) document.body.removeChild(overlay);
-                resolve(false);
-            };
-
-            const confirm = document.createElement('button');
-            confirm.className = 'px-4 py-2 rounded btn-primary';
-            confirm.textContent = 'Remove';
-            confirm.onclick = () => {
-                if (document.body.contains(overlay)) document.body.removeChild(overlay);
-                resolve(true);
-            };
-
-            row.appendChild(cancel);
-            row.appendChild(confirm);
-            modal.appendChild(h);
-            modal.appendChild(p);
-            modal.appendChild(row);
-            overlay.appendChild(modal);
-            document.body.appendChild(overlay);
-
-            setTimeout(() => confirm.focus(), 50);
-        });
+        // clean global reference if it points to this instance
+        try {
+            if ((window as any)._friendWidget === this) delete (window as any)._friendWidget;
+        } catch (e) {}
     }
 }

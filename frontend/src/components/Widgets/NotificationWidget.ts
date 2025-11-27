@@ -17,6 +17,8 @@ export class NotificationWidget {
             this.root = existing as HTMLElement;
             this.panel = this.root.querySelector('#notification-widget-panel') as HTMLElement | null;
             this.btn = this.root.querySelector('#notification-widget-btn') as HTMLElement | null;
+            // Ensure global instance is set so other widgets can interact
+            (window as any)._notificationWidget = this;
             if (AuthService.isAuthenticated()) this.startPolling();
             this.startAuthWatcher();
             return;
@@ -55,6 +57,9 @@ export class NotificationWidget {
         this.root.style.right = '100px';
         this.root.style.zIndex = '10000';
         document.body.appendChild(this.root);
+
+        // expose global reference so other widgets can interact with notification widget
+        (window as any)._notificationWidget = this;
 
         this.btn = document.createElement('button');
         this.btn.id = 'notification-widget-btn';
@@ -98,10 +103,27 @@ export class NotificationWidget {
         header.appendChild(h);
 
         const clearAll = document.createElement('button');
+        // left: refresh, right: clear all
         clearAll.textContent = 'Refresh';
-        clearAll.className = 'text-sm text-gray-300 hover:text-white';
+        clearAll.className = 'text-sm text-gray-300 hover:text-white mr-3';
         clearAll.onclick = () => this.refreshNow();
         header.appendChild(clearAll);
+
+        const clearAllBtn = document.createElement('button');
+        clearAllBtn.textContent = 'Clear All';
+        clearAllBtn.className = 'text-sm text-red-400 hover:text-red-200';
+        clearAllBtn.title = 'Clear all notifications';
+        clearAllBtn.onclick = async () => {
+            try {
+                const ok = await (window as any).app.confirm('Clear all notifications', 'Are you sure you want to delete all notifications? This cannot be undone.');
+                if (!ok) return;
+                await AuthService.clearNotifications();
+                this.refreshNow();
+            } catch (err: any) {
+                await (window as any).app.showInfo('Clear failed', AuthService.extractErrorMessage(err) || 'Failed to clear notifications');
+            }
+        };
+        header.appendChild(clearAllBtn);
 
         this.panel.appendChild(header);
 
@@ -111,6 +133,13 @@ export class NotificationWidget {
 
         this.refreshNow();
         this.startPolling();
+    }
+
+    // Close the panel without unmounting (used to avoid overlapping widgets)
+    closePanel(): void {
+        this.visible = false;
+        if (this.panel) this.panel.style.display = 'none';
+        if (this.btn) (this.btn as HTMLElement).classList.remove('bg-accent-pink');
     }
 
     private async fetchAndRender(): Promise<void> {
@@ -152,16 +181,27 @@ export class NotificationWidget {
                     }
                 })();
                 
-                let text = '';
                 if (n.type === 'friend_request') {
-                    const senderId = payload?.senderId;
-                    text = `Friend request`;
-                    if (senderId) text += ` (from user #${senderId})`;
+                    // prefer username when available, fallback to id
+                    const senderName = (payload && (payload.senderUsername || payload.sender_name || payload.sender || null))
+                        || (payload && payload.senderId ? `#${payload.senderId}` : 'Someone');
+
+                    const titleLine = document.createElement('div');
+                    titleLine.className = 'text-white font-medium';
+                    const strong = document.createElement('strong');
+                    strong.textContent = String(senderName);
+                    titleLine.appendChild(strong);
+                    titleLine.appendChild(document.createTextNode(' sent you a friend request'));
+
+                    const timeLine = document.createElement('div');
+                    timeLine.className = 'text-gray-400 text-xs mt-1';
+                    timeLine.textContent = new Date(n.created_at).toLocaleString();
+
+                    left.appendChild(titleLine);
+                    left.appendChild(timeLine);
                 } else {
-                    text = n.type || 'Notification';
+                    left.textContent = (n.type || 'Notification') + ` • ${new Date(n.created_at).toLocaleString()}`;
                 }
-                
-                left.textContent = text + ` • ${new Date(n.created_at).toLocaleString()}`;
                 
                 // Right side: mark read button
                 const actions = document.createElement('div');
@@ -176,17 +216,34 @@ export class NotificationWidget {
                         await AuthService.markNotificationRead(n.id);
                         this.refreshNow();
                     } catch (err: any) {
-                        alert('Failed to mark read');
+                        (window as any).app.showInfo('Notification Error', AuthService.extractErrorMessage(err) || 'Failed to mark read');
+                    }
+                };
+                
+                const clearBtn = document.createElement('button');
+                clearBtn.className = 'bg-game-dark text-white px-2 py-1 rounded text-sm';
+                clearBtn.title = 'Delete notification';
+                clearBtn.textContent = 'Clear';
+                clearBtn.onclick = async () => {
+                    try {
+                        const ok = await (window as any).app.confirm('Delete notification', 'Are you sure you want to delete this notification?');
+                        if (!ok) return;
+                        await AuthService.deleteNotification(n.id);
+                        this.refreshNow();
+                    } catch (err: any) {
+                        (window as any).app.showInfo('Delete failed', AuthService.extractErrorMessage(err) || 'Failed to delete notification');
                     }
                 };
                 
                 actions.appendChild(markBtn);
+                actions.appendChild(clearBtn);
                 row.appendChild(left);
                 row.appendChild(actions);
                 listEl.appendChild(row);
             });
-        } catch (err) {
-            listEl.innerHTML = '<p class="text-red-400">Error loading notifications</p>';
+        } catch (err: any) {
+            const msg = AuthService.extractErrorMessage(err) || 'Error loading notifications';
+            listEl.innerHTML = `<p class="text-red-400">${msg}</p>`;
             console.error(err);
         }
     }
@@ -195,6 +252,14 @@ export class NotificationWidget {
         this.visible = !this.visible;
         if (!this.panel || !this.btn) return;
         
+        // If opening, ask friend widget to close its panel to avoid overlap
+        if (this.visible) {
+            const fw = (window as any)._friendWidget;
+            if (fw && fw !== this && typeof fw.closePanel === 'function') {
+                try { fw.closePanel(); } catch (e) { /* ignore */ }
+            }
+        }
+
         this.panel.style.display = this.visible ? 'block' : 'none';
         (this.btn as HTMLElement).classList.toggle('bg-accent-pink', this.visible);
         
@@ -244,6 +309,10 @@ export class NotificationWidget {
         if (this.root && document.body.contains(this.root)) {
             document.body.removeChild(this.root);
         }
+        // clean global reference if it points to this instance
+        try {
+            if ((window as any)._notificationWidget === this) delete (window as any)._notificationWidget;
+        } catch (e) {}
         this.root = null;
         this.panel = null;
         this.btn = null;

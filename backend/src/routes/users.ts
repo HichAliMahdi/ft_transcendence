@@ -164,10 +164,12 @@ export default async function userRoutes(fastify: FastifyInstance) {
       }
 
       db.prepare('INSERT INTO friends (user_id, friend_id, status) VALUES (?, ?, ?)').run(senderId, targetId, 'pending');
-      // create notification for recipient
+      // create notification for recipient (include sender username when available)
       try {
+        const senderRow = db.prepare('SELECT username FROM users WHERE id = ?').get(senderId) as { username?: string } | undefined;
+        const senderUsername = senderRow?.username || null;
         db.prepare('INSERT INTO notifications (user_id, actor_id, type, payload) VALUES (?, ?, ?, ?)')
-          .run(targetId, senderId, 'friend_request', JSON.stringify({ senderId }));
+          .run(targetId, senderId, 'friend_request', JSON.stringify({ senderId, senderUsername }));
       } catch (e) { /* non-fatal */ }
       return reply.code(201).send({ message: 'Friend request sent' });
     } catch (err) {
@@ -316,12 +318,14 @@ export default async function userRoutes(fastify: FastifyInstance) {
       }
 
       db.prepare('INSERT INTO friends (user_id, friend_id, status) VALUES (?, ?, ?)').run(senderId, targetId, 'pending');
-
-      // notify recipient
-      try {
+ 
+       // notify recipient
+       try {
+        const senderRow = db.prepare('SELECT username FROM users WHERE id = ?').get(senderId) as { username?: string } | undefined;
+        const senderUsername = senderRow?.username || null;
         db.prepare('INSERT INTO notifications (user_id, actor_id, type, payload) VALUES (?, ?, ?, ?)')
-          .run(targetId, senderId, 'friend_request', JSON.stringify({ senderId }));
-      } catch (e) { /* ignore */ }
+          .run(targetId, senderId, 'friend_request', JSON.stringify({ senderId, senderUsername }));
+       } catch (e) { /* ignore */ }
 
       return reply.code(201).send({ message: 'Friend request sent' });
     } catch (err) {
@@ -346,6 +350,35 @@ export default async function userRoutes(fastify: FastifyInstance) {
     } catch (err) {
       request.log.error(err);
       return reply.code(500).send({ message: 'Failed to fetch notifications' });
+    }
+  });
+
+  // Delete a single notification (owner only)
+  fastify.delete('/notifications/:id', async (request: FastifyRequest, reply: FastifyReply) => {
+    const auth = verifyAuth(request, reply);
+    if (!auth) return;
+    try {
+      const nid = Number((request.params as any).id);
+      if (isNaN(nid)) return reply.code(400).send({ message: 'Invalid notification id' });
+      const info = db.prepare('DELETE FROM notifications WHERE id = ? AND user_id = ?').run(nid, auth.userId);
+      if (info.changes === 0) return reply.code(404).send({ message: 'Notification not found' });
+      return reply.code(200).send({ success: true });
+    } catch (err) {
+      request.log.error(err);
+      return reply.code(500).send({ message: 'Failed to delete notification' });
+    }
+  });
+
+  // Delete all notifications for the authenticated user
+  fastify.delete('/notifications', async (request: FastifyRequest, reply: FastifyReply) => {
+    const auth = verifyAuth(request, reply);
+    if (!auth) return;
+    try {
+      db.prepare('DELETE FROM notifications WHERE user_id = ?').run(auth.userId);
+      return reply.code(200).send({ success: true });
+    } catch (err) {
+      request.log.error(err);
+      return reply.code(500).send({ message: 'Failed to clear notifications' });
     }
   });
 

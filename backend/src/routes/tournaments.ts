@@ -30,7 +30,9 @@ interface MatchParams {
 }
 
 export default async function tournamentRoutes(fastify: FastifyInstance) {
-  
+  // helper to extract a safe message from thrown errors
+  const formatErr = (e: any) => (e instanceof Error ? e.message : String(e));
+
   fastify.post<{ Body: CreateTournamentBody }>(
     '/tournaments',
     async (request, reply) => {
@@ -49,7 +51,7 @@ export default async function tournamentRoutes(fastify: FastifyInstance) {
         return reply.code(201).send({ tournament });
       } catch (error) {
         fastify.log.error(error);
-        return reply.code(500).send({ message: 'Failed to create tournament' });
+        return reply.code(500).send({ message: formatErr(error) });
       }
     }
   );
@@ -61,7 +63,7 @@ export default async function tournamentRoutes(fastify: FastifyInstance) {
       return reply.send({ tournaments });
     } catch (error) {
       fastify.log.error(error);
-      return reply.code(500).send({ message: 'Failed to fetch joinable tournaments' });
+      return reply.code(500).send({ message: formatErr(error) });
     }
   });
 
@@ -92,7 +94,7 @@ export default async function tournamentRoutes(fastify: FastifyInstance) {
         });
       } catch (error) {
         fastify.log.error(error);
-        return reply.code(500).send({ message: 'Failed to fetch tournament' });
+        return reply.code(500).send({ message: formatErr(error) });
       }
     }
   );
@@ -103,7 +105,7 @@ export default async function tournamentRoutes(fastify: FastifyInstance) {
       return reply.send({ tournaments });
     } catch (error) {
       fastify.log.error(error);
-      return reply.code(500).send({ message: 'Failed to fetch tournaments' });
+      return reply.code(500).send({ message: formatErr(error) });
     }
   });
 
@@ -145,7 +147,7 @@ export default async function tournamentRoutes(fastify: FastifyInstance) {
         return reply.code(201).send({ participants });
       } catch (error) {
         fastify.log.error(error);
-        return reply.code(500).send({ message: 'Failed to add player' });
+        return reply.code(500).send({ message: formatErr(error) });
       }
     }
   );
@@ -174,7 +176,7 @@ export default async function tournamentRoutes(fastify: FastifyInstance) {
         return reply.send({ participants });
       } catch (error) {
         fastify.log.error(error);
-        return reply.code(500).send({ message: 'Failed to remove player' });
+        return reply.code(500).send({ message: formatErr(error) });
       }
     }
   );
@@ -207,7 +209,7 @@ export default async function tournamentRoutes(fastify: FastifyInstance) {
         });
       } catch (error) {
         fastify.log.error(error);
-        return reply.code(500).send({ message: 'Failed to start tournament' });
+        return reply.code(500).send({ message: formatErr(error) });
       }
     }
   );
@@ -232,7 +234,7 @@ export default async function tournamentRoutes(fastify: FastifyInstance) {
         return reply.send({ match: currentMatch });
       } catch (error) {
         fastify.log.error(error);
-        return reply.code(500).send({ message: 'Failed to fetch current match' });
+        return reply.code(500).send({ message: formatErr(error) });
       }
     }
   );
@@ -270,7 +272,7 @@ export default async function tournamentRoutes(fastify: FastifyInstance) {
         });
       } catch (error) {
         fastify.log.error(error);
-        return reply.code(500).send({ message: 'Failed to record match result' });
+        return reply.code(500).send({ message: formatErr(error) });
       }
     }
   );
@@ -290,7 +292,7 @@ export default async function tournamentRoutes(fastify: FastifyInstance) {
         return reply.send({ matches });
       } catch (error) {
         fastify.log.error(error);
-        return reply.code(500).send({ message: 'Failed to fetch matches' });
+        return reply.code(500).send({ message: formatErr(error) });
       }
     }
   );
@@ -315,7 +317,7 @@ export default async function tournamentRoutes(fastify: FastifyInstance) {
         return reply.send({ success: true, message: 'Tournament deleted successfully' });
       } catch (error) {
         fastify.log.error(error);
-        return reply.code(500).send({ message: 'Failed to delete tournament' });
+        return reply.code(500).send({ message: formatErr(error) });
       }
     }
   );
@@ -347,7 +349,7 @@ export default async function tournamentRoutes(fastify: FastifyInstance) {
         });
       } catch (error) {
         fastify.log.error(error);
-        return reply.code(500).send({ message: 'Failed to reset tournament' });
+        return reply.code(500).send({ message: formatErr(error) });
       }
     }
   );

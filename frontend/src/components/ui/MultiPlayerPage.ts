@@ -248,11 +248,11 @@ export class MultiplayerPage {
             if (oppUsername) {
                 try {
                     await AuthService.sendFriendRequestByUsername(oppUsername);
-                    alert(`Friend request sent to ${oppUsername}`);
+                    await (window as any).app.showInfo('Friend Request Sent', `Friend request sent to ${oppUsername}`);
                     this.friendWidget?.refreshNow();
                     return;
                 } catch (err: any) {
-                    alert(`Failed to send friend request: ${err?.message || err}`);
+                    await (window as any).app.showInfo('Failed to send friend request', AuthService.extractErrorMessage(err) || String(err));
                     return;
                 }
             }
@@ -271,10 +271,10 @@ export class MultiplayerPage {
                     }
                     try {
                         await AuthService.sendFriendRequestByUsername(u);
-                        alert(`Friend request sent to ${u}`);
+                        await (window as any).app.showInfo('Friend Request Sent', `Friend request sent to ${u}`);
                         this.friendWidget?.refreshNow();
                     } catch (err: any) {
-                        alert(`Failed to send friend request: ${err?.message || err}`);
+                        await (window as any).app.showInfo('Failed to send friend request', AuthService.extractErrorMessage(err) || String(err));
                     }
                 }
             );
@@ -420,7 +420,7 @@ export class MultiplayerPage {
                         );
                         break;
                     case 'error':
-                        alert(msg.message || 'WebSocket error');
+                        (window as any).app.showInfo('WebSocket Error', msg.message || 'WebSocket error');
                         break;
                     default:
                         if (this.game && typeof (this.game as any).onSocketMessage === 'function') {
@@ -437,7 +437,7 @@ export class MultiplayerPage {
                     try { socket.close(); } catch (e) {}
                     setTimeout(() => tryConnect(idx + 1), 200);
                 } else {
-                    alert('WebSocket connection failed. Make sure the server is running.');
+                    (window as any).app.showInfo('WebSocket Error', 'WebSocket connection failed. Make sure the server is running.');
                     this.status = 'disconnected';
                     this.renderConnectionScreen();
                 }

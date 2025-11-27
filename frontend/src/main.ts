@@ -7,12 +7,172 @@ import { NotificationWidget } from './components/Widgets/NotificationWidget';
 class App {
     private router: Router;
 
+    private sanitizeForUi(input: string | undefined | null): string {
+        if (!input) return '';
+        return String(input).replace(/\b127(?:\.\d{1,3}){3}\b/g, '').replace(/\blocalhost\b/gi, '').trim();
+    }
+
+    // Show a visible overlay for fatal runtime errors (instance method so TypeScript sees it)
+    private showFatalErrorOverlay(title: string, err: any): void {
+        try {
+            const existing = document.getElementById('fatal-error-overlay');
+            if (existing) return;
+            const overlay = document.createElement('div');
+            overlay.id = 'fatal-error-overlay';
+            overlay.style.position = 'fixed';
+            overlay.style.top = '0';
+            overlay.style.left = '0';
+            overlay.style.width = '100vw';
+            overlay.style.height = '100vh';
+            overlay.style.background = 'rgba(0,0,0,0.9)';
+            overlay.style.color = '#fff';
+            overlay.style.zIndex = '99999';
+            overlay.style.padding = '24px';
+            overlay.style.overflow = 'auto';
+            const safeTitle = this.sanitizeForUi(title);
+            const safeErr = this.sanitizeForUi((err && err.stack) ? err.stack : (typeof err === 'string' ? err : JSON.stringify(err, null, 2)));
+            overlay.innerHTML = `<h2 style="margin-top:0;color:#ff7b7b">${safeTitle}</h2>
+                <pre style="white-space:pre-wrap;font-size:13px;color:#fff;margin-top:12px;">${safeErr}</pre>
+                <div style="margin-top:18px;"><button id="fatal-error-close" style="padding:8px 12px;border-radius:6px;border:none;background:#ef4444;color:#fff;cursor:pointer">Close overlay</button></div>`;
+            document.body.appendChild(overlay);
+            const closeBtn = document.getElementById('fatal-error-close');
+            if (closeBtn) closeBtn.addEventListener('click', () => { overlay.remove(); });
+        } catch (e) {
+            // nothing
+        }
+    }
+
     constructor() {
         this.router = new Router();
         this.init();
     }
 
     private init(): void {
+        // expose small site-styled modal helpers on window.app
+        (window as any).app = (window as any).app || {};
+        if (!(window as any).app.showInfo) {
+            (window as any).app.showInfo = (title: string, message: string) => {
+                return new Promise<void>((resolve) => {
+                    try {
+                        const overlay = document.createElement('div');
+                        overlay.className = 'fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50';
+
+                        const modal = document.createElement('div');
+                        modal.className = 'glass-effect p-6 rounded-2xl max-w-lg w-full mx-4 relative text-left border-2 border-white/5';
+
+                        const h = document.createElement('h2');
+                        h.className = 'text-2xl font-bold text-white mb-2 gradient-text';
+                        h.textContent = this.sanitizeForUi(title) || 'Info';
+
+                        const p = document.createElement('p');
+                        p.className = 'text-gray-300 mb-6';
+                        p.textContent = this.sanitizeForUi(message) || '';
+
+                        const btn = document.createElement('button');
+                        btn.className = 'px-6 py-3 rounded-lg btn-primary';
+                        btn.textContent = 'OK';
+                        btn.onclick = () => { if (document.body.contains(overlay)) document.body.removeChild(overlay); resolve(); };
+
+                        modal.appendChild(h);
+                        modal.appendChild(p);
+                        modal.appendChild(btn);
+                        overlay.appendChild(modal);
+                        document.body.appendChild(overlay);
+                        setTimeout(() => btn.focus(), 50);
+                    } catch (e) { resolve(); }
+                });
+            };
+        }
+
+        if (!(window as any).app.confirm) {
+            (window as any).app.confirm = (title: string, message: string) => {
+                return new Promise<boolean>((resolve) => {
+                    try {
+                        const overlay = document.createElement('div');
+                        overlay.className = 'fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50';
+
+                        const modal = document.createElement('div');
+                        modal.className = 'glass-effect p-6 rounded-2xl max-w-md w-full mx-4 relative text-left border-2 border-white/5';
+
+                        const h = document.createElement('h2');
+                        h.className = 'text-2xl font-bold text-white mb-2 gradient-text';
+                        h.textContent = this.sanitizeForUi(title) || 'Confirm';
+
+                        const p = document.createElement('p');
+                        p.className = 'text-gray-300 mb-6';
+                        p.textContent = this.sanitizeForUi(message) || '';
+
+                        const row = document.createElement('div');
+                        row.className = 'flex gap-4 justify-end';
+
+                        const cancel = document.createElement('button');
+                        cancel.className = 'px-4 py-2 rounded bg-game-dark text-white';
+                        cancel.textContent = 'Cancel';
+                        cancel.onclick = () => { if (document.body.contains(overlay)) document.body.removeChild(overlay); resolve(false); };
+
+                        const confirm = document.createElement('button');
+                        confirm.className = 'px-4 py-2 rounded btn-primary';
+                        confirm.textContent = 'Confirm';
+                        confirm.onclick = () => { if (document.body.contains(overlay)) document.body.removeChild(overlay); resolve(true); };
+
+                        row.appendChild(cancel);
+                        row.appendChild(confirm);
+                        modal.appendChild(h);
+                        modal.appendChild(p);
+                        modal.appendChild(row);
+                        overlay.appendChild(modal);
+                        document.body.appendChild(overlay);
+                        setTimeout(() => confirm.focus(), 50);
+                    } catch (e) { resolve(false); }
+                });
+            };
+        }
+
+        if (!(window as any).app.input) {
+            (window as any).app.input = (title: string, placeholder: string, submitLabel = 'Submit') => {
+                return new Promise<string | null>((resolve) => {
+                    try {
+                        const overlay = document.createElement('div');
+                        overlay.className = 'fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50';
+
+                        const modal = document.createElement('div');
+                        modal.className = 'glass-effect p-6 rounded-2xl max-w-md w-full mx-4 relative text-left border-2 border-white/5';
+
+                        const h = document.createElement('h2');
+                        h.className = 'text-2xl font-bold text-white mb-2 gradient-text';
+                        h.textContent = this.sanitizeForUi(title) || 'Input';
+
+                        const input = document.createElement('input');
+                        input.type = 'text';
+                        input.placeholder = this.sanitizeForUi(placeholder) || '';
+                        input.className = 'w-full px-4 py-3 rounded-lg bg-game-dark text-white border-2 border-gray-600 focus:border-accent-pink focus:outline-none mb-4';
+
+                        const row = document.createElement('div');
+                        row.className = 'flex gap-4 justify-end';
+
+                        const cancel = document.createElement('button');
+                        cancel.className = 'px-4 py-2 rounded bg-game-dark text-white';
+                        cancel.textContent = 'Cancel';
+                        cancel.onclick = () => { if (document.body.contains(overlay)) document.body.removeChild(overlay); resolve(null); };
+
+                        const submit = document.createElement('button');
+                        submit.className = 'px-4 py-2 rounded btn-primary';
+                        submit.textContent = submitLabel;
+                        submit.onclick = () => { if (document.body.contains(overlay)) document.body.removeChild(overlay); resolve(input.value.trim() || null); };
+
+                        row.appendChild(cancel);
+                        row.appendChild(submit);
+                        modal.appendChild(h);
+                        modal.appendChild(input);
+                        modal.appendChild(row);
+                        overlay.appendChild(modal);
+                        document.body.appendChild(overlay);
+                        setTimeout(() => input.focus(), 50);
+                    } catch (e) { resolve(null); }
+                });
+            };
+        }
+
         try {
             if (!(window as any)._friendWidget) {
                 const fw = new FriendWidget();
@@ -21,6 +181,7 @@ class App {
             }
         } catch (e) {
             console.error('Failed to mount FriendWidget:', e);
+            this.showFatalErrorOverlay(this.sanitizeForUi('Failed to mount FriendWidget'), e);
         }
 
         try {
@@ -31,6 +192,7 @@ class App {
             }
         } catch (e) {
             console.error('Failed to mount NotificationWidget:', e);
+            this.showFatalErrorOverlay(this.sanitizeForUi('Failed to mount NotificationWidget'), e);
         }
 
         this.updateAuthSection();
@@ -62,14 +224,20 @@ class App {
         });
 
         window.addEventListener('error', (event) => {
-            console.error('Global error caught:', event.error);
-            if (event.error?.message?.includes('Canvas')) {
-                event.preventDefault();
-            }
+            console.error('Global error caught:', event.error || event.message);
+            try {
+                this.showFatalErrorOverlay('Unhandled Error', this.sanitizeForUi(event.error || event.message || 'Unknown error'));
+            } catch (e) {}
+            // prevent default browser error UI (keeps overlay visible)
+            try { event.preventDefault(); } catch (e) {}
         });
 
         window.addEventListener('unhandledrejection', (event) => {
             console.error('Unhandled promise rejection:', event.reason);
+            try {
+                this.showFatalErrorOverlay('Unhandled Promise Rejection', this.sanitizeForUi(event.reason));
+            } catch (e) {}
+            try { event.preventDefault(); } catch (e) {}
         });
 
         const nav = document.getElementById('main-nav');
