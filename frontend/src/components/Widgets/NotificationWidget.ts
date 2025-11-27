@@ -9,8 +9,21 @@ export class NotificationWidget {
     private visible = false;
     private unreadCount = 0;
     private authWatcherId: number | null = null;
+    private authChangeHandler: ((e?: Event) => void) | null = null;
 
     mount(): void {
+        // Single stable auth change handler: mount on login, unmount on logout.
+        if (!this.authChangeHandler) {
+            this.authChangeHandler = () => {
+                if (AuthService.isAuthenticated()) {
+                    if (!this.root) this.createUI();
+                } else {
+                    if (this.root && document.body.contains(this.root)) this.unmount();
+                }
+            };
+            window.addEventListener('auth:change', this.authChangeHandler);
+        }
+
         // If already present, ensure polling runs only when authenticated
         const existing = document.getElementById('notification-widget-root');
         if (existing) {
@@ -33,7 +46,7 @@ export class NotificationWidget {
                     if (this.authWatcherId) { clearInterval(this.authWatcherId); this.authWatcherId = null; }
                     this.createUI();
                 }
-            }, 1500) as unknown as number;
+            }, 500) as unknown as number; // faster fallback polling
         }
         this.startAuthWatcher();
     }
@@ -46,7 +59,7 @@ export class NotificationWidget {
                     this.unmount();
                 }
             }
-        }, 2000) as unknown as number;
+        }, 1000) as unknown as number; // quicker logout unmount
     }
 
     private createUI(): void {
@@ -108,6 +121,22 @@ export class NotificationWidget {
         clearAll.className = 'text-sm text-gray-300 hover:text-white mr-3';
         clearAll.onclick = () => this.refreshNow();
         header.appendChild(clearAll);
+
+        const markAllBtn = document.createElement('button');
+        markAllBtn.textContent = 'Mark All Read';
+        markAllBtn.className = 'text-sm text-green-300 hover:text-green-200 mr-3';
+        markAllBtn.title = 'Mark all notifications as read';
+        markAllBtn.onclick = async () => {
+            try {
+                await AuthService.markAllNotificationsRead();
+                await this.refreshNow();
+                // optional small feedback
+                try { (window as any).app.showInfo('Notifications', 'All notifications marked as read'); } catch (e) {}
+            } catch (err: any) {
+                (window as any).app.showInfo('Error', AuthService.extractErrorMessage(err) || 'Failed to mark all as read');
+            }
+        };
+        header.appendChild(markAllBtn);
 
         const clearAllBtn = document.createElement('button');
         clearAllBtn.textContent = 'Clear All';
@@ -305,6 +334,11 @@ export class NotificationWidget {
         if (this.authWatcherId) {
             clearInterval(this.authWatcherId);
             this.authWatcherId = null;
+        }
+        // remove the single auth listener
+        if (this.authChangeHandler) {
+            try { window.removeEventListener('auth:change', this.authChangeHandler); } catch (e) {}
+            this.authChangeHandler = null;
         }
         if (this.root && document.body.contains(this.root)) {
             document.body.removeChild(this.root);

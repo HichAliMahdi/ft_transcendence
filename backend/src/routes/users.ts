@@ -201,7 +201,18 @@ export default async function userRoutes(fastify: FastifyInstance) {
       }
 
       db.prepare('UPDATE friends SET status = ? WHERE user_id = ? AND friend_id = ?').run('accepted', requesterId, targetId);
-      return reply.code(200).send({ message: 'Friend request accepted' });
+
+      // create a notification for the original requester (they have been accepted)
+      try {
+        const accepterRow = db.prepare('SELECT username FROM users WHERE id = ?').get(targetId) as { username?: string } | undefined;
+        const accepterUsername = accepterRow?.username || null;
+        db.prepare('INSERT INTO notifications (user_id, actor_id, type, payload) VALUES (?, ?, ?, ?)')
+          .run(requesterId, targetId, 'friend_accept', JSON.stringify({ accepterId: targetId, accepterUsername }));
+} catch (e) {
+  // non-fatal
+}
+
+return reply.code(200).send({ message: 'Friend request accepted' });
     } catch (err) {
       request.log.error(err);
       return reply.code(500).send({ message: 'Failed to accept friend request' });
@@ -379,6 +390,19 @@ export default async function userRoutes(fastify: FastifyInstance) {
     } catch (err) {
       request.log.error(err);
       return reply.code(500).send({ message: 'Failed to clear notifications' });
+    }
+  });
+
+  // Mark all notifications as read for the authenticated user
+  fastify.post('/notifications/read-all', async (request: FastifyRequest, reply: FastifyReply) => {
+    const auth = verifyAuth(request, reply);
+    if (!auth) return;
+    try {
+      db.prepare('UPDATE notifications SET is_read = 1 WHERE user_id = ? AND is_read = 0').run(auth.userId);
+      return reply.code(200).send({ success: true });
+    } catch (err) {
+      request.log.error(err);
+      return reply.code(500).send({ message: 'Failed to mark notifications as read' });
     }
   });
 

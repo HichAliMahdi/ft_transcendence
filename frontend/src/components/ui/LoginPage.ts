@@ -63,14 +63,16 @@ export class LoginPage {
 
             try {
                 await AuthService.login(usernameInput.value, passwordInput.value);
-                window.location.hash = '#/dashboard';
+                // Navigate via the router (push state + trigger popstate) so app reacts immediately
                 const redirectUrl = sessionStorage.getItem('redirectAfterLogin');
                 if (redirectUrl) {
                     sessionStorage.removeItem('redirectAfterLogin');
-                    window.location.href = redirectUrl;
+                    history.replaceState(null, '', redirectUrl);
                 } else {
-                    window.location.href = '/';
+                    history.replaceState(null, '', '/');
                 }
+                // Trigger router to handle the new route without full page reload
+                window.dispatchEvent(new PopStateEvent('popstate'));
             } catch (error: any) {
                 errorMsg.textContent = AuthService.extractErrorMessage(error);
                 errorMsg.classList.remove('hidden');
