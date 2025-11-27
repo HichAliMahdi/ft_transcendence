@@ -195,15 +195,16 @@ export class FriendWidget {
                         await (window as any).app.showInfo('Not authenticated', 'You must be logged in to remove a friend.');
                         return; 
                     }
-                    const ok = await this.showConfirmModal(`Remove ${f.display_name || f.username}`, 'Are you sure you want to remove this friend?');
-                    if (!ok) return;
-                    try {
-                        await AuthService.removeFriend(me.id, f.id);
-                        this.refreshNow();
-                    } catch (err: any) {
-                        await (window as any).app.showInfo('Failed to remove friend', AuthService.extractErrorMessage(err) || String(err));
-                    }
-                };
+                    // Use global site-styled confirm modal (keeps UI consistent & sanitized)
+                    const ok = await (window as any).app.confirm(`Remove ${f.display_name || f.username}`, 'Are you sure you want to remove this friend?');
+                     if (!ok) return;
+                     try {
+                         await AuthService.removeFriend(me.id, f.id);
+                         this.refreshNow();
+                     } catch (err: any) {
+                         await (window as any).app.showInfo('Failed to remove friend', AuthService.extractErrorMessage(err) || String(err));
+                     }
+                 };
 
                 actions.appendChild(status);
                 actions.appendChild(remove);
@@ -258,52 +259,5 @@ export class FriendWidget {
         this.root = null;
         this.panel = null;
         this.btn = null;
-    }
-
-    private showConfirmModal(title: string, message: string): Promise<boolean> {
-        return new Promise((resolve) => {
-            const overlay = document.createElement('div');
-            overlay.className = 'fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50';
-
-            const modal = document.createElement('div');
-            modal.className = 'glass-effect p-6 rounded-2xl max-w-sm w-full mx-4 relative text-left border-2 border-white/5';
-
-            const h = document.createElement('h3');
-            h.className = 'text-lg font-bold text-white mb-2';
-            h.textContent = title;
-
-            const p = document.createElement('p');
-            p.className = 'text-gray-300 mb-4';
-            p.textContent = message;
-
-            const row = document.createElement('div');
-            row.className = 'flex gap-3 justify-end';
-
-            const cancel = document.createElement('button');
-            cancel.className = 'px-4 py-2 rounded bg-game-dark text-white';
-            cancel.textContent = 'Cancel';
-            cancel.onclick = () => {
-                if (document.body.contains(overlay)) document.body.removeChild(overlay);
-                resolve(false);
-            };
-
-            const confirm = document.createElement('button');
-            confirm.className = 'px-4 py-2 rounded btn-primary';
-            confirm.textContent = 'Remove';
-            confirm.onclick = () => {
-                if (document.body.contains(overlay)) document.body.removeChild(overlay);
-                resolve(true);
-            };
-
-            row.appendChild(cancel);
-            row.appendChild(confirm);
-            modal.appendChild(h);
-            modal.appendChild(p);
-            modal.appendChild(row);
-            overlay.appendChild(modal);
-            document.body.appendChild(overlay);
-
-            setTimeout(() => confirm.focus(), 50);
-        });
     }
 }
