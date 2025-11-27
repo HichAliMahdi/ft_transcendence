@@ -353,6 +353,35 @@ export default async function userRoutes(fastify: FastifyInstance) {
     }
   });
 
+  // Delete a single notification (owner only)
+  fastify.delete('/notifications/:id', async (request: FastifyRequest, reply: FastifyReply) => {
+    const auth = verifyAuth(request, reply);
+    if (!auth) return;
+    try {
+      const nid = Number((request.params as any).id);
+      if (isNaN(nid)) return reply.code(400).send({ message: 'Invalid notification id' });
+      const info = db.prepare('DELETE FROM notifications WHERE id = ? AND user_id = ?').run(nid, auth.userId);
+      if (info.changes === 0) return reply.code(404).send({ message: 'Notification not found' });
+      return reply.code(200).send({ success: true });
+    } catch (err) {
+      request.log.error(err);
+      return reply.code(500).send({ message: 'Failed to delete notification' });
+    }
+  });
+
+  // Delete all notifications for the authenticated user
+  fastify.delete('/notifications', async (request: FastifyRequest, reply: FastifyReply) => {
+    const auth = verifyAuth(request, reply);
+    if (!auth) return;
+    try {
+      db.prepare('DELETE FROM notifications WHERE user_id = ?').run(auth.userId);
+      return reply.code(200).send({ success: true });
+    } catch (err) {
+      request.log.error(err);
+      return reply.code(500).send({ message: 'Failed to clear notifications' });
+    }
+  });
+
   // Mark notification as read
   fastify.post('/notifications/:id/read', async (request: FastifyRequest, reply: FastifyReply) => {
     const auth = verifyAuth(request, reply);
