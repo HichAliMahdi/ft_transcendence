@@ -16,11 +16,27 @@ export class NotificationWidget {
         if (!this.authChangeHandler) {
             this.authChangeHandler = () => {
                 if (AuthService.isAuthenticated()) {
-                    if (!this.root) this.createUI();
+                    // Create UI if it doesn't exist
+                    if (!this.root || !document.body.contains(this.root)) {
+                        this.createUI();
+                    }
                 } else {
-                    // IMMEDIATELY unmount when logged out
+                    // IMMEDIATELY unmount when logged out (but keep the handler!)
                     if (this.root && document.body.contains(this.root)) {
-                        this.unmount();
+                        // Only remove DOM elements, not the event listener
+                        if (this.intervalId) {
+                            clearInterval(this.intervalId);
+                            this.intervalId = null;
+                        }
+                        if (this.root && document.body.contains(this.root)) {
+                            document.body.removeChild(this.root);
+                        }
+                        if ((window as any)._notificationWidget === this) {
+                            delete (window as any)._notificationWidget;
+                        }
+                        this.root = null;
+                        this.panel = null;
+                        this.btn = null;
                     }
                 }
             };
@@ -36,7 +52,15 @@ export class NotificationWidget {
             // Ensure global instance is set so other widgets can interact
             (window as any)._notificationWidget = this;
             if (AuthService.isAuthenticated()) this.startPolling();
-            else this.unmount(); // Remove if not authenticated
+            else {
+                // Remove if not authenticated but keep listener
+                if (document.body.contains(existing)) {
+                    document.body.removeChild(existing);
+                }
+                this.root = null;
+                this.panel = null;
+                this.btn = null;
+            }
             return;
         }
 
@@ -311,6 +335,7 @@ export class NotificationWidget {
     }
 
     unmount(): void {
+        // Stop polling
         if (this.intervalId) {
             clearInterval(this.intervalId);
             this.intervalId = null;
@@ -319,14 +344,12 @@ export class NotificationWidget {
             clearInterval(this.authWatcherId);
             this.authWatcherId = null;
         }
-        // remove the single auth listener
-        if (this.authChangeHandler) {
-            try { window.removeEventListener('auth:change', this.authChangeHandler); } catch (e) {}
-            this.authChangeHandler = null;
-        }
+        
+        // Remove DOM elements
         if (this.root && document.body.contains(this.root)) {
             document.body.removeChild(this.root);
         }
+        
         // clean global reference if it points to this instance
         try {
             if ((window as any)._notificationWidget === this) delete (window as any)._notificationWidget;
@@ -336,5 +359,6 @@ export class NotificationWidget {
         this.root = null;
         this.panel = null;
         this.btn = null;
+        
     }
 }
