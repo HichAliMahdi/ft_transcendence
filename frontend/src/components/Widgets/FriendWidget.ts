@@ -109,14 +109,17 @@ export class FriendWidget {
         this.searchBtn.className = 'bg-accent-pink text-white rounded px-2 py-1 text-sm';
         this.searchBtn.onclick = async () => {
             const val = this.searchInput?.value?.trim();
-            if (!val) { alert('Enter a username'); return; }
+            if (!val) { 
+                await (window as any).app.showInfo('Add Friend', 'Enter a username');
+                return;
+            }
             try {
                 await AuthService.sendFriendRequestByUsername(val);
                 this.searchInput!.value = '';
                 this.refreshNow();
-                alert(`Friend request sent to ${val}`);
+                await (window as any).app.showInfo('Friend Request Sent', `Friend request sent to ${val}`);
             } catch (err: any) {
-                alert(`Failed to send request: ${err?.message || err}`);
+                await (window as any).app.showInfo('Failed to send request', AuthService.extractErrorMessage(err) || String(err));
             }
         };
         searchContainer.appendChild(this.searchBtn);
@@ -189,7 +192,7 @@ export class FriendWidget {
                 remove.onclick = async () => {
                     const me = AuthService.getUser();
                     if (!me) { 
-                        alert('Not authenticated'); 
+                        await (window as any).app.showInfo('Not authenticated', 'You must be logged in to remove a friend.');
                         return; 
                     }
                     const ok = await this.showConfirmModal(`Remove ${f.display_name || f.username}`, 'Are you sure you want to remove this friend?');
@@ -198,7 +201,7 @@ export class FriendWidget {
                         await AuthService.removeFriend(me.id, f.id);
                         this.refreshNow();
                     } catch (err: any) {
-                        alert(`Failed to remove friend: ${err?.message || err}`);
+                        await (window as any).app.showInfo('Failed to remove friend', AuthService.extractErrorMessage(err) || String(err));
                     }
                 };
 

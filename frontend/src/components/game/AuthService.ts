@@ -26,11 +26,17 @@ export class AuthService {
 
     // Normalize various error shapes into a user-friendly single-line message
     static extractErrorMessage(err: any): string {
+        const sanitize = (s: string) => {
+            if (!s) return s;
+            // remove bare 127.0.0.1 occurrences and common localhost tokens
+            return s.replace(/\b127(?:\.\d{1,3}){3}\b/g, '').replace(/\blocalhost\b/gi, '').trim();
+        };
+
         if (!err) return 'Unknown error';
 
         // If it's an Error instance, use its message
         if (err instanceof Error) {
-            return AuthService.extractErrorMessage(err.message);
+            return sanitize(AuthService.extractErrorMessage(err.message));
         }
 
         // If it's a string, try to parse JSON or strip quotes/braces
@@ -45,7 +51,7 @@ export class AuthService {
             } catch (_) {
                 // Not JSON - remove surrounding quotes if any
                 if ((s.startsWith('"') && s.endsWith('"')) || (s.startsWith("'") && s.endsWith("'"))) {
-                    return s.slice(1, -1);
+                    return sanitize(s.slice(1, -1));
                 }
                 // Remove outer braces if someone passed raw JSON-like string
                 if (s.startsWith('{') && s.endsWith('}')) {
@@ -54,7 +60,7 @@ export class AuthService {
                         if (pj?.message) return String(pj.message);
                     } catch (_) {}
                 }
-                return s;
+                return sanitize(s);
             }
         }
 

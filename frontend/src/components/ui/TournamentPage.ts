@@ -484,8 +484,9 @@ export class TournamentPage {
             }
         };
         
-        leaveButton.onclick = () => {
-            if (confirm('Are you sure you want to leave the tournament? This action cannot be undone.')) {
+        leaveButton.onclick = async () => {
+            const ok = await (window as any).app.confirm('Leave Tournament', 'Are you sure you want to leave the tournament? This action cannot be undone.');
+            if (ok) {
                 this.cleanupCurrentGame();
                 this.tournament = null;
                 this.participants = [];
@@ -915,8 +916,9 @@ export class TournamentPage {
         const leaveButton = document.createElement('button');
         leaveButton.textContent = 'Leave Tournament';
         leaveButton.className = 'bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-200 mt-8';
-        leaveButton.onclick = () => {
-            if (confirm('Are you sure you want to leave the tournament? This action cannot be undone.')) {
+        leaveButton.onclick = async () => {
+            const ok = await (window as any).app.confirm('Leave Tournament', 'Are you sure you want to leave the tournament? This action cannot be undone.');
+            if (ok) {
                 this.tournament = null;
                 this.participants = [];
                 this.matches = [];
