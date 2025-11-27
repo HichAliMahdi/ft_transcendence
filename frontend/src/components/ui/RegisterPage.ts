@@ -94,7 +94,9 @@ export class RegisterPage {
                     passwordInput.value,
                     displayNameInput.value
                 );
-                window.location.hash = '#/dashboard';
+                // Navigate to app root via router (no full reload)
+                history.replaceState(null, '', '/');
+                window.dispatchEvent(new PopStateEvent('popstate'));
             } catch (error: any) {
                 errorMsg.textContent = AuthService.extractErrorMessage(error);
                 errorMsg.classList.remove('hidden');

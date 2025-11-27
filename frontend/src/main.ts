@@ -275,6 +275,15 @@ class App {
                 if (toggleBtn) toggleBtn.style.display = 'none';
             };
 
+            // react immediately to auth changes (login/logout)
+            const onAuthChange = () => {
+                this.updateAuthSection();
+                const auth = AuthService.isAuthenticated();
+                if (auth) showNav();
+                else hideNav();
+            };
+            window.addEventListener('auth:change', onAuthChange);
+
             let prevAuth = AuthService.isAuthenticated();
             if (prevAuth) {
                 showNav();

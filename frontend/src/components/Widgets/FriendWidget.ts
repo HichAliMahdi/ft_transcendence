@@ -9,10 +9,26 @@ export class FriendWidget {
     private searchInput: HTMLInputElement | null = null;
     private searchBtn: HTMLButtonElement | null = null;
     private authWatcherId: number | null = null;
-    private authChangeHandler: ((e: Event) => void) | null = null;
+    private authChangeHandler: ((e?: Event) => void) | null = null;
 
 
     mount(): void {
+        // ensure we react immediately to login/logout events
+        if (!this.authChangeHandler) {
+            this.authChangeHandler = () => {
+                if (AuthService.isAuthenticated()) {
+                    // if not created yet, create immediately
+                    if (!this.root) this.createUI();
+                } else {
+                    // on logout -> unmount immediately if present
+                    if (this.root && document.body.contains(this.root)) {
+                        this.unmount();
+                    }
+                }
+            };
+            window.addEventListener('auth:change', this.authChangeHandler);
+        }
+
         // If already created (e.g., SSR or remount), reuse existing root elements
         const existing = document.getElementById('friend-widget-root');
         if (existing) {

@@ -9,9 +9,23 @@ export class NotificationWidget {
     private visible = false;
     private unreadCount = 0;
     private authWatcherId: number | null = null;
-    private authChangeHandler: ((e: Event) => void) | null = null;
+    private authChangeHandler: ((e?: Event) => void) | null = null;
 
     mount(): void {
+        // react immediately to auth state changes
+        if (!this.authChangeHandler) {
+            this.authChangeHandler = () => {
+                if (AuthService.isAuthenticated()) {
+                    if (!this.root) this.createUI();
+                } else {
+                    if (this.root && document.body.contains(this.root)) {
+                        this.unmount();
+                    }
+                }
+            };
+            window.addEventListener('auth:change', this.authChangeHandler);
+        }
+
         // If already present, ensure polling runs only when authenticated
         const existing = document.getElementById('notification-widget-root');
         if (existing) {
@@ -346,7 +360,7 @@ export class NotificationWidget {
         }
         // clean global reference if it points to this instance
         try {
-            if ((window as any)._notificationWidget === this) delete (window as any)._notification_widget;
+            if ((window as any)._notificationWidget === this) delete (window as any)._notificationWidget;
         } catch (e) {}
         this.root = null;
         this.panel = null;
