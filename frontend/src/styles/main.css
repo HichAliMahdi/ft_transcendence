@@ -30,70 +30,45 @@
   }
 }
 
-/* Add left-sidebar and toggle styles */
+/* Left sidebar navigation */
 #main-nav {
-  /* Keep the Tailwind glass-effect visual but enforce left-sidebar layout */
-  position: fixed;
-  left: 0;
-  top: 0;
-  height: 100vh;
-  width: 18rem; /* 72 */
-  transform: translateX(0);
-  transition: transform 0.25s ease;
-  z-index: 50;
-  padding-top: 1.25rem;
+  @apply fixed left-0 top-0 h-screen w-72 transform translate-x-0 transition-transform duration-300 ease-in-out z-50 pt-5;
 }
 
-/* Collapsed state - hidden offscreen */
 #main-nav.collapsed {
-  transform: translateX(-100%);
+  @apply -translate-x-full;
 }
 
-/* Content shifts to the right when sidebar is visible */
 #content {
-  transition: margin-left 0.25s ease;
-  margin-left: 18rem;
+  @apply transition-[margin-left] duration-300 ease-in-out ml-72;
 }
 
-/* When nav is collapsed remove left margin */
 body.nav-collapsed #content {
-  margin-left: 0;
+  @apply ml-0;
 }
 
 /* Toggle button */
 #nav-toggle-btn {
-  position: fixed;
-  left: 18rem;
-  top: 1rem;
-  z-index: 60;
-  background: rgba(255,255,255,0.04);
-  color: #fff;
-  border: 1px solid rgba(255,255,255,0.06);
-  padding: 0.5rem 0.6rem;
-  border-radius: 0.5rem;
-  cursor: pointer;
-  transition: left 0.25s ease, background-color 0.15s ease;
-  font-size: 1.05rem;
-  line-height: 1;
+  @apply fixed left-72 top-4 z-[60] bg-white/[0.04] text-white border border-white/[0.06] 
+         px-2.5 py-2 rounded-lg cursor-pointer transition-all duration-300 text-[1.05rem] leading-none;
 }
 
-/* When collapsed set button closer to edge */
 body.nav-collapsed #nav-toggle-btn {
-  left: 0.75rem;
+  @apply left-3;
 }
 
-/* Small screens: default collapsed and button visible */
+/* Small screens */
 @media (max-width: 768px) {
   #main-nav {
-    width: 16rem;
+    @apply w-64;
   }
-  /* Start collapsed on small screens unless opened by the user */
+  
   #content {
-    margin-left: 0;
+    @apply ml-0;
   }
+  
   #nav-toggle-btn {
-    display: block;
-    left: 0.75rem;
+    @apply block left-3;
   }
 }
 
@@ -115,16 +90,16 @@ body.nav-collapsed #nav-toggle-btn {
 }
 
 @keyframes scale-in {
-    from {
-        transform: scale(0.95);
-        opacity: 0;
-    }
-    to {
-        transform: scale(1);
-        opacity: 1;
-    }
+  from {
+    transform: scale(0.95);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
 
 .animate-scale-in {
-    animation: scale-in 0.2s ease-out;
+  animation: scale-in 0.2s ease-out;
 }

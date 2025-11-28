@@ -388,16 +388,38 @@ class App {
             const container = document.createElement('div');
             container.className = 'flex items-center gap-4';
 
+            // Welcome text with status indicator
+            const welcomeContainer = document.createElement('div');
+            welcomeContainer.className = 'flex items-center gap-2';
+            
             const welcomeText = document.createElement('span');
             welcomeText.className = 'text-white';
             welcomeText.textContent = `Welcome, ${user?.display_name || user?.username}!`;
+            
+            // Status dot indicator
+            const statusDot = document.createElement('span');
+            statusDot.id = 'header-status-dot';
+            
+            const currentStatus = (user && (user as any).status) ? (user as any).status : 'Online';
+            const statusColors: {[key: string]: string} = {
+                'Online': '#22c55e',
+                'Busy': '#ef4444',
+                'Away': '#f59e0b',
+                'Offline': '#94a3b8'
+            };
+            
+            const hasGlow = currentStatus !== 'Offline';
+            statusDot.className = `w-2.5 h-2.5 rounded-full inline-block ${hasGlow ? 'shadow-[0_0_8px_currentColor]' : ''}`;
+            statusDot.style.backgroundColor = statusColors[currentStatus] || '#94a3b8';
+            
+            welcomeContainer.appendChild(welcomeText);
+            welcomeContainer.appendChild(statusDot);
 
             const logoutBtn = document.createElement('button');
             logoutBtn.id = 'logout-btn';
             logoutBtn.className = 'bg-game-red hover:bg-red-600 text-white px-4 py-2 rounded-lg transition-colors duration-300';
             logoutBtn.textContent = 'Logout';
             logoutBtn.onclick = async () => {
-                // Disconnect presence socket before logout
                 if (this.presenceSocket) {
                     this.presenceSocket.close();
                     this.presenceSocket = null;
@@ -407,11 +429,10 @@ class App {
                 this.router.navigateTo('/login');
             };
 
-            container.appendChild(welcomeText);
+            container.appendChild(welcomeContainer);
             container.appendChild(logoutBtn);
             authSection.appendChild(container);
 
-            // Connect presence socket when user logs in
             if (!this.presenceSocket || this.presenceSocket.readyState !== WebSocket.OPEN) {
                 this.connectPresenceSocket();
             }

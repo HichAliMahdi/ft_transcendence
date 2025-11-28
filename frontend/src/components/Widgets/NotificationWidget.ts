@@ -73,10 +73,7 @@ export class NotificationWidget {
     private createUI(): void {
         this.root = document.createElement('div');
         this.root.id = 'notification-widget-root';
-        this.root.style.position = 'fixed';
-        this.root.style.bottom = '20px';
-        this.root.style.right = '100px';
-        this.root.style.zIndex = '10000';
+        this.root.className = 'fixed bottom-5 right-[100px] z-[10000]';
         document.body.appendChild(this.root);
 
         // expose global reference so other widgets can interact with notification widget
@@ -85,34 +82,19 @@ export class NotificationWidget {
         this.btn = document.createElement('button');
         this.btn.id = 'notification-widget-btn';
         this.btn.title = 'Notifications';
-        this.btn.className = 'bg-game-dark hover:bg-blue-800 text-white rounded-full w-12 h-12 flex items-center justify-center shadow-lg relative';
-        this.btn.style.cursor = 'pointer';
+        this.btn.className = 'bg-game-dark hover:bg-blue-800 text-white rounded-full w-12 h-12 flex items-center justify-center shadow-lg relative cursor-pointer text-xl';
         this.btn.innerHTML = '🔔';
         this.btn.onclick = () => this.toggle();
         this.root.appendChild(this.btn);
 
         const badge = document.createElement('span');
         badge.id = 'notification-badge';
-        badge.style.position = 'absolute';
-        badge.style.top = '4px';
-        badge.style.right = '4px';
-        badge.style.background = '#ef4444';
-        badge.style.color = '#fff';
-        badge.style.borderRadius = '999px';
-        badge.style.padding = '2px 6px';
-        badge.style.fontSize = '12px';
-        badge.style.display = 'none';
+        badge.className = 'absolute top-1 right-1 bg-red-500 text-white rounded-full px-1.5 py-0.5 text-xs hidden';
         this.btn.appendChild(badge);
 
         this.panel = document.createElement('div');
         this.panel.id = 'notification-widget-panel';
-        this.panel.className = 'glass-effect p-4 rounded-2xl shadow-xl';
-        this.panel.style.width = '360px';
-        this.panel.style.maxHeight = '60vh';
-        this.panel.style.overflow = 'auto';
-        this.panel.style.marginBottom = '12px';
-        this.panel.style.display = 'none';
-        this.panel.style.boxShadow = '0 8px 30px rgba(0,0,0,0.6)';
+        this.panel.className = 'glass-effect p-4 rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.6)] w-[360px] max-h-[60vh] overflow-auto mb-3 hidden';
         this.root.appendChild(this.panel);
 
         const header = document.createElement('div');
@@ -297,7 +279,14 @@ export class NotificationWidget {
             }
         }
 
-        this.panel.style.display = this.visible ? 'block' : 'none';
+        if (this.visible) {
+            this.panel.classList.remove('hidden');
+            this.panel.classList.add('block');
+        } else {
+            this.panel.classList.remove('block');
+            this.panel.classList.add('hidden');
+        }
+        
         (this.btn as HTMLElement).classList.toggle('bg-accent-pink', this.visible);
         
         if (this.visible) this.refreshNow();

@@ -17,10 +17,13 @@ Ft_transcendence
 - Proper Offline status on logout and WebSocket disconnect
 - Beautiful status badges in friend widget with emojis and color coding
 - Personal status section at the top of Friends widget
-- Users can now select Offline status manually
+- Status indicator dot next to username in header
+- Clean, non-redundant status display throughout the UI
+- Fully Tailwind CSS-based styling (no inline styles)
 
 /// RECENT IMPROVEMENTS ///
-- Moved status selector from header into Friends widget for cleaner interface
-- Added visual status selection with clickable buttons and checkmarks
-- Enhanced Friends widget with personal status management section
-- Streamlined header to show only welcome message and logout button
+- Converted all inline styles to Tailwind CSS utility classes
+- Cleaned up custom CSS and replaced with Tailwind utilities
+- Improved maintainability with consistent styling approach
+- Better responsive design with Tailwind's breakpoint system
+- Enhanced code readability with declarative Tailwind classes

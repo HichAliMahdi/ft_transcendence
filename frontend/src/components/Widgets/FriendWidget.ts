@@ -73,10 +73,7 @@ export class FriendWidget {
     private createUI(): void {
         this.root = document.createElement('div');
         this.root.id = 'friend-widget-root';
-        this.root.style.position = 'fixed';
-        this.root.style.bottom = '20px';
-        this.root.style.right = '20px';
-        this.root.style.zIndex = '9999';
+        this.root.className = 'fixed bottom-5 right-5 z-[9999]';
         document.body.appendChild(this.root);
 
         (window as any)._friendWidget = this;
@@ -84,21 +81,14 @@ export class FriendWidget {
         this.btn = document.createElement('button');
         this.btn.id = 'friend-widget-btn';
         this.btn.title = 'Friends';
-        this.btn.className = 'bg-game-dark hover:bg-blue-800 text-white rounded-full w-14 h-14 flex items-center justify-center shadow-lg';
-        this.btn.style.cursor = 'pointer';
+        this.btn.className = 'bg-game-dark hover:bg-blue-800 text-white rounded-full w-14 h-14 flex items-center justify-center shadow-lg cursor-pointer text-2xl';
         this.btn.innerHTML = '👥';
         this.btn.onclick = () => this.toggle();
         this.root.appendChild(this.btn);
 
         this.panel = document.createElement('div');
         this.panel.id = 'friend-widget-panel';
-        this.panel.className = 'glass-effect p-4 rounded-2xl shadow-xl';
-        this.panel.style.width = '340px';
-        this.panel.style.maxHeight = '70vh';
-        this.panel.style.overflow = 'auto';
-        this.panel.style.marginBottom = '12px';
-        this.panel.style.display = 'none';
-        this.panel.style.boxShadow = '0 8px 30px rgba(0,0,0,0.6)';
+        this.panel.className = 'glass-effect p-4 rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.6)] w-[340px] max-h-[70vh] overflow-auto mb-3 hidden';
         this.root.appendChild(this.panel);
 
         // Personal Status Section
@@ -130,25 +120,20 @@ export class FriendWidget {
         
         statuses.forEach(s => {
             const statusBtn = document.createElement('button');
-            statusBtn.className = 'flex items-center gap-3 p-2 rounded-lg hover:bg-blue-800 transition-colors text-left';
-            statusBtn.style.background = currentStatus === s.value ? 'rgba(59, 130, 246, 0.3)' : 'transparent';
+            const isActive = currentStatus === s.value;
+            statusBtn.className = `flex items-center gap-3 p-2 rounded-lg hover:bg-blue-800 transition-colors text-left ${isActive ? 'bg-blue-500/30' : 'bg-transparent'}`;
             
             const dot = document.createElement('span');
-            dot.style.width = '12px';
-            dot.style.height = '12px';
-            dot.style.borderRadius = '50%';
-            dot.style.background = s.color;
-            dot.style.display = 'inline-block';
-            if (currentStatus === s.value && s.value !== 'Offline') {
-                dot.style.boxShadow = `0 0 8px ${s.color}`;
-            }
+            const glowClass = s.value !== 'Offline' && isActive ? 'shadow-[0_0_8px_currentColor]' : '';
+            dot.className = `w-3 h-3 rounded-full inline-block ${glowClass}`;
+            dot.style.backgroundColor = s.color;
             
             const label = document.createElement('span');
             label.className = 'text-white text-sm flex-1';
             label.textContent = `${s.emoji} ${s.label}`;
             
             const checkmark = document.createElement('span');
-            checkmark.textContent = currentStatus === s.value ? '✓' : '';
+            checkmark.textContent = isActive ? '✓' : '';
             checkmark.className = 'text-green-400 font-bold';
             
             statusBtn.appendChild(dot);
@@ -160,19 +145,30 @@ export class FriendWidget {
                     await AuthService.setStatus(s.value as any);
                     // Update UI
                     statusSelector.querySelectorAll('button').forEach(btn => {
-                        btn.style.background = 'transparent';
+                        btn.className = 'flex items-center gap-3 p-2 rounded-lg hover:bg-blue-800 transition-colors text-left bg-transparent';
                         const check = btn.querySelector('span:last-child');
                         if (check) check.textContent = '';
                     });
-                    statusBtn.style.background = 'rgba(59, 130, 246, 0.3)';
+                    statusBtn.className = 'flex items-center gap-3 p-2 rounded-lg hover:bg-blue-800 transition-colors text-left bg-blue-500/30';
                     checkmark.textContent = '✓';
                     
                     // Update dot glow
-                    statusSelector.querySelectorAll('.status-dot').forEach(d => {
-                        (d as HTMLElement).style.boxShadow = 'none';
+                    statusSelector.querySelectorAll('button span:first-child').forEach(d => {
+                        (d as HTMLElement).className = 'w-3 h-3 rounded-full inline-block';
                     });
                     if (s.value !== 'Offline') {
-                        dot.style.boxShadow = `0 0 8px ${s.color}`;
+                        dot.className = 'w-3 h-3 rounded-full inline-block shadow-[0_0_8px_currentColor]';
+                    }
+                    
+                    // Update header status dot
+                    const headerDot = document.getElementById('header-status-dot');
+                    if (headerDot) {
+                        headerDot.style.backgroundColor = s.color;
+                        if (s.value !== 'Offline') {
+                            headerDot.className = 'w-2.5 h-2.5 rounded-full inline-block shadow-[0_0_8px_currentColor]';
+                        } else {
+                            headerDot.className = 'w-2.5 h-2.5 rounded-full inline-block';
+                        }
                     }
                 } catch (err: any) {
                     await (window as any).app.showInfo('Status update failed', AuthService.extractErrorMessage(err) || String(err));
@@ -267,34 +263,9 @@ export class FriendWidget {
                 row.className = 'flex items-center justify-between p-3 rounded-lg hover:bg-blue-800 transition-colors duration-200 mb-2';
                 row.setAttribute('data-friend-id', String(f.id));
                 
-                // Left side: status dot + name + status badge
+                // Left side: name + status badge
                 const left = document.createElement('div');
                 left.className = 'flex items-center gap-3 flex-1';
-                
-                const dot = document.createElement('span');
-                dot.className = 'status-dot';
-                dot.style.width = '12px';
-                dot.style.height = '12px';
-                dot.style.borderRadius = '50%';
-                dot.style.display = 'inline-block';
-                dot.style.flexShrink = '0';
-                
-                // Status colors: Online=green, Busy=red, Away=yellow, Offline=gray
-                const userStatus = (f as any).user_status || 'Offline';
-                if (f.is_online) {
-                    if (userStatus === 'Busy') {
-                        dot.style.background = '#ef4444'; // red
-                        dot.style.boxShadow = '0 0 6px rgba(239, 68, 68, 0.6)';
-                    } else if (userStatus === 'Away') {
-                        dot.style.background = '#f59e0b'; // yellow/amber
-                        dot.style.boxShadow = '0 0 6px rgba(245, 158, 11, 0.6)';
-                    } else {
-                        dot.style.background = '#22c55e'; // green (Online)
-                        dot.style.boxShadow = '0 0 6px rgba(34, 197, 94, 0.6)';
-                    }
-                } else {
-                    dot.style.background = '#94a3b8'; // gray (Offline)
-                }
                 
                 const nameContainer = document.createElement('div');
                 nameContainer.className = 'flex flex-col';
@@ -305,37 +276,32 @@ export class FriendWidget {
                 
                 // Status badge with emoji and color coding
                 const statusBadge = document.createElement('span');
-                statusBadge.className = 'status-text text-xs px-2 py-0.5 rounded-full inline-block mt-1';
-                statusBadge.style.width = 'fit-content';
+                statusBadge.className = 'status-text text-xs px-2 py-0.5 rounded-full inline-block mt-1 w-fit';
+                
+                const userStatus = (f as any).user_status || 'Offline';
                 
                 if (f.status === 'pending') {
                     statusBadge.textContent = '⏳ Pending';
-                    statusBadge.style.background = 'rgba(156, 163, 175, 0.2)';
-                    statusBadge.style.color = '#9ca3af';
+                    statusBadge.className += ' bg-gray-500/20 text-gray-400';
                 } else if (f.is_online) {
                     if (userStatus === 'Busy') {
                         statusBadge.textContent = '🔴 Busy';
-                        statusBadge.style.background = 'rgba(239, 68, 68, 0.2)';
-                        statusBadge.style.color = '#ef4444';
+                        statusBadge.className += ' bg-red-500/20 text-red-400';
                     } else if (userStatus === 'Away') {
                         statusBadge.textContent = '🟡 Away';
-                        statusBadge.style.background = 'rgba(245, 158, 11, 0.2)';
-                        statusBadge.style.color = '#f59e0b';
+                        statusBadge.className += ' bg-amber-500/20 text-amber-400';
                     } else {
                         statusBadge.textContent = '🟢 Online';
-                        statusBadge.style.background = 'rgba(34, 197, 94, 0.2)';
-                        statusBadge.style.color = '#22c55e';
+                        statusBadge.className += ' bg-green-500/20 text-green-400';
                     }
                 } else {
                     statusBadge.textContent = '⚫ Offline';
-                    statusBadge.style.background = 'rgba(148, 163, 184, 0.2)';
-                    statusBadge.style.color = '#94a3b8';
+                    statusBadge.className += ' bg-slate-500/20 text-slate-400';
                 }
                 
                 nameContainer.appendChild(name);
                 nameContainer.appendChild(statusBadge);
                 
-                left.appendChild(dot);
                 left.appendChild(nameContainer);
 
                 // Right side: action buttons
@@ -432,46 +398,26 @@ export class FriendWidget {
         rows.forEach((row) => {
             const friendId = parseInt(row.getAttribute('data-friend-id') || '0');
             if (friendId === userId) {
-                const dot = row.querySelector('.status-dot') as HTMLElement | null;
                 const statusBadge = row.querySelector('.status-text') as HTMLElement | null;
                 
-                if (dot) {
-                    if (isOnline) {
-                        if (status === 'Busy') {
-                            dot.style.background = '#ef4444';
-                            dot.style.boxShadow = '0 0 6px rgba(239, 68, 68, 0.6)';
-                        } else if (status === 'Away') {
-                            dot.style.background = '#f59e0b';
-                            dot.style.boxShadow = '0 0 6px rgba(245, 158, 11, 0.6)';
-                        } else {
-                            dot.style.background = '#22c55e';
-                            dot.style.boxShadow = '0 0 6px rgba(34, 197, 94, 0.6)';
-                        }
-                    } else {
-                        dot.style.background = '#94a3b8';
-                        dot.style.boxShadow = 'none';
-                    }
-                }
-                
                 if (statusBadge && !statusBadge.textContent?.includes('Pending')) {
+                    // Reset classes
+                    statusBadge.className = 'status-text text-xs px-2 py-0.5 rounded-full inline-block mt-1 w-fit';
+                    
                     if (isOnline) {
                         if (status === 'Busy') {
                             statusBadge.textContent = '🔴 Busy';
-                            statusBadge.style.background = 'rgba(239, 68, 68, 0.2)';
-                            statusBadge.style.color = '#ef4444';
+                            statusBadge.className += ' bg-red-500/20 text-red-400';
                         } else if (status === 'Away') {
                             statusBadge.textContent = '🟡 Away';
-                            statusBadge.style.background = 'rgba(245, 158, 11, 0.2)';
-                            statusBadge.style.color = '#f59e0b';
+                            statusBadge.className += ' bg-amber-500/20 text-amber-400';
                         } else {
                             statusBadge.textContent = '🟢 Online';
-                            statusBadge.style.background = 'rgba(34, 197, 94, 0.2)';
-                            statusBadge.style.color = '#22c55e';
+                            statusBadge.className += ' bg-green-500/20 text-green-400';
                         }
                     } else {
                         statusBadge.textContent = '⚫ Offline';
-                        statusBadge.style.background = 'rgba(148, 163, 184, 0.2)';
-                        statusBadge.style.color = '#94a3b8';
+                        statusBadge.className += ' bg-slate-500/20 text-slate-400';
                     }
                 }
             }
@@ -490,7 +436,14 @@ export class FriendWidget {
             }
         }
 
-        this.panel.style.display = this.visible ? 'block' : 'none';
+        if (this.visible) {
+            this.panel.classList.remove('hidden');
+            this.panel.classList.add('block');
+        } else {
+            this.panel.classList.remove('block');
+            this.panel.classList.add('hidden');
+        }
+        
         this.btn.classList.toggle('bg-accent-pink', this.visible);
         
         if (this.visible) this.refreshNow();
