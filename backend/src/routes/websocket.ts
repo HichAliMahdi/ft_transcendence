@@ -129,8 +129,12 @@ export default async function websocketRoutes(fastify: FastifyInstance) {
           // If this was the last socket for this user, mark them offline
           if (userSockets.size === 0) {
             presenceConnections.delete(socketUserId);
-            db.prepare('UPDATE users SET is_online = 0, status = ?, last_seen = CURRENT_TIMESTAMP WHERE id = ?').run('Offline', socketUserId);
-            broadcastPresenceUpdate(socketUserId, 'Offline', false);
+            try {
+              db.prepare('UPDATE users SET is_online = 0, status = ?, last_seen = CURRENT_TIMESTAMP WHERE id = ?').run('Offline', socketUserId);
+              broadcastPresenceUpdate(socketUserId, 'Offline', false);
+            } catch (e) {
+              fastify.log.debug({ err: e }, 'Failed to update user offline status');
+            }
           }
         }
       }

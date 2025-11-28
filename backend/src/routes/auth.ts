@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { db } from '../database/db';
 import { config } from '../config';
+import { broadcastPresenceUpdate } from './websocket';
 
 interface RegisterBody {
     username: string;
@@ -118,6 +119,13 @@ export default async function authRoutes(fastify: FastifyInstance) {
             const userId = decoded.userId;
 
             db.prepare('UPDATE users SET is_online = 0, last_seen = CURRENT_TIMESTAMP, status = ? WHERE id = ?').run('Offline', userId);
+            
+            // Broadcast offline status to all connected clients
+            try {
+                broadcastPresenceUpdate(userId, 'Offline', false);
+            } catch (e) {
+                fastify.log.debug({ err: e }, 'Failed to broadcast logout presence');
+            }
 
             reply.code(200).send({ message: 'Logout successful' });
         } catch (error) {

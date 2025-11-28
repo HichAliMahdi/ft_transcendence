@@ -93,7 +93,7 @@ export class FriendWidget {
         this.panel = document.createElement('div');
         this.panel.id = 'friend-widget-panel';
         this.panel.className = 'glass-effect p-4 rounded-2xl shadow-xl';
-        this.panel.style.width = '320px';
+        this.panel.style.width = '340px';
         this.panel.style.maxHeight = '70vh';
         this.panel.style.overflow = 'auto';
         this.panel.style.marginBottom = '12px';
@@ -101,6 +101,91 @@ export class FriendWidget {
         this.panel.style.boxShadow = '0 8px 30px rgba(0,0,0,0.6)';
         this.root.appendChild(this.panel);
 
+        // Personal Status Section
+        const statusSection = document.createElement('div');
+        statusSection.className = 'mb-4 pb-4 border-b border-gray-600';
+        
+        const statusHeader = document.createElement('div');
+        statusHeader.className = 'flex items-center justify-between mb-2';
+        
+        const myStatusLabel = document.createElement('h4');
+        myStatusLabel.textContent = 'My Status';
+        myStatusLabel.className = 'text-sm font-semibold text-gray-400';
+        statusHeader.appendChild(myStatusLabel);
+        
+        statusSection.appendChild(statusHeader);
+        
+        const statusSelector = document.createElement('div');
+        statusSelector.className = 'flex flex-col gap-2';
+        
+        const statuses: Array<{value: string; label: string; color: string; emoji: string}> = [
+            { value: 'Online', label: 'Online', color: '#22c55e', emoji: '🟢' },
+            { value: 'Busy', label: 'Busy', color: '#ef4444', emoji: '🔴' },
+            { value: 'Away', label: 'Away', color: '#f59e0b', emoji: '🟡' },
+            { value: 'Offline', label: 'Offline', color: '#94a3b8', emoji: '⚫' }
+        ];
+        
+        const user = AuthService.getUser();
+        const currentStatus = (user && (user as any).status) ? (user as any).status : 'Online';
+        
+        statuses.forEach(s => {
+            const statusBtn = document.createElement('button');
+            statusBtn.className = 'flex items-center gap-3 p-2 rounded-lg hover:bg-blue-800 transition-colors text-left';
+            statusBtn.style.background = currentStatus === s.value ? 'rgba(59, 130, 246, 0.3)' : 'transparent';
+            
+            const dot = document.createElement('span');
+            dot.style.width = '12px';
+            dot.style.height = '12px';
+            dot.style.borderRadius = '50%';
+            dot.style.background = s.color;
+            dot.style.display = 'inline-block';
+            if (currentStatus === s.value && s.value !== 'Offline') {
+                dot.style.boxShadow = `0 0 8px ${s.color}`;
+            }
+            
+            const label = document.createElement('span');
+            label.className = 'text-white text-sm flex-1';
+            label.textContent = `${s.emoji} ${s.label}`;
+            
+            const checkmark = document.createElement('span');
+            checkmark.textContent = currentStatus === s.value ? '✓' : '';
+            checkmark.className = 'text-green-400 font-bold';
+            
+            statusBtn.appendChild(dot);
+            statusBtn.appendChild(label);
+            statusBtn.appendChild(checkmark);
+            
+            statusBtn.onclick = async () => {
+                try {
+                    await AuthService.setStatus(s.value as any);
+                    // Update UI
+                    statusSelector.querySelectorAll('button').forEach(btn => {
+                        btn.style.background = 'transparent';
+                        const check = btn.querySelector('span:last-child');
+                        if (check) check.textContent = '';
+                    });
+                    statusBtn.style.background = 'rgba(59, 130, 246, 0.3)';
+                    checkmark.textContent = '✓';
+                    
+                    // Update dot glow
+                    statusSelector.querySelectorAll('.status-dot').forEach(d => {
+                        (d as HTMLElement).style.boxShadow = 'none';
+                    });
+                    if (s.value !== 'Offline') {
+                        dot.style.boxShadow = `0 0 8px ${s.color}`;
+                    }
+                } catch (err: any) {
+                    await (window as any).app.showInfo('Status update failed', AuthService.extractErrorMessage(err) || String(err));
+                }
+            };
+            
+            statusSelector.appendChild(statusBtn);
+        });
+        
+        statusSection.appendChild(statusSelector);
+        this.panel.appendChild(statusSection);
+
+        // Friends Header
         const header = document.createElement('div');
         header.className = 'flex items-center justify-between mb-3 gap-2';
         const h = document.createElement('h4');
@@ -179,62 +264,88 @@ export class FriendWidget {
             listEl.innerHTML = '';
             friends.forEach(f => {
                 const row = document.createElement('div');
-                row.className = 'flex items-center justify-between p-2 rounded hover:bg-blue-800';
+                row.className = 'flex items-center justify-between p-3 rounded-lg hover:bg-blue-800 transition-colors duration-200 mb-2';
                 row.setAttribute('data-friend-id', String(f.id));
                 
-                // Left side: status dot + name
+                // Left side: status dot + name + status badge
                 const left = document.createElement('div');
-                left.className = 'flex items-center gap-3';
+                left.className = 'flex items-center gap-3 flex-1';
                 
                 const dot = document.createElement('span');
                 dot.className = 'status-dot';
-                dot.style.width = '10px';
-                dot.style.height = '10px';
+                dot.style.width = '12px';
+                dot.style.height = '12px';
                 dot.style.borderRadius = '50%';
                 dot.style.display = 'inline-block';
-                dot.style.marginRight = '6px';
+                dot.style.flexShrink = '0';
                 
                 // Status colors: Online=green, Busy=red, Away=yellow, Offline=gray
                 const userStatus = (f as any).user_status || 'Offline';
                 if (f.is_online) {
                     if (userStatus === 'Busy') {
                         dot.style.background = '#ef4444'; // red
+                        dot.style.boxShadow = '0 0 6px rgba(239, 68, 68, 0.6)';
                     } else if (userStatus === 'Away') {
                         dot.style.background = '#f59e0b'; // yellow/amber
+                        dot.style.boxShadow = '0 0 6px rgba(245, 158, 11, 0.6)';
                     } else {
                         dot.style.background = '#22c55e'; // green (Online)
+                        dot.style.boxShadow = '0 0 6px rgba(34, 197, 94, 0.6)';
                     }
                 } else {
                     dot.style.background = '#94a3b8'; // gray (Offline)
                 }
                 
+                const nameContainer = document.createElement('div');
+                nameContainer.className = 'flex flex-col';
+                
                 const name = document.createElement('div');
-                name.className = 'text-white';
+                name.className = 'text-white font-medium';
                 name.textContent = f.display_name || f.username;
                 
+                // Status badge with emoji and color coding
+                const statusBadge = document.createElement('span');
+                statusBadge.className = 'status-text text-xs px-2 py-0.5 rounded-full inline-block mt-1';
+                statusBadge.style.width = 'fit-content';
+                
+                if (f.status === 'pending') {
+                    statusBadge.textContent = '⏳ Pending';
+                    statusBadge.style.background = 'rgba(156, 163, 175, 0.2)';
+                    statusBadge.style.color = '#9ca3af';
+                } else if (f.is_online) {
+                    if (userStatus === 'Busy') {
+                        statusBadge.textContent = '🔴 Busy';
+                        statusBadge.style.background = 'rgba(239, 68, 68, 0.2)';
+                        statusBadge.style.color = '#ef4444';
+                    } else if (userStatus === 'Away') {
+                        statusBadge.textContent = '🟡 Away';
+                        statusBadge.style.background = 'rgba(245, 158, 11, 0.2)';
+                        statusBadge.style.color = '#f59e0b';
+                    } else {
+                        statusBadge.textContent = '🟢 Online';
+                        statusBadge.style.background = 'rgba(34, 197, 94, 0.2)';
+                        statusBadge.style.color = '#22c55e';
+                    }
+                } else {
+                    statusBadge.textContent = '⚫ Offline';
+                    statusBadge.style.background = 'rgba(148, 163, 184, 0.2)';
+                    statusBadge.style.color = '#94a3b8';
+                }
+                
+                nameContainer.appendChild(name);
+                nameContainer.appendChild(statusBadge);
+                
                 left.appendChild(dot);
-                left.appendChild(name);
+                left.appendChild(nameContainer);
 
-                // Right side: status text + action buttons
+                // Right side: action buttons
                 const actions = document.createElement('div');
                 actions.className = 'flex items-center gap-2';
-
-                const status = document.createElement('span');
-                status.className = 'text-sm text-gray-300 status-text';
-                
-                // Show appropriate status text
-                if (f.status === 'pending') {
-                    status.textContent = 'Pending';
-                } else if (f.is_online) {
-                    status.textContent = userStatus; // Online, Busy, or Away
-                } else {
-                    status.textContent = 'Offline';
-                }
 
                 // If the relation is 'incoming' and status is pending, show accept/decline
                 if (f.status === 'pending' && f.relation === 'incoming') {
                     const accept = document.createElement('button');
-                    accept.className = 'bg-game-dark text-white px-2 py-1 rounded text-sm';
+                    accept.className = 'bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded text-sm transition-colors';
                     accept.title = 'Accept';
                     accept.textContent = '✔';
                     accept.onclick = async () => {
@@ -248,7 +359,7 @@ export class FriendWidget {
                     };
 
                     const decline = document.createElement('button');
-                    decline.className = 'bg-game-dark text-white px-2 py-1 rounded text-sm';
+                    decline.className = 'bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded text-sm transition-colors';
                     decline.title = 'Decline';
                     decline.textContent = '✖';
                     decline.onclick = async () => {
@@ -262,13 +373,12 @@ export class FriendWidget {
                         }
                     };
 
-                    actions.appendChild(status);
                     actions.appendChild(accept);
                     actions.appendChild(decline);
                 } else if (f.status === 'pending' && f.relation === 'outgoing') {
                     // outgoing pending -> allow cancel
                     const cancel = document.createElement('button');
-                    cancel.className = 'ml-2 bg-game-dark text-white px-2 py-1 rounded text-sm';
+                    cancel.className = 'bg-gray-600 hover:bg-gray-700 text-white px-3 py-1.5 rounded text-sm transition-colors';
                     cancel.textContent = 'Cancel';
                     cancel.onclick = async () => {
                         const ok = await (window as any).app.confirm('Cancel request', `Cancel friend request to ${f.display_name || f.username}?`);
@@ -280,12 +390,11 @@ export class FriendWidget {
                             await (window as any).app.showInfo('Cancel failed', AuthService.extractErrorMessage(err) || 'Failed to cancel request');
                         }
                     };
-                    actions.appendChild(status);
                     actions.appendChild(cancel);
                 } else {
                     // accepted friend -> show remove
                     const remove = document.createElement('button');
-                    remove.className = 'ml-2 bg-game-red text-white px-2 py-1 rounded text-xs';
+                    remove.className = 'bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded text-xs transition-colors';
                     remove.textContent = 'Remove';
                     remove.onclick = async () => {
                         const ok = await (window as any).app.confirm(`Remove ${f.display_name || f.username}`, 'Are you sure you want to remove this friend?');
@@ -297,7 +406,6 @@ export class FriendWidget {
                             await (window as any).app.showInfo('Failed to remove friend', AuthService.extractErrorMessage(err) || String(err));
                         }
                     };
-                    actions.appendChild(status);
                     actions.appendChild(remove);
                 }
 
@@ -313,7 +421,8 @@ export class FriendWidget {
 
     // Add method to update friend presence from WebSocket broadcasts
     updateFriendPresence(userId: number, status: string, isOnline: boolean): void {
-        if (!this.panel || !this.visible) return;
+        // Update even when not visible - this keeps the data fresh for when user opens the panel
+        if (!this.panel) return;
         
         const listEl = this.panel.querySelector('#friend-list') as HTMLElement | null;
         if (!listEl) return;
@@ -324,24 +433,46 @@ export class FriendWidget {
             const friendId = parseInt(row.getAttribute('data-friend-id') || '0');
             if (friendId === userId) {
                 const dot = row.querySelector('.status-dot') as HTMLElement | null;
-                const statusText = row.querySelector('.status-text') as HTMLElement | null;
+                const statusBadge = row.querySelector('.status-text') as HTMLElement | null;
                 
                 if (dot) {
                     if (isOnline) {
                         if (status === 'Busy') {
                             dot.style.background = '#ef4444';
+                            dot.style.boxShadow = '0 0 6px rgba(239, 68, 68, 0.6)';
                         } else if (status === 'Away') {
                             dot.style.background = '#f59e0b';
+                            dot.style.boxShadow = '0 0 6px rgba(245, 158, 11, 0.6)';
                         } else {
                             dot.style.background = '#22c55e';
+                            dot.style.boxShadow = '0 0 6px rgba(34, 197, 94, 0.6)';
                         }
                     } else {
                         dot.style.background = '#94a3b8';
+                        dot.style.boxShadow = 'none';
                     }
                 }
                 
-                if (statusText) {
-                    statusText.textContent = isOnline ? status : 'Offline';
+                if (statusBadge && !statusBadge.textContent?.includes('Pending')) {
+                    if (isOnline) {
+                        if (status === 'Busy') {
+                            statusBadge.textContent = '🔴 Busy';
+                            statusBadge.style.background = 'rgba(239, 68, 68, 0.2)';
+                            statusBadge.style.color = '#ef4444';
+                        } else if (status === 'Away') {
+                            statusBadge.textContent = '🟡 Away';
+                            statusBadge.style.background = 'rgba(245, 158, 11, 0.2)';
+                            statusBadge.style.color = '#f59e0b';
+                        } else {
+                            statusBadge.textContent = '🟢 Online';
+                            statusBadge.style.background = 'rgba(34, 197, 94, 0.2)';
+                            statusBadge.style.color = '#22c55e';
+                        }
+                    } else {
+                        statusBadge.textContent = '⚫ Offline';
+                        statusBadge.style.background = 'rgba(148, 163, 184, 0.2)';
+                        statusBadge.style.color = '#94a3b8';
+                    }
                 }
             }
         });
