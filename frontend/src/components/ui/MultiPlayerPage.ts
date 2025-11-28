@@ -37,10 +37,11 @@ export class MultiplayerPage {
         connectionCard.className = 'glass-effect p-8 rounded-2xl max-w-md mx-auto';
 
         if (this.status === 'disconnected') {
+            // Quick Match button now uses quickMatch method
             const quickMatchButton = document.createElement('button');
             quickMatchButton.textContent = '🎮 Find Online Match';
             quickMatchButton.className = 'btn-primary w-full text-lg py-4 mb-4';
-            quickMatchButton.onclick = () => this.createPrivateRoom();
+            quickMatchButton.onclick = () => this.quickMatch();
 
             const divider = document.createElement('div');
             divider.className = 'flex items-center my-6';
@@ -640,5 +641,57 @@ export class MultiplayerPage {
         document.body.appendChild(overlay);
 
         setTimeout(() => input.focus(), 50);
+    }
+
+    // Add quickMatch method
+    private quickMatch(): void {
+        this.status = 'connecting';
+        this.renderConnectionScreen();
+
+        // Build quick match WebSocket URL
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const host = window.location.host || `${window.location.hostname}${window.location.port ? ':' + window.location.port : ''}`;
+        const token = AuthService.getToken();
+        const tokenParam = token ? `?token=${encodeURIComponent(token)}` : '';
+        const wsUrl = `${protocol}//${host}/ws/quick${tokenParam}`;
+
+        let socket: WebSocket | null = null;
+        try {
+            socket = new WebSocket(wsUrl);
+        } catch {
+            alert('WebSocket connection failed. Make sure the server is running.');
+            this.status = 'disconnected';
+            this.renderConnectionScreen();
+            return;
+        }
+
+        socket.onopen = () => {
+            this.socket = socket as any;
+        };
+
+        socket.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            if (data.type === 'quick_waiting') {
+                this.status = 'waiting';
+                this.renderConnectionScreen();
+            } else if (data.type === 'joined' || data.type === 'peerJoined' || data.type === 'ready') {
+                this.setupWebSocketHandlers(socket!);
+            } else {
+                if (this.game && typeof (this.game as any).onSocketMessage === 'function') {
+                    (this.game as any).onSocketMessage(data);
+                }
+            }
+        };
+
+        socket.onerror = () => {
+            alert('WebSocket error. Make sure the server is running.');
+            this.status = 'disconnected';
+            this.renderConnectionScreen();
+        };
+
+        socket.onclose = () => {
+            this.status = 'disconnected';
+            this.renderConnectionScreen();
+        };
     }
 }

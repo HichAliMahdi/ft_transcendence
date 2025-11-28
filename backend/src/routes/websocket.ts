@@ -15,6 +15,12 @@ interface UserRow {
 // Global registry of connected users for presence broadcasting
 const presenceConnections = new Map<number, Set<WS>>();
 
+// Add rooms map at top-level scope
+const rooms = new Map<string, GameRoom>();
+
+// Quick match queue (FIFO)
+const quickMatchQueue: WS[] = [];
+
 export function broadcastPresenceUpdate(userId: number, status: string, isOnline: boolean): void {
   const message = JSON.stringify({
     type: 'presence_update',
@@ -37,10 +43,44 @@ export function broadcastPresenceUpdate(userId: number, status: string, isOnline
   }
 }
 
-export default async function websocketRoutes(fastify: FastifyInstance) {
-  const rooms = new Map<string, GameRoom>();
+function handleQuickMatch(socket: WS, fastify: FastifyInstance) {
+  // Remove socket from queue if already present
+  const idx = quickMatchQueue.indexOf(socket);
+  if (idx !== -1) quickMatchQueue.splice(idx, 1);
 
-  const wsHandler = (connection: any, request: FastifyRequest) => {
+  quickMatchQueue.push(socket);
+
+  // If two sockets are waiting, pair them
+  if (quickMatchQueue.length >= 2) {
+    const s1 = quickMatchQueue.shift()!;
+    const s2 = quickMatchQueue.shift()!;
+    const roomId = Math.random().toString(36).substring(2, 8).toUpperCase();
+    if (!rooms.has(roomId)) {
+      rooms.set(roomId, new GameRoom(roomId));
+    }
+    const room = rooms.get(roomId)!;
+    room.addClient(s1);
+    room.addClient(s2);
+    fastify.log.info(`QuickMatch: paired sockets in room ${roomId}`);
+  } else {
+    // Notify waiting
+    try {
+      socket.send(JSON.stringify({ type: 'quick_waiting' }));
+    } catch (e) {}
+  }
+
+  socket.on('close', () => {
+    const idx = quickMatchQueue.indexOf(socket);
+    if (idx !== -1) quickMatchQueue.splice(idx, 1);
+  });
+  socket.on('error', () => {
+    const idx = quickMatchQueue.indexOf(socket);
+    if (idx !== -1) quickMatchQueue.splice(idx, 1);
+  });
+}
+
+export default async function websocketRoutes(fastify: FastifyInstance) {
+    const wsHandler = (connection: any, request: FastifyRequest) => {
     const socket: WS = connection.socket;
     const params = (request.params as any) || {};
     const query = (request.query as any) || {};
@@ -159,4 +199,121 @@ export default async function websocketRoutes(fastify: FastifyInstance) {
 
   fastify.get('/ws', { websocket: true }, wsHandler);
   fastify.get('/ws/:room', { websocket: true }, wsHandler);
+
+  fastify.get('/ws/quick', { websocket: true }, (connection, request) => {
+    const socket: WS = connection.socket;
+    const params = (request.params as any) || {};
+    const query = (request.query as any) || {};
+    let roomId: string | null = params.room || null;
+    let socketUserId: number | null = null;
+
+    // Attempt to decode JWT from query parameter or authorization header
+    try {
+      let token: string | null = null;
+      
+      // First try query parameter (for browser WebSocket connections)
+      if (query.token) {
+        token = query.token;
+      } else {
+        // Fallback to authorization header
+        const authHeader = (request.headers.authorization || '') as string;
+        const parts = authHeader.split(' ');
+        if (parts.length === 2 && parts[0] === 'Bearer' && parts[1]) {
+          token = parts[1];
+        }
+      }
+      
+      if (token) {
+        try {
+          const decoded = jwt.verify(token, config.jwt.secret) as any;
+          const userId = Number(decoded.userId);
+          if (!Number.isNaN(userId)) {
+            const row = db.prepare('SELECT id, username, display_name, status, is_online FROM users WHERE id = ?').get(userId) as (UserRow & { status?: string; is_online?: number }) | undefined;
+            if (row) {
+              (socket as any).user = { id: row.id, username: row.username, display_name: row.display_name };
+              socketUserId = row.id;
+              
+              // Register socket for presence updates
+              if (!presenceConnections.has(userId)) {
+                presenceConnections.set(userId, new Set());
+              }
+              presenceConnections.get(userId)!.add(socket);
+              
+              // Broadcast user came online (if not already)
+              if (!row.is_online) {
+                db.prepare('UPDATE users SET is_online = 1, status = ? WHERE id = ?').run(row.status || 'Online', userId);
+                broadcastPresenceUpdate(userId, row.status || 'Online', true);
+              }
+            }
+          }
+        } catch (err2) {
+          fastify.log.debug('WS token verify failed', err2 as any);
+        }
+      }
+    } catch (err) {
+      fastify.log.debug('WS auth decode failed', err as any);
+    }
+
+    if (!roomId) {
+      roomId = Math.random().toString(36).substring(2, 8).toUpperCase();
+    }
+
+    if (!rooms.has(roomId)) {
+      rooms.set(roomId, new GameRoom(roomId));
+    }
+    const room = rooms.get(roomId)!;
+
+    const assignment = room.addClient(socket);
+    fastify.log.info(`Socket joined room ${roomId} as player ${assignment.player} host=${assignment.isHost} user=${socketUserId || 'anonymous'}`);
+
+    socket.on('message', (raw: any) => {
+      let payload: any = null;
+      try {
+        const text = typeof raw === 'string' ? raw : raw.toString();
+        payload = JSON.parse(text);
+      } catch (err) {
+        fastify.log.debug('Invalid WS message JSON', err as any);
+        return;
+      }
+      try {
+        room.handleMessage(socket, payload);
+      } catch (e) {
+        fastify.log.debug('Room handle message error', e as any);
+      }
+    });
+
+    socket.on('close', () => {
+      try {
+        room.removeClient(socket);
+        if (room.getClientCount && room.getClientCount() === 0) {
+          rooms.delete(roomId!);
+          fastify.log.info(`Room ${roomId} deleted (empty)`);
+        }
+      } catch (err) {
+        fastify.log.debug('Error during ws close', err as any);
+      }
+      
+      // Handle presence cleanup
+      if (socketUserId) {
+        const userSockets = presenceConnections.get(socketUserId);
+        if (userSockets) {
+          userSockets.delete(socket);
+          // If this was the last socket for this user, mark them offline
+          if (userSockets.size === 0) {
+            presenceConnections.delete(socketUserId);
+            try {
+              db.prepare('UPDATE users SET is_online = 0, status = ?, last_seen = CURRENT_TIMESTAMP WHERE id = ?').run('Offline', socketUserId);
+              broadcastPresenceUpdate(socketUserId, 'Offline', false);
+            } catch (e) {
+              fastify.log.debug({ err: e }, 'Failed to update user offline status');
+            }
+          }
+        }
+      }
+    });
+
+    socket.on('error', (err: any) => {
+      fastify.log.debug('WS error', err as any);
+    });
+  });
 }
