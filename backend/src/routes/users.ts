@@ -424,4 +424,31 @@ return reply.code(200).send({ message: 'Friend request accepted' });
       return reply.code(500).send({ message: 'Failed to mark notification read' });
     }
   });
+
+  // Set user presence/status (owner only)
+  fastify.post('/users/:id/status', async (request: FastifyRequest, reply: FastifyReply) => {
+    const auth = verifyAuth(request, reply);
+    if (!auth) return;
+    const targetId = Number((request.params as any).id);
+    if (auth.userId !== targetId) {
+      return reply.status(403).send({ message: 'Forbidden' });
+    }
+
+    try {
+      const body = (request.body || {}) as any;
+      const status = (body.status || '').toString();
+      const allowed = ['Online', 'Busy', 'Away', 'Offline'];
+      if (!allowed.includes(status)) {
+        return reply.status(400).send({ message: 'Invalid status' });
+      }
+      const isOnline = status === 'Offline' ? 0 : 1;
+      db.prepare('UPDATE users SET status = ?, is_online = ? WHERE id = ?').run(status, isOnline, targetId);
+
+      const updated = db.prepare('SELECT id, username, display_name, avatar_url, is_online, status, last_seen, created_at, updated_at FROM users WHERE id = ?').get(targetId);
+      return reply.code(200).send({ user: updated });
+    } catch (err) {
+      request.log.error(err);
+      return reply.code(500).send({ message: 'Failed to set status' });
+    }
+  });
 }
