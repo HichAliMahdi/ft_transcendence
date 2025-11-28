@@ -73,7 +73,7 @@ export class FriendWidget {
     private createUI(): void {
         this.root = document.createElement('div');
         this.root.id = 'friend-widget-root';
-        this.root.className = 'fixed bottom-5 right-5 z-[9999]';
+        this.root.className = 'fixed bottom-5 right-5 z-[9998]';
         document.body.appendChild(this.root);
 
         (window as any)._friendWidget = this;
@@ -81,14 +81,14 @@ export class FriendWidget {
         this.btn = document.createElement('button');
         this.btn.id = 'friend-widget-btn';
         this.btn.title = 'Friends';
-        this.btn.className = 'bg-game-dark hover:bg-blue-800 text-white rounded-full w-14 h-14 flex items-center justify-center shadow-lg cursor-pointer text-2xl';
+        this.btn.className = 'bg-game-dark hover:bg-blue-800 text-white rounded-full w-14 h-14 flex items-center justify-center shadow-lg cursor-pointer text-2xl relative z-10';
         this.btn.innerHTML = '👥';
         this.btn.onclick = () => this.toggle();
         this.root.appendChild(this.btn);
 
         this.panel = document.createElement('div');
         this.panel.id = 'friend-widget-panel';
-        this.panel.className = 'glass-effect p-4 rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.6)] w-[340px] max-h-[70vh] overflow-auto mb-3 hidden';
+        this.panel.className = 'glass-effect p-4 rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.6)] w-[340px] max-h-[70vh] overflow-auto absolute bottom-16 right-0 hidden';
         this.root.appendChild(this.panel);
 
         // Personal Status Section
@@ -234,8 +234,13 @@ export class FriendWidget {
 
     closePanel(): void {
         this.visible = false;
-        if (this.panel) this.panel.style.display = 'none';
-        if (this.btn) (this.btn as HTMLElement).classList.remove('bg-accent-pink');
+        if (this.panel) {
+            this.panel.classList.remove('block');
+            this.panel.classList.add('hidden');
+        }
+        if (this.btn) {
+            this.btn.classList.remove('bg-accent-pink');
+        }
     }
 
     private async fetchAndRender(): Promise<void> {

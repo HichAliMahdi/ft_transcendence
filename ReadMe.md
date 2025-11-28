@@ -20,10 +20,15 @@ Ft_transcendence
 - Status indicator dot next to username in header
 - Clean, non-redundant status display throughout the UI
 - Fully Tailwind CSS-based styling (no inline styles)
+- Fixed widget positioning and z-index for proper click interaction
 
 /// RECENT IMPROVEMENTS ///
-- Converted all inline styles to Tailwind CSS utility classes
-- Cleaned up custom CSS and replaced with Tailwind utilities
-- Improved maintainability with consistent styling approach
-- Better responsive design with Tailwind's breakpoint system
-- Enhanced code readability with declarative Tailwind classes
+- Fixed TypeScript compilation errors in NotificationWidget
+- Corrected AuthService method names (clearNotifications, markNotificationRead, getNotifications)
+- Removed unused authWatcherId variable
+- Added proper payload parsing for notification messages
+- Fixed widget overlap and click issues by adjusting positioning
+- Notification widget positioned at right-24 to avoid overlap with friend widget
+- Proper z-index hierarchy for widgets (Friend: 9998, Notification: 9999)
+- Panels now use absolute positioning relative to their root containers
+- Each widget closes the other when opened for better UX
