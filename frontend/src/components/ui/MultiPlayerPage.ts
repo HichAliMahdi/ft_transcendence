@@ -96,71 +96,32 @@ export class MultiplayerPage {
             connectionCard.appendChild(divider);
             connectionCard.appendChild(createRoomButton);
             connectionCard.appendChild(joinRoomContainer);
-
         } else if (this.status === 'connecting') {
             const statusText = document.createElement('p');
-            statusText.textContent = 'Connecting to server...';
-            statusText.className = 'text-white text-center text-lg';
+            statusText.textContent = 'Looking for an opponent...';
+            statusText.className = 'text-white text-center text-lg mb-4';
 
             const spinner = document.createElement('div');
             spinner.className = 'loader mx-auto my-4';
 
+            const leaveQueueButton = document.createElement('button');
+            leaveQueueButton.textContent = 'Leave Queue';
+            leaveQueueButton.className = 'bg-game-red hover:bg-red-600 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-300 mt-4';
+            leaveQueueButton.onclick = () => {
+                if (this.socket) {
+                    try { this.socket.close(); } catch {}
+                    this.socket = null;
+                }
+                this.status = 'disconnected';
+                this.renderConnectionScreen();
+            };
+
             connectionCard.appendChild(statusText);
             connectionCard.appendChild(spinner);
-            
-        } else if (this.status === 'waiting') {
-            const statusText = document.createElement('p');
-            statusText.className = 'text-white text-center text-lg mb-4';
-            
-            if (this.isHost) {
-                statusText.textContent = 'Waiting for opponent to join...';
-                
-                const roomCodeDisplay = document.createElement('div');
-                roomCodeDisplay.className = 'bg-game-dark p-6 rounded-xl my-6';
-                
-                const codeLabel = document.createElement('p');
-                codeLabel.className = 'text-gray-400 text-sm mb-2 text-center';
-                codeLabel.textContent = 'Share this code with your friend:';
-                
-                const codeValue = document.createElement('p');
-                codeValue.className = 'text-3xl font-bold text-accent-pink text-center tracking-wider';
-                codeValue.textContent = this.roomId || '';
-                
-                const copyButton = document.createElement('button');
-                copyButton.textContent = '📋 Copy Code';
-                copyButton.className = 'bg-accent-purple hover:bg-purple-600 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-300 mt-4 mx-auto block';
-                copyButton.onclick = () => {
-                    navigator.clipboard.writeText(this.roomId || '');
-                    copyButton.textContent = '✓ Copied!';
-                    setTimeout(() => {
-                        copyButton.textContent = '📋 Copy Code';
-                    }, 2000);
-                };
-                
-                roomCodeDisplay.appendChild(codeLabel);
-                roomCodeDisplay.appendChild(codeValue);
-                roomCodeDisplay.appendChild(copyButton);
-                
-                connectionCard.appendChild(statusText);
-                connectionCard.appendChild(roomCodeDisplay);
-            } else {
-                statusText.textContent = 'Looking for opponent...';
-                
-                const spinner = document.createElement('div');
-                spinner.className = 'loader mx-auto my-4';
-                
-                connectionCard.appendChild(statusText);
-                connectionCard.appendChild(spinner);
-            }
-
-            const cancelButton = document.createElement('button');
-            cancelButton.textContent = 'Cancel';
-            cancelButton.className = 'bg-game-red hover:bg-red-600 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-300 mt-4';
-            cancelButton.onclick = () => this.disconnect();
-            
-            connectionCard.appendChild(cancelButton);
+            connectionCard.appendChild(leaveQueueButton);
         }
 
+        // Fix: define instructions before using it
         const instructions = document.createElement('div');
         instructions.className = 'glass-effect p-6 rounded-2xl mt-8 max-w-2xl mx-auto';
 
@@ -182,11 +143,9 @@ export class MultiplayerPage {
         points.forEach(point => {
             const li = document.createElement('li');
             li.className = 'flex items-start';
-            
             const bullet = document.createElement('span');
             bullet.textContent = '•';
             bullet.className = 'mr-2 text-accent-pink';
-            
             li.appendChild(bullet);
             li.appendChild(document.createTextNode(point));
             instructionsList.appendChild(li);
@@ -667,13 +626,17 @@ export class MultiplayerPage {
 
         socket.onopen = () => {
             this.socket = socket as any;
+            // Show "Looking for an opponent..." immediately after connecting
+            this.status = 'connecting';
+            this.renderConnectionScreen();
         };
 
         socket.onmessage = (event) => {
             const data = JSON.parse(event.data);
             if (data.type === 'quick_waiting') {
-                this.status = 'waiting';
-                this.renderConnectionScreen();
+                // Already handled by 'connecting' state, but you can use 'waiting' if you want a different UI
+                // this.status = 'connecting';
+                // this.renderConnectionScreen();
             } else if (data.type === 'joined' || data.type === 'peerJoined' || data.type === 'ready') {
                 this.setupWebSocketHandlers(socket!);
             } else {
