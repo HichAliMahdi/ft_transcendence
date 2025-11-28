@@ -13,6 +13,7 @@ export function initializeDatabase(): void {
             display_name TEXT NOT NULL DEFAULT '',
             avatar_url TEXT DEFAULT '/default-avatar.png',
             is_online INTEGER DEFAULT 0,
+            status TEXT NOT NULL DEFAULT 'Offline',
             last_seen DATETIME DEFAULT CURRENT_TIMESTAMP,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP

@@ -190,6 +190,29 @@ export class AuthService {
         }
     }
 
+    // Set user's presence/status (Online | Busy | Away | Offline)
+    static async setStatus(status: 'Online'|'Busy'|'Away'|'Offline'): Promise<User> {
+        const token = this.getToken();
+        const user = this.getUser();
+        if (!token || !user) throw new Error('Not authenticated');
+        const resp = await fetch(`${API_BASE}/users/${user.id}/status`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status })
+        });
+        if (!resp.ok) {
+            await this.parseResponseError(resp);
+        }
+        const data = await resp.json();
+        const updated = data.user;
+        // update local cache
+        try {
+            localStorage.setItem(this.USER_KEY, JSON.stringify(updated));
+            try { window.dispatchEvent(new Event('auth:change')); } catch (e) {}
+        } catch (e) {}
+        return updated;
+    }
+
     static isAuthenticated(): boolean {
         return this.getToken() !== null;
     }

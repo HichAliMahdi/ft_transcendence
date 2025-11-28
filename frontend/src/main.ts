@@ -327,6 +327,41 @@ class App {
             welcomeText.className = 'text-white';
             welcomeText.textContent = `Welcome, ${user?.display_name || user?.username}!`;
 
+            // Status selector (placed after welcome text, before logout)
+            const statusSelect = document.createElement('select');
+            statusSelect.className = 'bg-game-dark text-white px-3 py-2 rounded-lg';
+            const statuses = ['Online','Busy','Away','Offline'];
+            statuses.forEach(s => {
+                const opt = document.createElement('option');
+                opt.value = s;
+                opt.textContent = s;
+                statusSelect.appendChild(opt);
+            });
+            // Preference: use server/cached user status if available; default to Online for authenticated users
+            const currentStatus = (user && (user as any).status) ? (user as any).status : 'Online';
+            statusSelect.value = currentStatus;
+
+            statusSelect.onchange = async () => {
+                const newStatus = statusSelect.value as 'Online'|'Busy'|'Away'|'Offline';
+                try {
+                    await AuthService.setStatus(newStatus);
+                } catch (err: any) {
+                    await (window as any).app.showInfo('Status update failed', AuthService.extractErrorMessage(err) || String(err));
+                    // revert select to cached value
+                    const cached = AuthService.getUser();
+                    statusSelect.value = (cached && (cached as any).status) ? (cached as any).status : 'Online';
+                }
+            };
+
+            // Ensure authenticated user is online by default (only call when cached status is not Online)
+            try {
+                if (currentStatus !== 'Online') {
+                    // fire-and-forget; keep UI responsive
+                    AuthService.setStatus('Online').catch(() => {});
+                    statusSelect.value = 'Online';
+                }
+            } catch (e) {}
+
             const logoutBtn = document.createElement('button');
             logoutBtn.id = 'logout-btn';
             logoutBtn.className = 'bg-game-red hover:bg-red-600 text-white px-4 py-2 rounded-lg transition-colors duration-300';
@@ -338,6 +373,7 @@ class App {
             };
 
             container.appendChild(welcomeText);
+            container.appendChild(statusSelect);
             container.appendChild(logoutBtn);
             authSection.appendChild(container);
 

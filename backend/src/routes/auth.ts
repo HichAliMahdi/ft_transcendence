@@ -44,19 +44,16 @@ export default async function authRoutes(fastify: FastifyInstance) {
                 }
 
                 const password_hash = await bcrypt.hash(password, 10);
+                // mark new user as online immediately and set status = 'Online'
                 const result = db.prepare(
-                    'INSERT INTO users (username, email, password_hash, display_name) VALUES (?, ?, ?, ?)'
-                ).run(username, email, password_hash, display_name);
+                    'INSERT INTO users (username, email, password_hash, display_name, is_online, status) VALUES (?, ?, ?, ?, 1, ?)'
+                ).run(username, email, password_hash, display_name, 'Online');
 
-                const token = jwt.sign(
-                    { userId: result.lastInsertRowid }, 
-                    config.jwt.secret,
-                    { expiresIn: '7d' }
-                );
+                const token = jwt.sign({ userId: result.lastInsertRowid }, config.jwt.secret, { expiresIn: '7d' });
                 reply.code(201).send({
                     message: 'User registered successfully',
                     token,
-                    user: { id: result.lastInsertRowid, username, email, display_name }
+                    user: { id: result.lastInsertRowid, username, email, display_name, status: 'Online', is_online: 1 }
                 });
             } catch (error) {
                 fastify.log.error(error);
@@ -85,7 +82,8 @@ export default async function authRoutes(fastify: FastifyInstance) {
                     return reply.status(401).send({ message: 'Invalid username or password' });
                 }
 
-                db.prepare('UPDATE users SET is_online = 1, last_seen = CURRENT_TIMESTAMP WHERE id = ?').run(user.id);
+                // mark user online and status Online
+                db.prepare('UPDATE users SET is_online = 1, last_seen = CURRENT_TIMESTAMP, status = ? WHERE id = ?').run('Online', user.id);
                 
                 const token = jwt.sign(
                     { userId: user.id }, 
@@ -95,7 +93,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
                 reply.code(200).send({
                     message: 'Login successful',
                     token,
-                    user: { id: user.id, username: user.username, email: user.email, display_name: user.display_name }
+                    user: { id: user.id, username: user.username, email: user.email, display_name: user.display_name, status: 'Online', is_online: 1 }
                 });
             } catch (error) {
                 fastify.log.error(error);
@@ -119,7 +117,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
             const decoded = jwt.verify(token, config.jwt.secret) as { userId: number };
             const userId = decoded.userId;
 
-            db.prepare('UPDATE users SET is_online = 0, last_seen = CURRENT_TIMESTAMP WHERE id = ?').run(userId);
+            db.prepare('UPDATE users SET is_online = 0, last_seen = CURRENT_TIMESTAMP, status = ? WHERE id = ?').run('Offline', userId);
 
             reply.code(200).send({ message: 'Logout successful' });
         } catch (error) {
@@ -143,7 +141,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
             const decoded = jwt.verify(token, config.jwt.secret) as { userId: number };
             const userId = decoded.userId;
 
-            const user = db.prepare('SELECT id, username, email, display_name, avatar_url, is_online, last_seen, created_at, updated_at FROM users WHERE id = ?').get(userId);
+            const user = db.prepare('SELECT id, username, email, display_name, avatar_url, is_online, status, last_seen, created_at, updated_at FROM users WHERE id = ?').get(userId);
             if (!user) {
                 return reply.status(404).send({ message: 'User not found' });
             }
