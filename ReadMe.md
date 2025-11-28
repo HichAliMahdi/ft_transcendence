@@ -21,14 +21,11 @@ Ft_transcendence
 - Clean, non-redundant status display throughout the UI
 - Fully Tailwind CSS-based styling (no inline styles)
 - Fixed widget positioning and z-index for proper click interaction
+- WebSocket authentication via query parameter for online multiplayer
 
 /// RECENT IMPROVEMENTS ///
-- Fixed TypeScript compilation errors in NotificationWidget
-- Corrected AuthService method names (clearNotifications, markNotificationRead, getNotifications)
-- Removed unused authWatcherId variable
-- Added proper payload parsing for notification messages
-- Fixed widget overlap and click issues by adjusting positioning
-- Notification widget positioned at right-24 to avoid overlap with friend widget
-- Proper z-index hierarchy for widgets (Friend: 9998, Notification: 9999)
-- Panels now use absolute positioning relative to their root containers
-- Each widget closes the other when opened for better UX
+- Fixed WebSocket authentication for online multiplayer matches
+- Token now passed as query parameter (?token=...) instead of headers
+- Backend WebSocket handler accepts token from both query param and auth header
+- Proper user info attached to WebSocket connections for friend features
+- Enhanced logging for WebSocket connections with user identification

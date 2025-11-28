@@ -43,15 +43,27 @@ export default async function websocketRoutes(fastify: FastifyInstance) {
   const wsHandler = (connection: any, request: FastifyRequest) => {
     const socket: WS = connection.socket;
     const params = (request.params as any) || {};
+    const query = (request.query as any) || {};
     let roomId: string | null = params.room || null;
     let socketUserId: number | null = null;
 
-    // Attempt to decode JWT from the request headers and attach basic user info to socket
+    // Attempt to decode JWT from query parameter or authorization header
     try {
-      const authHeader = (request.headers.authorization || '') as string;
-      const parts = authHeader.split(' ');
-      if (parts.length === 2 && parts[0] === 'Bearer' && parts[1]) {
-        const token = parts[1];
+      let token: string | null = null;
+      
+      // First try query parameter (for browser WebSocket connections)
+      if (query.token) {
+        token = query.token;
+      } else {
+        // Fallback to authorization header
+        const authHeader = (request.headers.authorization || '') as string;
+        const parts = authHeader.split(' ');
+        if (parts.length === 2 && parts[0] === 'Bearer' && parts[1]) {
+          token = parts[1];
+        }
+      }
+      
+      if (token) {
         try {
           const decoded = jwt.verify(token, config.jwt.secret) as any;
           const userId = Number(decoded.userId);
@@ -92,7 +104,7 @@ export default async function websocketRoutes(fastify: FastifyInstance) {
     const room = rooms.get(roomId)!;
 
     const assignment = room.addClient(socket);
-    fastify.log.info(`Socket joined room ${roomId} as player ${assignment.player} host=${assignment.isHost}`);
+    fastify.log.info(`Socket joined room ${roomId} as player ${assignment.player} host=${assignment.isHost} user=${socketUserId || 'anonymous'}`);
 
     socket.on('message', (raw: any) => {
       let payload: any = null;

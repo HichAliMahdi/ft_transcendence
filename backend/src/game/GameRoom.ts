@@ -134,7 +134,7 @@ export class GameRoom {
       this.enqueueSend(socket, joinedMsg);
     } catch (e) {}
 
-    // if both players present, broadcast peerJoined with player -> user mapping so clients can learn opponent info
+    // if both players present, broadcast peerJoined and ready immediately
     if (this.getPlayerCount() >= 2) {
       // collect player sockets and attached user info
       const playersInfo: Array<{ player: number; user: { id?: number; username?: string; display_name?: string } | null }> = [];
@@ -144,8 +144,9 @@ export class GameRoom {
           playersInfo.push({ player: p, user: su ? { id: su.id, username: su.username, display_name: su.display_name } : null });
         }
       }
-      this.engine.start();
+      this.engine.start(); // <-- Start game engine immediately
       this.broadcastToAll({ type: 'peerJoined', roomId: this.id, players: playersInfo });
+      this.broadcastToAll({ type: 'ready', roomId: this.id }); // <-- Notify clients game is ready
     }
 
     return { player: assigned, isHost };

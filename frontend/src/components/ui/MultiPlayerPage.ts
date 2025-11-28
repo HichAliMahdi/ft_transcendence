@@ -309,10 +309,15 @@ export class MultiplayerPage {
         const host = window.location.host || `${window.location.hostname}${window.location.port ? ':' + window.location.port : ''}`;
         const base = `${protocol}//${host}`;
         
+        // Get authentication token
+        const token = AuthService.getToken();
+        const tokenParam = token ? `?token=${encodeURIComponent(token)}` : '';
+        
         if (room) {
-            return `${base}/ws/${encodeURIComponent(room)}`;
+            return `${base}/ws/${encodeURIComponent(room)}${tokenParam}`;
         } else {
-            return trailingSlash ? `${base}/ws/` : `${base}/ws`;
+            const path = trailingSlash ? '/ws/' : '/ws';
+            return `${base}${path}${tokenParam}`;
         }
     }
 
@@ -371,64 +376,7 @@ export class MultiplayerPage {
                 this.socket = socket as any;
             };
 
-            socket.onmessage = (evt) => {
-                let msg: any;
-                try { msg = JSON.parse(evt.data); } catch (e) { console.warn('Invalid WS message', e); return; }
-
-                switch (msg.type) {
-                    case 'joined':
-                        // Store our player number
-                        this.playerNumber = msg.player ?? null;
-                        this.roomId = msg.roomId;
-                        this.isHost = !!msg.isHost;
-                        this.status = this.isHost ? 'waiting' : 'playing';
-                        if (this.status === 'playing') this.renderGameScreen();
-                        else this.renderConnectionScreen();
-                        break;
-                    case 'created':
-                        this.roomId = msg.roomId;
-                        this.isHost = true;
-                        this.status = 'waiting';
-                        this.renderConnectionScreen();
-                        break;
-                    case 'peerJoined':
-                        // Server sends players array with attached user info when available
-                        if (Array.isArray(msg.players)) {
-                            const players: Array<{ player: number; user?: any | null }> = msg.players;
-                            const opponent = players.find(p => p.player !== this.playerNumber);
-                            if (opponent && opponent.user) {
-                                this.opponentUser = { 
-                                    id: opponent.user.id, 
-                                    username: opponent.user.username, 
-                                    display_name: opponent.user.display_name 
-                                };
-                            }
-                        }
-                        this.status = 'playing';
-                        this.renderGameScreen();
-                        break;
-                    case 'peerLeft':
-                        this.status = 'disconnected';
-                        this.opponentUser = null;
-                        this.showInfoModal(
-                            'Opponent Left',
-                            'Your opponent has left the room. You can return to the lobby or try reconnecting to the same room.',
-                            [
-                                { label: 'Return to Lobby', style: 'danger', action: () => { this.disconnect(); } },
-                                { label: 'Reconnect', style: 'primary', action: () => { this.connectWithRoom(this.roomId || undefined); } }
-                            ]
-                        );
-                        break;
-                    case 'error':
-                        (window as any).app.showInfo('WebSocket Error', msg.message || 'WebSocket error');
-                        break;
-                    default:
-                        if (this.game && typeof (this.game as any).onSocketMessage === 'function') {
-                            (this.game as any).onSocketMessage(msg);
-                        }
-                        break;
-                }
-            };
+            this.setupWebSocketHandlers(socket);
 
             socket.onerror = (err) => {
                 console.error('WebSocket error event on', wsUrl, err);
@@ -461,6 +409,75 @@ export class MultiplayerPage {
         };
 
         tryConnect(0);
+    }
+
+    private setupWebSocketHandlers(ws: WebSocket) {
+        ws.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+
+            switch (data.type) {
+                case 'joined':
+                    // Store our player number
+                    this.playerNumber = data.player ?? null;
+                    this.roomId = data.roomId;
+                    this.isHost = !!data.isHost;
+                    this.status = this.isHost ? 'waiting' : 'playing';
+                    if (this.status === 'playing') this.renderGameScreen();
+                    else this.renderConnectionScreen();
+                    break;
+                case 'created':
+                    this.roomId = data.roomId;
+                    this.isHost = true;
+                    this.status = 'waiting';
+                    this.renderConnectionScreen();
+                    break;
+                case 'peerJoined':
+                    // Server sends players array with attached user info when available
+                    if (Array.isArray(data.players)) {
+                        const players: Array<{ player: number; user?: any | null }> = data.players;
+                        const opponent = players.find(p => p.player !== this.playerNumber);
+                        if (opponent && opponent.user) {
+                            this.opponentUser = { 
+                                id: opponent.user.id, 
+                                username: opponent.user.username, 
+                                display_name: opponent.user.display_name 
+                            };
+                        }
+                    }
+                    this.status = 'playing';
+                    this.renderGameScreen();
+                    break;
+                case 'peerLeft':
+                    this.status = 'disconnected';
+                    this.opponentUser = null;
+                    this.showInfoModal(
+                        'Opponent Left',
+                        'Your opponent has left the room. You can return to the lobby or try reconnecting to the same room.',
+                        [
+                            { label: 'Return to Lobby', style: 'danger', action: () => { this.disconnect(); } },
+                            { label: 'Reconnect', style: 'primary', action: () => { this.connectWithRoom(this.roomId || undefined); } }
+                        ]
+                    );
+                    break;
+                case 'error':
+                    (window as any).app.showInfo('WebSocket Error', data.message || 'WebSocket error');
+                    break;
+                case 'ready':
+                    // Start game UI immediately when both players are present
+                    this.startGameUI();
+                    break;
+                default:
+                    if (this.game && typeof (this.game as any).onSocketMessage === 'function') {
+                        (this.game as any).onSocketMessage(data);
+                    }
+                    break;
+            }
+        };
+    }
+
+    private startGameUI() {
+        this.status = 'playing';
+        this.renderGameScreen();
     }
 
     private createPrivateRoom(): void {
