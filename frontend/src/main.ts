@@ -6,6 +6,7 @@ import { NotificationWidget } from './components/Widgets/NotificationWidget';
 
 class App {
     private router: Router;
+    private presenceSocket: WebSocket | null = null;
 
     private sanitizeForUi(input: string | undefined | null): string {
         if (!input) return '';
@@ -308,7 +309,70 @@ class App {
 
         }
 
+        // Initialize presence WebSocket for realtime status updates
+        this.connectPresenceSocket();
+
         this.router.handleRoute();
+    }
+
+    private connectPresenceSocket(): void {
+        if (!AuthService.isAuthenticated()) return;
+
+        const token = AuthService.getToken();
+        if (!token) return;
+
+        try {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const host = window.location.host;
+            const wsUrl = `${protocol}//${host}/ws`;
+
+            this.presenceSocket = new WebSocket(wsUrl);
+
+            // Send auth token after connection
+            this.presenceSocket.onopen = () => {
+                console.log('Presence WebSocket connected');
+            };
+
+            this.presenceSocket.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    if (data.type === 'presence_update') {
+                        this.handlePresenceUpdate(data.userId, data.status, data.isOnline);
+                    }
+                } catch (e) {
+                    console.debug('Failed to parse presence message', e);
+                }
+            };
+
+            this.presenceSocket.onerror = (err) => {
+                console.debug('Presence WebSocket error', err);
+            };
+
+            this.presenceSocket.onclose = () => {
+                console.log('Presence WebSocket closed');
+                // Attempt reconnect after 5 seconds if still authenticated
+                setTimeout(() => {
+                    if (AuthService.isAuthenticated() && !this.presenceSocket) {
+                        this.connectPresenceSocket();
+                    }
+                }, 5000);
+            };
+        } catch (e) {
+            console.error('Failed to connect presence WebSocket', e);
+        }
+    }
+
+    private handlePresenceUpdate(userId: number, status: string, isOnline: boolean): void {
+        // Update friend widget if it exists
+        const fw = (window as any)._friendWidget;
+        if (fw && typeof fw.updateFriendPresence === 'function') {
+            fw.updateFriendPresence(userId, status, isOnline);
+        }
+
+        // Dispatch custom event for other components
+        window.dispatchEvent(new CustomEvent('user:presence', {
+            detail: { userId, status, isOnline }
+        }));
     }
 
     private updateAuthSection(): void {

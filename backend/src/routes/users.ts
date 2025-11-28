@@ -2,6 +2,7 @@ import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import jwt from 'jsonwebtoken';
 import { db } from '../database/db';
 import { config } from '../config';
+import { broadcastPresenceUpdate } from './websocket';
 
 export default async function userRoutes(fastify: FastifyInstance) {
   fastify.get('/users/:id/stats', async (request: FastifyRequest, reply: FastifyReply) => {
@@ -443,6 +444,9 @@ return reply.code(200).send({ message: 'Friend request accepted' });
       }
       const isOnline = status === 'Offline' ? 0 : 1;
       db.prepare('UPDATE users SET status = ?, is_online = ? WHERE id = ?').run(status, isOnline, targetId);
+
+      // Broadcast presence update to all connected clients
+      broadcastPresenceUpdate(targetId, status, isOnline === 1);
 
       const updated = db.prepare('SELECT id, username, display_name, avatar_url, is_online, status, last_seen, created_at, updated_at FROM users WHERE id = ?').get(targetId);
       return reply.code(200).send({ user: updated });
