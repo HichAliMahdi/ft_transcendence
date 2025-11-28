@@ -3,6 +3,7 @@ import cors from '@fastify/cors';
 import websocketPlugin from '@fastify/websocket';
 import { config } from './config';
 import { initializeDatabase } from './database/db';
+import { runMigrations } from './database/migrations';
 import { TournamentService } from './services/TournamentService';
 import routes from './routes';
 
@@ -21,6 +22,9 @@ const fastify = Fastify({
 
 // Initialize database
 initializeDatabase();
+
+// Run migrations
+runMigrations();
 
 // Clean up abandoned tournaments every hour
 setInterval(() => {

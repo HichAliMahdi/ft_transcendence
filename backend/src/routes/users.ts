@@ -2,6 +2,7 @@ import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import jwt from 'jsonwebtoken';
 import { db } from '../database/db';
 import { config } from '../config';
+import { broadcastPresenceUpdate } from './websocket';
 
 export default async function userRoutes(fastify: FastifyInstance) {
   fastify.get('/users/:id/stats', async (request: FastifyRequest, reply: FastifyReply) => {
@@ -90,16 +91,17 @@ export default async function userRoutes(fastify: FastifyInstance) {
         display_name: string;
         avatar_url?: string | null;
         is_online?: number | null;
+        user_status?: string | null;
       };
 
-      // cast DB output to any[] to avoid '{}' inference, then cast items where needed
       const rawRows = db.prepare(`
         SELECT f.user_id, f.friend_id, f.status,
                u.id      AS other_id,
                u.username,
                u.display_name,
                u.avatar_url,
-               u.is_online
+               u.is_online,
+               u.status  AS user_status
         FROM friends f
         JOIN users u ON u.id = f.friend_id
         WHERE f.user_id = ?
@@ -109,11 +111,12 @@ export default async function userRoutes(fastify: FastifyInstance) {
                u.username,
                u.display_name,
                u.avatar_url,
-               u.is_online
+               u.is_online,
+               u.status  AS user_status
         FROM friends f
         JOIN users u ON u.id = f.user_id
         WHERE f.friend_id = ?
-      `).all(targetId, targetId) as any[]; // use any[] here
+      `).all(targetId, targetId) as any[];
 
       const includePending = auth.userId === targetId;
       const filtered = rawRows
@@ -127,6 +130,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
             display_name: rr.display_name,
             avatar_url: rr.avatar_url || null,
             is_online: !!rr.is_online,
+            user_status: rr.user_status || 'Offline',
             status: rr.status,
             relation
           };
@@ -443,6 +447,9 @@ return reply.code(200).send({ message: 'Friend request accepted' });
       }
       const isOnline = status === 'Offline' ? 0 : 1;
       db.prepare('UPDATE users SET status = ?, is_online = ? WHERE id = ?').run(status, isOnline, targetId);
+
+      // Broadcast presence update to all connected clients
+      broadcastPresenceUpdate(targetId, status, isOnline === 1);
 
       const updated = db.prepare('SELECT id, username, display_name, avatar_url, is_online, status, last_seen, created_at, updated_at FROM users WHERE id = ?').get(targetId);
       return reply.code(200).send({ user: updated });

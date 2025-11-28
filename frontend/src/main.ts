@@ -6,6 +6,7 @@ import { NotificationWidget } from './components/Widgets/NotificationWidget';
 
 class App {
     private router: Router;
+    private presenceSocket: WebSocket | null = null;
 
     private sanitizeForUi(input: string | undefined | null): string {
         if (!input) return '';
@@ -308,7 +309,71 @@ class App {
 
         }
 
+        // Initialize presence WebSocket for realtime status updates
+        this.connectPresenceSocket();
+
         this.router.handleRoute();
+    }
+
+    private connectPresenceSocket(): void {
+        if (!AuthService.isAuthenticated()) return;
+
+        const token = AuthService.getToken();
+        if (!token) return;
+
+        try {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const host = window.location.host;
+            const wsUrl = `${protocol}//${host}/ws`;
+
+            this.presenceSocket = new WebSocket(wsUrl);
+
+            // Send auth token after connection
+            this.presenceSocket.onopen = () => {
+                console.log('Presence WebSocket connected');
+            };
+
+            this.presenceSocket.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    if (data.type === 'presence_update') {
+                        this.handlePresenceUpdate(data.userId, data.status, data.isOnline);
+                    }
+                } catch (e) {
+                    console.debug('Failed to parse presence message', e);
+                }
+            };
+
+            this.presenceSocket.onerror = (err) => {
+                console.debug('Presence WebSocket error', err);
+            };
+
+            this.presenceSocket.onclose = () => {
+                console.log('Presence WebSocket closed');
+                this.presenceSocket = null;
+                // Attempt reconnect after 5 seconds if still authenticated
+                setTimeout(() => {
+                    if (AuthService.isAuthenticated() && !this.presenceSocket) {
+                        this.connectPresenceSocket();
+                    }
+                }, 5000);
+            };
+        } catch (e) {
+            console.error('Failed to connect presence WebSocket', e);
+        }
+    }
+
+    private handlePresenceUpdate(userId: number, status: string, isOnline: boolean): void {
+        // Update friend widget if it exists
+        const fw = (window as any)._friendWidget;
+        if (fw && typeof fw.updateFriendPresence === 'function') {
+            fw.updateFriendPresence(userId, status, isOnline);
+        }
+
+        // Dispatch custom event for other components
+        window.dispatchEvent(new CustomEvent('user:presence', {
+            detail: { userId, status, isOnline }
+        }));
     }
 
     private updateAuthSection(): void {
@@ -323,61 +388,62 @@ class App {
             const container = document.createElement('div');
             container.className = 'flex items-center gap-4';
 
+            // Welcome text with status indicator
+            const welcomeContainer = document.createElement('div');
+            welcomeContainer.className = 'flex items-center gap-2';
+            
             const welcomeText = document.createElement('span');
             welcomeText.className = 'text-white';
             welcomeText.textContent = `Welcome, ${user?.display_name || user?.username}!`;
-
-            // Status selector (placed after welcome text, before logout)
-            const statusSelect = document.createElement('select');
-            statusSelect.className = 'bg-game-dark text-white px-3 py-2 rounded-lg';
-            const statuses = ['Online','Busy','Away','Offline'];
-            statuses.forEach(s => {
-                const opt = document.createElement('option');
-                opt.value = s;
-                opt.textContent = s;
-                statusSelect.appendChild(opt);
-            });
-            // Preference: use server/cached user status if available; default to Online for authenticated users
+            
+            // Status dot indicator
+            const statusDot = document.createElement('span');
+            statusDot.id = 'header-status-dot';
+            
             const currentStatus = (user && (user as any).status) ? (user as any).status : 'Online';
-            statusSelect.value = currentStatus;
-
-            statusSelect.onchange = async () => {
-                const newStatus = statusSelect.value as 'Online'|'Busy'|'Away'|'Offline';
-                try {
-                    await AuthService.setStatus(newStatus);
-                } catch (err: any) {
-                    await (window as any).app.showInfo('Status update failed', AuthService.extractErrorMessage(err) || String(err));
-                    // revert select to cached value
-                    const cached = AuthService.getUser();
-                    statusSelect.value = (cached && (cached as any).status) ? (cached as any).status : 'Online';
-                }
+            const statusColors: {[key: string]: string} = {
+                'Online': '#22c55e',
+                'Busy': '#ef4444',
+                'Away': '#f59e0b',
+                'Offline': '#94a3b8'
             };
-
-            // Ensure authenticated user is online by default (only call when cached status is not Online)
-            try {
-                if (currentStatus !== 'Online') {
-                    // fire-and-forget; keep UI responsive
-                    AuthService.setStatus('Online').catch(() => {});
-                    statusSelect.value = 'Online';
-                }
-            } catch (e) {}
+            
+            const hasGlow = currentStatus !== 'Offline';
+            statusDot.className = `w-2.5 h-2.5 rounded-full inline-block ${hasGlow ? 'shadow-[0_0_8px_currentColor]' : ''}`;
+            statusDot.style.backgroundColor = statusColors[currentStatus] || '#94a3b8';
+            
+            welcomeContainer.appendChild(welcomeText);
+            welcomeContainer.appendChild(statusDot);
 
             const logoutBtn = document.createElement('button');
             logoutBtn.id = 'logout-btn';
             logoutBtn.className = 'bg-game-red hover:bg-red-600 text-white px-4 py-2 rounded-lg transition-colors duration-300';
             logoutBtn.textContent = 'Logout';
             logoutBtn.onclick = async () => {
+                if (this.presenceSocket) {
+                    this.presenceSocket.close();
+                    this.presenceSocket = null;
+                }
                 await AuthService.logout();
                 this.updateAuthSection();
                 this.router.navigateTo('/login');
             };
 
-            container.appendChild(welcomeText);
-            container.appendChild(statusSelect);
+            container.appendChild(welcomeContainer);
             container.appendChild(logoutBtn);
             authSection.appendChild(container);
 
+            if (!this.presenceSocket || this.presenceSocket.readyState !== WebSocket.OPEN) {
+                this.connectPresenceSocket();
+            }
+
         } else {
+            // Disconnect presence socket when user logs out
+            if (this.presenceSocket) {
+                this.presenceSocket.close();
+                this.presenceSocket = null;
+            }
+
             const container = document.createElement('div');
             container.className = 'flex gap-4';
 

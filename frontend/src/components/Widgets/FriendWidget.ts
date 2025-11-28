@@ -13,18 +13,14 @@ export class FriendWidget {
 
 
     mount(): void {
-        // Single stable auth change handler: mount on login, unmount on logout.
         if (!this.authChangeHandler) {
             this.authChangeHandler = () => {
                 if (AuthService.isAuthenticated()) {
-                    // Create UI if it doesn't exist
                     if (!this.root || !document.body.contains(this.root)) {
                         this.createUI();
                     }
                 } else {
-                    // IMMEDIATELY unmount when logged out (but keep the handler!)
                     if (this.root && document.body.contains(this.root)) {
-                        // Only remove DOM elements, not the event listener
                         if (this.intervalId) {
                             clearInterval(this.intervalId);
                             this.intervalId = null;
@@ -46,7 +42,6 @@ export class FriendWidget {
             window.addEventListener('auth:change', this.authChangeHandler);
         }
 
-        // If already created (e.g., SSR or remount), reuse existing root elements
         const existing = document.getElementById('friend-widget-root');
         if (existing) {
             this.root = existing as HTMLElement;
@@ -54,10 +49,8 @@ export class FriendWidget {
             this.btn = this.root.querySelector('#friend-widget-btn') as HTMLElement | null;
             this.searchInput = this.root.querySelector('#friend-widget-search-input') as HTMLInputElement | null;
             this.searchBtn = this.root.querySelector('#friend-widget-search-btn') as HTMLButtonElement | null;
-            // start background polling only if authenticated
             if (AuthService.isAuthenticated()) this.startPolling();
             else {
-                // Remove if not authenticated but keep listener
                 if (document.body.contains(existing)) {
                     document.body.removeChild(existing);
                 }
@@ -68,51 +61,127 @@ export class FriendWidget {
                 this.searchBtn = null;
             }
 
-            // expose global ref so other widgets can interact
             (window as any)._friendWidget = this;
             return;
         }
 
-        // Defer creating UI until user is authenticated
         if (AuthService.isAuthenticated()) {
             this.createUI();
         }
-        // No need for polling to check auth - auth:change event will handle it
     }
 
     private createUI(): void {
-        // create widget root and elements (extracted from previous mount logic)
         this.root = document.createElement('div');
         this.root.id = 'friend-widget-root';
-        this.root.style.position = 'fixed';
-        this.root.style.bottom = '20px';
-        this.root.style.right = '20px';
-        this.root.style.zIndex = '9999';
+        this.root.className = 'fixed bottom-5 right-5 z-[9998]';
         document.body.appendChild(this.root);
 
-        // set global reference so other widgets (notification) can close this panel
         (window as any)._friendWidget = this;
 
         this.btn = document.createElement('button');
         this.btn.id = 'friend-widget-btn';
         this.btn.title = 'Friends';
-        this.btn.className = 'bg-game-dark hover:bg-blue-800 text-white rounded-full w-14 h-14 flex items-center justify-center shadow-lg';
-        this.btn.style.cursor = 'pointer';
+        this.btn.className = 'bg-game-dark hover:bg-blue-800 text-white rounded-full w-14 h-14 flex items-center justify-center shadow-lg cursor-pointer text-2xl relative z-10';
         this.btn.innerHTML = '👥';
         this.btn.onclick = () => this.toggle();
         this.root.appendChild(this.btn);
 
         this.panel = document.createElement('div');
         this.panel.id = 'friend-widget-panel';
-        this.panel.className = 'glass-effect p-4 rounded-2xl shadow-xl';
-        this.panel.style.width = '320px';
-        this.panel.style.maxHeight = '70vh';
-        this.panel.style.overflow = 'auto';
-        this.panel.style.marginBottom = '12px';
-        this.panel.style.display = 'none';
-        this.panel.style.boxShadow = '0 8px 30px rgba(0,0,0,0.6)';
+        this.panel.className = 'glass-effect p-4 rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.6)] w-[340px] max-h-[70vh] overflow-auto absolute bottom-16 right-0 hidden';
         this.root.appendChild(this.panel);
 
+        // Personal Status Section
+        const statusSection = document.createElement('div');
+        statusSection.className = 'mb-4 pb-4 border-b border-gray-600';
+        
+        const statusHeader = document.createElement('div');
+        statusHeader.className = 'flex items-center justify-between mb-2';
+        
+        const myStatusLabel = document.createElement('h4');
+        myStatusLabel.textContent = 'My Status';
+        myStatusLabel.className = 'text-sm font-semibold text-gray-400';
+        statusHeader.appendChild(myStatusLabel);
+        
+        statusSection.appendChild(statusHeader);
+        
+        const statusSelector = document.createElement('div');
+        statusSelector.className = 'flex flex-col gap-2';
+        
+        const statuses: Array<{value: string; label: string; color: string; emoji: string}> = [
+            { value: 'Online', label: 'Online', color: '#22c55e', emoji: '🟢' },
+            { value: 'Busy', label: 'Busy', color: '#ef4444', emoji: '🔴' },
+            { value: 'Away', label: 'Away', color: '#f59e0b', emoji: '🟡' },
+            { value: 'Offline', label: 'Offline', color: '#94a3b8', emoji: '⚫' }
+        ];
+        
+        const user = AuthService.getUser();
+        const currentStatus = (user && (user as any).status) ? (user as any).status : 'Online';
+        
+        statuses.forEach(s => {
+            const statusBtn = document.createElement('button');
+            const isActive = currentStatus === s.value;
+            statusBtn.className = `flex items-center gap-3 p-2 rounded-lg hover:bg-blue-800 transition-colors text-left ${isActive ? 'bg-blue-500/30' : 'bg-transparent'}`;
+            
+            const dot = document.createElement('span');
+            const glowClass = s.value !== 'Offline' && isActive ? 'shadow-[0_0_8px_currentColor]' : '';
+            dot.className = `w-3 h-3 rounded-full inline-block ${glowClass}`;
+            dot.style.backgroundColor = s.color;
+            
+            const label = document.createElement('span');
+            label.className = 'text-white text-sm flex-1';
+            label.textContent = `${s.emoji} ${s.label}`;
+            
+            const checkmark = document.createElement('span');
+            checkmark.textContent = isActive ? '✓' : '';
+            checkmark.className = 'text-green-400 font-bold';
+            
+            statusBtn.appendChild(dot);
+            statusBtn.appendChild(label);
+            statusBtn.appendChild(checkmark);
+            
+            statusBtn.onclick = async () => {
+                try {
+                    await AuthService.setStatus(s.value as any);
+                    // Update UI
+                    statusSelector.querySelectorAll('button').forEach(btn => {
+                        btn.className = 'flex items-center gap-3 p-2 rounded-lg hover:bg-blue-800 transition-colors text-left bg-transparent';
+                        const check = btn.querySelector('span:last-child');
+                        if (check) check.textContent = '';
+                    });
+                    statusBtn.className = 'flex items-center gap-3 p-2 rounded-lg hover:bg-blue-800 transition-colors text-left bg-blue-500/30';
+                    checkmark.textContent = '✓';
+                    
+                    // Update dot glow
+                    statusSelector.querySelectorAll('button span:first-child').forEach(d => {
+                        (d as HTMLElement).className = 'w-3 h-3 rounded-full inline-block';
+                    });
+                    if (s.value !== 'Offline') {
+                        dot.className = 'w-3 h-3 rounded-full inline-block shadow-[0_0_8px_currentColor]';
+                    }
+                    
+                    // Update header status dot
+                    const headerDot = document.getElementById('header-status-dot');
+                    if (headerDot) {
+                        headerDot.style.backgroundColor = s.color;
+                        if (s.value !== 'Offline') {
+                            headerDot.className = 'w-2.5 h-2.5 rounded-full inline-block shadow-[0_0_8px_currentColor]';
+                        } else {
+                            headerDot.className = 'w-2.5 h-2.5 rounded-full inline-block';
+                        }
+                    }
+                } catch (err: any) {
+                    await (window as any).app.showInfo('Status update failed', AuthService.extractErrorMessage(err) || String(err));
+                }
+            };
+            
+            statusSelector.appendChild(statusBtn);
+        });
+        
+        statusSection.appendChild(statusSelector);
+        this.panel.appendChild(statusSection);
+
+        // Friends Header
         const header = document.createElement('div');
         header.className = 'flex items-center justify-between mb-3 gap-2';
         const h = document.createElement('h4');
@@ -163,11 +232,15 @@ export class FriendWidget {
         this.startPolling();
     }
 
-    // Close the panel without unmounting (used to avoid overlapping widgets)
     closePanel(): void {
         this.visible = false;
-        if (this.panel) this.panel.style.display = 'none';
-        if (this.btn) (this.btn as HTMLElement).classList.remove('bg-accent-pink');
+        if (this.panel) {
+            this.panel.classList.remove('block');
+            this.panel.classList.add('hidden');
+        }
+        if (this.btn) {
+            this.btn.classList.remove('bg-accent-pink');
+        }
     }
 
     private async fetchAndRender(): Promise<void> {
@@ -192,39 +265,58 @@ export class FriendWidget {
             listEl.innerHTML = '';
             friends.forEach(f => {
                 const row = document.createElement('div');
-                row.className = 'flex items-center justify-between p-2 rounded hover:bg-blue-800';
+                row.className = 'flex items-center justify-between p-3 rounded-lg hover:bg-blue-800 transition-colors duration-200 mb-2';
+                row.setAttribute('data-friend-id', String(f.id));
                 
-                // Left side: status dot + name
+                // Left side: name + status badge
                 const left = document.createElement('div');
-                left.className = 'flex items-center gap-3';
+                left.className = 'flex items-center gap-3 flex-1';
                 
-                const dot = document.createElement('span');
-                dot.style.width = '10px';
-                dot.style.height = '10px';
-                dot.style.borderRadius = '50%';
-                dot.style.display = 'inline-block';
-                dot.style.marginRight = '6px';
-                dot.style.background = f.is_online ? '#22c55e' : '#94a3b8';
+                const nameContainer = document.createElement('div');
+                nameContainer.className = 'flex flex-col';
                 
                 const name = document.createElement('div');
-                name.className = 'text-white';
+                name.className = 'text-white font-medium';
                 name.textContent = f.display_name || f.username;
                 
-                left.appendChild(dot);
-                left.appendChild(name);
+                // Status badge with emoji and color coding
+                const statusBadge = document.createElement('span');
+                statusBadge.className = 'status-text text-xs px-2 py-0.5 rounded-full inline-block mt-1 w-fit';
+                
+                const userStatus = (f as any).user_status || 'Offline';
+                
+                if (f.status === 'pending') {
+                    statusBadge.textContent = '⏳ Pending';
+                    statusBadge.className += ' bg-gray-500/20 text-gray-400';
+                } else if (f.is_online) {
+                    if (userStatus === 'Busy') {
+                        statusBadge.textContent = '🔴 Busy';
+                        statusBadge.className += ' bg-red-500/20 text-red-400';
+                    } else if (userStatus === 'Away') {
+                        statusBadge.textContent = '🟡 Away';
+                        statusBadge.className += ' bg-amber-500/20 text-amber-400';
+                    } else {
+                        statusBadge.textContent = '🟢 Online';
+                        statusBadge.className += ' bg-green-500/20 text-green-400';
+                    }
+                } else {
+                    statusBadge.textContent = '⚫ Offline';
+                    statusBadge.className += ' bg-slate-500/20 text-slate-400';
+                }
+                
+                nameContainer.appendChild(name);
+                nameContainer.appendChild(statusBadge);
+                
+                left.appendChild(nameContainer);
 
-                // Right side: status text + action buttons
+                // Right side: action buttons
                 const actions = document.createElement('div');
                 actions.className = 'flex items-center gap-2';
-
-                const status = document.createElement('span');
-                status.className = 'text-sm text-gray-300';
-                status.textContent = f.status === 'pending' ? 'Pending' : (f.is_online ? 'Online' : 'Offline');
 
                 // If the relation is 'incoming' and status is pending, show accept/decline
                 if (f.status === 'pending' && f.relation === 'incoming') {
                     const accept = document.createElement('button');
-                    accept.className = 'bg-game-dark text-white px-2 py-1 rounded text-sm';
+                    accept.className = 'bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded text-sm transition-colors';
                     accept.title = 'Accept';
                     accept.textContent = '✔';
                     accept.onclick = async () => {
@@ -238,7 +330,7 @@ export class FriendWidget {
                     };
 
                     const decline = document.createElement('button');
-                    decline.className = 'bg-game-dark text-white px-2 py-1 rounded text-sm';
+                    decline.className = 'bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded text-sm transition-colors';
                     decline.title = 'Decline';
                     decline.textContent = '✖';
                     decline.onclick = async () => {
@@ -252,13 +344,12 @@ export class FriendWidget {
                         }
                     };
 
-                    actions.appendChild(status);
                     actions.appendChild(accept);
                     actions.appendChild(decline);
                 } else if (f.status === 'pending' && f.relation === 'outgoing') {
                     // outgoing pending -> allow cancel
                     const cancel = document.createElement('button');
-                    cancel.className = 'ml-2 bg-game-dark text-white px-2 py-1 rounded text-sm';
+                    cancel.className = 'bg-gray-600 hover:bg-gray-700 text-white px-3 py-1.5 rounded text-sm transition-colors';
                     cancel.textContent = 'Cancel';
                     cancel.onclick = async () => {
                         const ok = await (window as any).app.confirm('Cancel request', `Cancel friend request to ${f.display_name || f.username}?`);
@@ -270,12 +361,11 @@ export class FriendWidget {
                             await (window as any).app.showInfo('Cancel failed', AuthService.extractErrorMessage(err) || 'Failed to cancel request');
                         }
                     };
-                    actions.appendChild(status);
                     actions.appendChild(cancel);
                 } else {
                     // accepted friend -> show remove
                     const remove = document.createElement('button');
-                    remove.className = 'ml-2 bg-game-red text-white px-2 py-1 rounded text-xs';
+                    remove.className = 'bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded text-xs transition-colors';
                     remove.textContent = 'Remove';
                     remove.onclick = async () => {
                         const ok = await (window as any).app.confirm(`Remove ${f.display_name || f.username}`, 'Are you sure you want to remove this friend?');
@@ -287,7 +377,6 @@ export class FriendWidget {
                             await (window as any).app.showInfo('Failed to remove friend', AuthService.extractErrorMessage(err) || String(err));
                         }
                     };
-                    actions.appendChild(status);
                     actions.appendChild(remove);
                 }
 
@@ -299,6 +388,45 @@ export class FriendWidget {
             listEl.innerHTML = `<p class="text-red-400">Error loading friends</p>`;
             console.error(err);
         }
+    }
+
+    // Add method to update friend presence from WebSocket broadcasts
+    updateFriendPresence(userId: number, status: string, isOnline: boolean): void {
+        // Update even when not visible - this keeps the data fresh for when user opens the panel
+        if (!this.panel) return;
+        
+        const listEl = this.panel.querySelector('#friend-list') as HTMLElement | null;
+        if (!listEl) return;
+        
+        // Find the friend row and update its status indicator
+        const rows = listEl.querySelectorAll('div[data-friend-id]');
+        rows.forEach((row) => {
+            const friendId = parseInt(row.getAttribute('data-friend-id') || '0');
+            if (friendId === userId) {
+                const statusBadge = row.querySelector('.status-text') as HTMLElement | null;
+                
+                if (statusBadge && !statusBadge.textContent?.includes('Pending')) {
+                    // Reset classes
+                    statusBadge.className = 'status-text text-xs px-2 py-0.5 rounded-full inline-block mt-1 w-fit';
+                    
+                    if (isOnline) {
+                        if (status === 'Busy') {
+                            statusBadge.textContent = '🔴 Busy';
+                            statusBadge.className += ' bg-red-500/20 text-red-400';
+                        } else if (status === 'Away') {
+                            statusBadge.textContent = '🟡 Away';
+                            statusBadge.className += ' bg-amber-500/20 text-amber-400';
+                        } else {
+                            statusBadge.textContent = '🟢 Online';
+                            statusBadge.className += ' bg-green-500/20 text-green-400';
+                        }
+                    } else {
+                        statusBadge.textContent = '⚫ Offline';
+                        statusBadge.className += ' bg-slate-500/20 text-slate-400';
+                    }
+                }
+            }
+        });
     }
 
     toggle(): void {
@@ -313,7 +441,14 @@ export class FriendWidget {
             }
         }
 
-        this.panel.style.display = this.visible ? 'block' : 'none';
+        if (this.visible) {
+            this.panel.classList.remove('hidden');
+            this.panel.classList.add('block');
+        } else {
+            this.panel.classList.remove('block');
+            this.panel.classList.add('hidden');
+        }
+        
         this.btn.classList.toggle('bg-accent-pink', this.visible);
         
         if (this.visible) this.refreshNow();
