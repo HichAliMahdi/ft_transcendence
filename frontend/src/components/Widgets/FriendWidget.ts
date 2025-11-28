@@ -13,18 +13,14 @@ export class FriendWidget {
 
 
     mount(): void {
-        // Single stable auth change handler: mount on login, unmount on logout.
         if (!this.authChangeHandler) {
             this.authChangeHandler = () => {
                 if (AuthService.isAuthenticated()) {
-                    // Create UI if it doesn't exist
                     if (!this.root || !document.body.contains(this.root)) {
                         this.createUI();
                     }
                 } else {
-                    // IMMEDIATELY unmount when logged out (but keep the handler!)
                     if (this.root && document.body.contains(this.root)) {
-                        // Only remove DOM elements, not the event listener
                         if (this.intervalId) {
                             clearInterval(this.intervalId);
                             this.intervalId = null;
@@ -46,7 +42,6 @@ export class FriendWidget {
             window.addEventListener('auth:change', this.authChangeHandler);
         }
 
-        // If already created (e.g., SSR or remount), reuse existing root elements
         const existing = document.getElementById('friend-widget-root');
         if (existing) {
             this.root = existing as HTMLElement;
@@ -54,10 +49,8 @@ export class FriendWidget {
             this.btn = this.root.querySelector('#friend-widget-btn') as HTMLElement | null;
             this.searchInput = this.root.querySelector('#friend-widget-search-input') as HTMLInputElement | null;
             this.searchBtn = this.root.querySelector('#friend-widget-search-btn') as HTMLButtonElement | null;
-            // start background polling only if authenticated
             if (AuthService.isAuthenticated()) this.startPolling();
             else {
-                // Remove if not authenticated but keep listener
                 if (document.body.contains(existing)) {
                     document.body.removeChild(existing);
                 }
@@ -68,20 +61,16 @@ export class FriendWidget {
                 this.searchBtn = null;
             }
 
-            // expose global ref so other widgets can interact
             (window as any)._friendWidget = this;
             return;
         }
 
-        // Defer creating UI until user is authenticated
         if (AuthService.isAuthenticated()) {
             this.createUI();
         }
-        // No need for polling to check auth - auth:change event will handle it
     }
 
     private createUI(): void {
-        // create widget root and elements (extracted from previous mount logic)
         this.root = document.createElement('div');
         this.root.id = 'friend-widget-root';
         this.root.style.position = 'fixed';
@@ -90,7 +79,6 @@ export class FriendWidget {
         this.root.style.zIndex = '9999';
         document.body.appendChild(this.root);
 
-        // set global reference so other widgets (notification) can close this panel
         (window as any)._friendWidget = this;
 
         this.btn = document.createElement('button');
@@ -163,7 +151,6 @@ export class FriendWidget {
         this.startPolling();
     }
 
-    // Close the panel without unmounting (used to avoid overlapping widgets)
     closePanel(): void {
         this.visible = false;
         if (this.panel) this.panel.style.display = 'none';
@@ -193,18 +180,33 @@ export class FriendWidget {
             friends.forEach(f => {
                 const row = document.createElement('div');
                 row.className = 'flex items-center justify-between p-2 rounded hover:bg-blue-800';
+                row.setAttribute('data-friend-id', String(f.id));
                 
                 // Left side: status dot + name
                 const left = document.createElement('div');
                 left.className = 'flex items-center gap-3';
                 
                 const dot = document.createElement('span');
+                dot.className = 'status-dot';
                 dot.style.width = '10px';
                 dot.style.height = '10px';
                 dot.style.borderRadius = '50%';
                 dot.style.display = 'inline-block';
                 dot.style.marginRight = '6px';
-                dot.style.background = f.is_online ? '#22c55e' : '#94a3b8';
+                
+                // Status colors: Online=green, Busy=red, Away=yellow, Offline=gray
+                const userStatus = (f as any).user_status || 'Offline';
+                if (f.is_online) {
+                    if (userStatus === 'Busy') {
+                        dot.style.background = '#ef4444'; // red
+                    } else if (userStatus === 'Away') {
+                        dot.style.background = '#f59e0b'; // yellow/amber
+                    } else {
+                        dot.style.background = '#22c55e'; // green (Online)
+                    }
+                } else {
+                    dot.style.background = '#94a3b8'; // gray (Offline)
+                }
                 
                 const name = document.createElement('div');
                 name.className = 'text-white';
@@ -218,8 +220,16 @@ export class FriendWidget {
                 actions.className = 'flex items-center gap-2';
 
                 const status = document.createElement('span');
-                status.className = 'text-sm text-gray-300';
-                status.textContent = f.status === 'pending' ? 'Pending' : (f.is_online ? 'Online' : 'Offline');
+                status.className = 'text-sm text-gray-300 status-text';
+                
+                // Show appropriate status text
+                if (f.status === 'pending') {
+                    status.textContent = 'Pending';
+                } else if (f.is_online) {
+                    status.textContent = userStatus; // Online, Busy, or Away
+                } else {
+                    status.textContent = 'Offline';
+                }
 
                 // If the relation is 'incoming' and status is pending, show accept/decline
                 if (f.status === 'pending' && f.relation === 'incoming') {
@@ -299,6 +309,42 @@ export class FriendWidget {
             listEl.innerHTML = `<p class="text-red-400">Error loading friends</p>`;
             console.error(err);
         }
+    }
+
+    // Add method to update friend presence from WebSocket broadcasts
+    updateFriendPresence(userId: number, status: string, isOnline: boolean): void {
+        if (!this.panel || !this.visible) return;
+        
+        const listEl = this.panel.querySelector('#friend-list') as HTMLElement | null;
+        if (!listEl) return;
+        
+        // Find the friend row and update its status indicator
+        const rows = listEl.querySelectorAll('div[data-friend-id]');
+        rows.forEach((row) => {
+            const friendId = parseInt(row.getAttribute('data-friend-id') || '0');
+            if (friendId === userId) {
+                const dot = row.querySelector('.status-dot') as HTMLElement | null;
+                const statusText = row.querySelector('.status-text') as HTMLElement | null;
+                
+                if (dot) {
+                    if (isOnline) {
+                        if (status === 'Busy') {
+                            dot.style.background = '#ef4444';
+                        } else if (status === 'Away') {
+                            dot.style.background = '#f59e0b';
+                        } else {
+                            dot.style.background = '#22c55e';
+                        }
+                    } else {
+                        dot.style.background = '#94a3b8';
+                    }
+                }
+                
+                if (statusText) {
+                    statusText.textContent = isOnline ? status : 'Offline';
+                }
+            }
+        });
     }
 
     toggle(): void {

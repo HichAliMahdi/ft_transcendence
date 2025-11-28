@@ -391,57 +391,104 @@ class App {
             welcomeText.className = 'text-white';
             welcomeText.textContent = `Welcome, ${user?.display_name || user?.username}!`;
 
-            // Status selector (placed after welcome text, before logout)
+            // Status selector with visual indicator
+            const statusContainer = document.createElement('div');
+            statusContainer.className = 'relative';
+            
             const statusSelect = document.createElement('select');
-            statusSelect.className = 'bg-game-dark text-white px-3 py-2 rounded-lg';
-            const statuses = ['Online','Busy','Away','Offline'];
+            statusSelect.className = 'bg-game-dark text-white px-3 py-2 pr-8 rounded-lg appearance-none cursor-pointer';
+            statusSelect.style.paddingLeft = '32px'; // make room for status dot
+            
+            const statuses: Array<{value: string; label: string; color: string}> = [
+                { value: 'Online', label: '🟢 Online', color: '#22c55e' },
+                { value: 'Busy', label: '🔴 Busy', color: '#ef4444' },
+                { value: 'Away', label: '🟡 Away', color: '#f59e0b' },
+                { value: 'Offline', label: '⚫ Offline', color: '#94a3b8' }
+            ];
+            
             statuses.forEach(s => {
                 const opt = document.createElement('option');
-                opt.value = s;
-                opt.textContent = s;
+                opt.value = s.value;
+                opt.textContent = s.label;
                 statusSelect.appendChild(opt);
             });
-            // Preference: use server/cached user status if available; default to Online for authenticated users
+            
+            // Get current status from user object (includes status field from server)
             const currentStatus = (user && (user as any).status) ? (user as any).status : 'Online';
             statusSelect.value = currentStatus;
 
+            // Add visual status indicator dot
+            const statusDot = document.createElement('span');
+            statusDot.className = 'absolute left-2 top-1/2 transform -translate-y-1/2 pointer-events-none';
+            statusDot.style.width = '10px';
+            statusDot.style.height = '10px';
+            statusDot.style.borderRadius = '50%';
+            statusDot.style.display = 'inline-block';
+            const currentStatusColor = statuses.find(s => s.value === currentStatus)?.color || '#94a3b8';
+            statusDot.style.background = currentStatusColor;
+            
             statusSelect.onchange = async () => {
                 const newStatus = statusSelect.value as 'Online'|'Busy'|'Away'|'Offline';
                 try {
                     await AuthService.setStatus(newStatus);
+                    // Update dot color
+                    const newColor = statuses.find(s => s.value === newStatus)?.color || '#94a3b8';
+                    statusDot.style.background = newColor;
                 } catch (err: any) {
                     await (window as any).app.showInfo('Status update failed', AuthService.extractErrorMessage(err) || String(err));
                     // revert select to cached value
                     const cached = AuthService.getUser();
-                    statusSelect.value = (cached && (cached as any).status) ? (cached as any).status : 'Online';
+                    const cachedStatus = (cached && (cached as any).status) ? (cached as any).status : 'Online';
+                    statusSelect.value = cachedStatus;
+                    const cachedColor = statuses.find(s => s.value === cachedStatus)?.color || '#94a3b8';
+                    statusDot.style.background = cachedColor;
                 }
             };
 
-            // Ensure authenticated user is online by default (only call when cached status is not Online)
+            // Set user online by default when authenticated (but respect cached status if not Offline)
             try {
-                if (currentStatus !== 'Online') {
-                    // fire-and-forget; keep UI responsive
+                if (currentStatus === 'Offline') {
                     AuthService.setStatus('Online').catch(() => {});
                     statusSelect.value = 'Online';
+                    statusDot.style.background = '#22c55e';
                 }
             } catch (e) {}
+
+            statusContainer.appendChild(statusDot);
+            statusContainer.appendChild(statusSelect);
 
             const logoutBtn = document.createElement('button');
             logoutBtn.id = 'logout-btn';
             logoutBtn.className = 'bg-game-red hover:bg-red-600 text-white px-4 py-2 rounded-lg transition-colors duration-300';
             logoutBtn.textContent = 'Logout';
             logoutBtn.onclick = async () => {
+                // Disconnect presence socket before logout
+                if (this.presenceSocket) {
+                    this.presenceSocket.close();
+                    this.presenceSocket = null;
+                }
                 await AuthService.logout();
                 this.updateAuthSection();
                 this.router.navigateTo('/login');
             };
 
             container.appendChild(welcomeText);
-            container.appendChild(statusSelect);
+            container.appendChild(statusContainer);
             container.appendChild(logoutBtn);
             authSection.appendChild(container);
 
+            // Connect presence socket when user logs in
+            if (!this.presenceSocket || this.presenceSocket.readyState !== WebSocket.OPEN) {
+                this.connectPresenceSocket();
+            }
+
         } else {
+            // Disconnect presence socket when user logs out
+            if (this.presenceSocket) {
+                this.presenceSocket.close();
+                this.presenceSocket = null;
+            }
+
             const container = document.createElement('div');
             container.className = 'flex gap-4';
 

@@ -91,16 +91,17 @@ export default async function userRoutes(fastify: FastifyInstance) {
         display_name: string;
         avatar_url?: string | null;
         is_online?: number | null;
+        user_status?: string | null;
       };
 
-      // cast DB output to any[] to avoid '{}' inference, then cast items where needed
       const rawRows = db.prepare(`
         SELECT f.user_id, f.friend_id, f.status,
                u.id      AS other_id,
                u.username,
                u.display_name,
                u.avatar_url,
-               u.is_online
+               u.is_online,
+               u.status  AS user_status
         FROM friends f
         JOIN users u ON u.id = f.friend_id
         WHERE f.user_id = ?
@@ -110,11 +111,12 @@ export default async function userRoutes(fastify: FastifyInstance) {
                u.username,
                u.display_name,
                u.avatar_url,
-               u.is_online
+               u.is_online,
+               u.status  AS user_status
         FROM friends f
         JOIN users u ON u.id = f.user_id
         WHERE f.friend_id = ?
-      `).all(targetId, targetId) as any[]; // use any[] here
+      `).all(targetId, targetId) as any[];
 
       const includePending = auth.userId === targetId;
       const filtered = rawRows
@@ -128,6 +130,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
             display_name: rr.display_name,
             avatar_url: rr.avatar_url || null,
             is_online: !!rr.is_online,
+            user_status: rr.user_status || 'Offline',
             status: rr.status,
             relation
           };
