@@ -338,6 +338,9 @@ class App {
                     const data = JSON.parse(event.data);
                     if (data.type === 'presence_update') {
                         this.handlePresenceUpdate(data.userId, data.status, data.isOnline);
+                    } else if (data.type === 'direct_message') {
+                        // relay to UI components
+                        window.dispatchEvent(new CustomEvent('direct_message', { detail: data }));
                     }
                 } catch (e) {
                     console.debug('Failed to parse presence message', e);

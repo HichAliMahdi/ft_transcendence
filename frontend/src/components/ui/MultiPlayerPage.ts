@@ -153,7 +153,7 @@ export class MultiplayerPage {
             }
 
             const cancelButton = document.createElement('button');
-            cancelButton.textContent = 'Cancel';
+            cancelButton.textContent = 'Leave Queue/Room';
             cancelButton.className = 'bg-game-red hover:bg-red-600 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-300 mt-4';
             cancelButton.onclick = () => this.disconnect();
             

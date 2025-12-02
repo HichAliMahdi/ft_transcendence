@@ -230,6 +230,9 @@ export class FriendWidget {
 
         this.refreshNow();
         this.startPolling();
+
+        // register global incoming direct message handler so widget can react (unread / refresh)
+        this.registerGlobalMessageListener();
     }
 
     closePanel(): void {
@@ -242,7 +245,7 @@ export class FriendWidget {
             this.btn.classList.remove('bg-accent-pink');
         }
     }
-
+    
     private async fetchAndRender(): Promise<void> {
         const listEl = this.panel ? this.panel.querySelector('#friend-list') as HTMLElement | null : null;
         if (!listEl) return;
@@ -278,6 +281,9 @@ export class FriendWidget {
                 const name = document.createElement('div');
                 name.className = 'text-white font-medium';
                 name.textContent = f.display_name || f.username;
+                // clicking the name opens chat modal
+                name.style.cursor = 'pointer';
+                name.onclick = () => this.openChat(f.id, f.display_name || f.username);
                 
                 // Status badge with emoji and color coding
                 const statusBadge = document.createElement('span');
@@ -459,6 +465,23 @@ export class FriendWidget {
         await this.fetchAndRender();
     }
 
+    // Global listener to react to incoming direct messages (keeps UI updated)
+    private registerGlobalMessageListener(): void {
+        window.addEventListener('direct_message', (ev: Event) => {
+            try {
+                const d = (ev as CustomEvent).detail;
+                if (!d) return;
+                // If widget is open, refresh to show any relevant changes (simple approach)
+                if (this.visible) {
+                    this.refreshNow();
+                } else {
+                    // optional: could show toast/unread indicator here
+                }
+            } catch (e) {
+                // ignore
+            }
+        });
+    }
 
     private startPolling(): void {
         if (this.intervalId) return;
@@ -497,5 +520,108 @@ export class FriendWidget {
         this.searchInput = null;
         this.searchBtn = null;
 
+    }
+
+    // Open chat modal for a friend
+    private async openChat(peerId: number, peerName: string): Promise<void> {
+        // create modal overlay
+        const overlay = document.createElement('div');
+        overlay.className = 'fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50';
+        overlay.setAttribute('role', 'dialog');
+
+        const modal = document.createElement('div');
+        modal.className = 'glass-effect p-4 rounded-2xl max-w-md w-full mx-4 relative text-left';
+
+        const header = document.createElement('div');
+        header.className = 'flex items-center justify-between mb-2';
+        const h = document.createElement('h3');
+        h.className = 'text-lg text-white font-semibold';
+        h.textContent = `Chat with ${peerName}`;
+        header.appendChild(h);
+        const closeBtn = document.createElement('button');
+        closeBtn.className = 'text-white text-xl';
+        closeBtn.innerHTML = '&times;';
+        closeBtn.onclick = () => { if (document.body.contains(overlay)) document.body.removeChild(overlay); };
+        header.appendChild(closeBtn);
+
+        const messagesWrap = document.createElement('div');
+        messagesWrap.className = 'bg-game-dark p-3 rounded mb-3 max-h-[50vh] overflow-auto text-sm';
+        messagesWrap.textContent = 'Loading...';
+
+        const inputRow = document.createElement('div');
+        inputRow.className = 'flex gap-2';
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.placeholder = 'Type a message...';
+        input.className = 'flex-1 px-3 py-2 rounded bg-primary-dark text-white';
+        const sendBtn = document.createElement('button');
+        sendBtn.className = 'px-4 py-2 btn-primary';
+        sendBtn.textContent = 'Send';
+        inputRow.appendChild(input);
+        inputRow.appendChild(sendBtn);
+
+        modal.appendChild(header);
+        modal.appendChild(messagesWrap);
+        modal.appendChild(inputRow);
+        overlay.appendChild(modal);
+        document.body.appendChild(overlay);
+
+        // Load history
+        try {
+            const history = await (window as any).AuthService?.getMessages ? await (window as any).AuthService.getMessages(peerId) : await (await import('../game/AuthService')).AuthService.getMessages(peerId);
+            messagesWrap.innerHTML = '';
+            history.forEach((m: any) => {
+                const el = document.createElement('div');
+                el.className = `mb-2 ${m.sender_id === (window as any).AuthService.getUser()?.id ? 'text-right' : 'text-left'}`;
+                el.innerHTML = `<div class="inline-block px-3 py-1 rounded ${m.sender_id === (window as any).AuthService.getUser()?.id ? 'bg-blue-600' : 'bg-gray-700'}">${m.content}</div><div class="text-xs text-gray-400 mt-1">${m.created_at}</div>`;
+                messagesWrap.appendChild(el);
+            });
+            messagesWrap.scrollTop = messagesWrap.scrollHeight;
+        } catch (e) {
+            messagesWrap.textContent = 'Failed to load messages';
+        }
+
+        // Send handler
+        sendBtn.onclick = async () => {
+            const txt = input.value.trim();
+            if (!txt) return;
+            sendBtn.disabled = true;
+            try {
+                await (window as any).AuthService.sendMessage(peerId, txt);
+                // append locally
+                const el = document.createElement('div');
+                el.className = 'mb-2 text-right';
+                el.innerHTML = `<div class="inline-block px-3 py-1 rounded bg-blue-600">${txt}</div><div class="text-xs text-gray-400 mt-1">now</div>`;
+                messagesWrap.appendChild(el);
+                messagesWrap.scrollTop = messagesWrap.scrollHeight;
+                input.value = '';
+            } catch (err: any) {
+                await (window as any).app.showInfo('Send failed', (window as any).AuthService?.extractErrorMessage ? (window as any).AuthService.extractErrorMessage(err) : String(err));
+            } finally {
+                sendBtn.disabled = false;
+            }
+        };
+
+        // Listen for incoming messages and append if from this peer
+        const handler = (ev: Event) => {
+            const detail = (ev as CustomEvent).detail;
+            if (!detail || detail.type !== 'direct_message') return;
+            if (detail.from === peerId) {
+                const el = document.createElement('div');
+                el.className = 'mb-2 text-left';
+                el.innerHTML = `<div class="inline-block px-3 py-1 rounded bg-gray-700">${detail.content}</div><div class="text-xs text-gray-400 mt-1">${detail.created_at || 'now'}</div>`;
+                messagesWrap.appendChild(el);
+                messagesWrap.scrollTop = messagesWrap.scrollHeight;
+            }
+        };
+        window.addEventListener('direct_message', handler as any);
+
+        // Clean up listener when modal closed
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) {
+                if (document.body.contains(overlay)) document.body.removeChild(overlay);
+                window.removeEventListener('direct_message', handler as any);
+            }
+        });
     }
 }
