@@ -324,11 +324,10 @@ class App {
         try {
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
             const host = window.location.host;
-            const wsUrl = `${protocol}//${host}/ws`;
+            const wsUrl = `${protocol}//${host}/ws?token=${encodeURIComponent(token)}`;
 
             this.presenceSocket = new WebSocket(wsUrl);
 
-            // Send auth token after connection
             this.presenceSocket.onopen = () => {
                 console.log('Presence WebSocket connected');
             };
@@ -341,6 +340,18 @@ class App {
                     } else if (data.type === 'direct_message') {
                         // relay to UI components
                         window.dispatchEvent(new CustomEvent('direct_message', { detail: data }));
+                    } else if (data.type === 'notification_update') {
+                        // NEW: Handle real-time notification updates
+                        // Trigger notification widget to refresh
+                        const nw = (window as any)._notificationWidget;
+                        if (nw && typeof nw.refreshNow === 'function') {
+                            nw.refreshNow();
+                        }
+                        // Also refresh friend widget in case it's a friend request
+                        const fw = (window as any)._friendWidget;
+                        if (fw && typeof fw.refreshNow === 'function') {
+                            fw.refreshNow();
+                        }
                     }
                 } catch (e) {
                     console.debug('Failed to parse presence message', e);
