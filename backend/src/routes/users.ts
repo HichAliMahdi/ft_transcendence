@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import { db } from '../database/db';
 import { config } from '../config';
 import { broadcastPresenceUpdate } from './websocket';
+import { sendDirectMessage } from './websocket';
 
 export default async function userRoutes(fastify: FastifyInstance) {
   fastify.get('/users/:id/stats', async (request: FastifyRequest, reply: FastifyReply) => {
@@ -346,6 +347,54 @@ return reply.code(200).send({ message: 'Friend request accepted' });
     } catch (err) {
       request.log.error(err);
       return reply.code(500).send({ message: 'Failed to send friend request' });
+    }
+  });
+
+  // Get conversation between authenticated user and a peer (peer passed as query ?peer_id=)
+  fastify.get('/users/:id/messages', async (request: FastifyRequest, reply: FastifyReply) => {
+    const auth = verifyAuth(request, reply);
+    if (!auth) return;
+    const meId = auth.userId;
+    const peerId = Number((request.query as any).peer_id);
+    if (isNaN(peerId)) return reply.status(400).send({ message: 'peer_id is required' });
+    try {
+      const rows = db.prepare(`
+        SELECT id, sender_id, recipient_id, content, created_at
+        FROM messages
+        WHERE (sender_id = ? AND recipient_id = ?) OR (sender_id = ? AND recipient_id = ?)
+        ORDER BY created_at ASC
+        LIMIT 1000
+      `).all(meId, peerId, peerId, meId);
+      return reply.code(200).send({ messages: rows });
+    } catch (e) {
+      request.log.error(e);
+      return reply.code(500).send({ message: 'Failed to fetch messages' });
+    }
+  });
+
+  // Send a direct message to :id (recipient). Authenticated user is sender.
+  fastify.post('/users/:id/messages', async (request: FastifyRequest, reply: FastifyReply) => {
+    const auth = verifyAuth(request, reply);
+    if (!auth) return;
+    const senderId = auth.userId;
+    const recipientId = Number((request.params as any).id);
+    const body = (request.body || {}) as any;
+    const content = (body.message || '').toString().trim();
+    if (!content) return reply.status(400).send({ message: 'Message content is required' });
+    try {
+      const info = db.prepare('INSERT INTO messages (sender_id, recipient_id, content) VALUES (?, ?, ?)').run(senderId, recipientId, content);
+      // better-sqlite3 returns unknown; cast to any to satisfy TS and access fields
+      const created = db.prepare('SELECT id, sender_id, recipient_id, content, created_at FROM messages WHERE id = ?').get(info.lastInsertRowid) as any;
+ 
+      // deliver real-time notification if recipient online
+      try {
+        sendDirectMessage(recipientId, { type: 'direct_message', from: senderId, content, created_at: created.created_at, id: created.id });
+      } catch (e) { /* ignore delivery errors */ }
+
+      return reply.code(201).send({ message: 'Sent', data: created });
+    } catch (e) {
+      request.log.error(e);
+      return reply.code(500).send({ message: 'Failed to send message' });
     }
   });
 
