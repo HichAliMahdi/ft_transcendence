@@ -40,7 +40,7 @@ export class MultiplayerPage {
             const quickMatchButton = document.createElement('button');
             quickMatchButton.textContent = '🎮 Find Online Match';
             quickMatchButton.className = 'btn-primary w-full text-lg py-4 mb-4';
-            quickMatchButton.onclick = () => this.createPrivateRoom();
+            quickMatchButton.onclick = () => this.joinQueue();
 
             const divider = document.createElement('div');
             divider.className = 'flex items-center my-6';
@@ -304,35 +304,46 @@ export class MultiplayerPage {
         return ws;
     }
 
-    private buildWsUrl(room?: string, trailingSlash = true): string {
+    private buildWsUrl(room?: string, trailingSlash = true, extraQuery?: Record<string, string | boolean>): string {
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const host = window.location.host || `${window.location.hostname}${window.location.port ? ':' + window.location.port : ''}`;
         const base = `${protocol}//${host}`;
         
         // Get authentication token
         const token = AuthService.getToken();
-        const tokenParam = token ? `?token=${encodeURIComponent(token)}` : '';
-        
+        const params: string[] = [];
+        if (token) params.push(`token=${encodeURIComponent(token)}`);
+
+        if (extraQuery) {
+            for (const k of Object.keys(extraQuery)) {
+                const v = extraQuery[k];
+                if (v === true) params.push(`${encodeURIComponent(k)}=1`);
+                else params.push(`${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`);
+            }
+        }
+
+        const qs = params.length ? `?${params.join('&')}` : '';
+
         if (room) {
-            return `${base}/ws/${encodeURIComponent(room)}${tokenParam}`;
+            return `${base}/ws/${encodeURIComponent(room)}${qs}`;
         } else {
             const path = trailingSlash ? '/ws/' : '/ws';
-            return `${base}${path}${tokenParam}`;
+            return `${base}${path}${qs}`;
         }
     }
 
-    private connectWithRoom(room?: string): void {
+    private connectWithRoom(room?: string, extraQuery?: Record<string, string | boolean>): void {
         this.status = 'connecting';
         this.renderConnectionScreen();
 
         const candidates: string[] = [];
         const prefersSecure = window.location.protocol === 'https:';
-        candidates.push(this.buildWsUrl(room, true));
-        candidates.push(this.buildWsUrl(room, false));
+        candidates.push(this.buildWsUrl(room, true, extraQuery));
+        candidates.push(this.buildWsUrl(room, false, extraQuery));
         
         if (!prefersSecure) {
-            const alt1 = this.buildWsUrl(room, true).replace(/^wss:/i, 'ws:');
-            const alt2 = this.buildWsUrl(room, false).replace(/^wss:/i, 'ws:');
+            const alt1 = this.buildWsUrl(room, true, extraQuery).replace(/^wss:/i, 'ws:');
+            const alt2 = this.buildWsUrl(room, false, extraQuery).replace(/^wss:/i, 'ws:');
             candidates.push(alt1, alt2);
         }
 
@@ -411,6 +422,18 @@ export class MultiplayerPage {
         tryConnect(0);
     }
 
+    // New helper: join matchmaking queue
+    private joinQueue(): void {
+        this.isHost = false;
+        this.playerNumber = null;
+        this.roomId = null;
+        this.opponentUser = null;
+        this.status = 'connecting';
+        this.renderConnectionScreen();
+        // add queue=1 query param so server treats this connection as matchmaking queue
+        this.connectWithRoom(undefined, { queue: '1' });
+    }
+
     private setupWebSocketHandlers(ws: WebSocket) {
         ws.onmessage = (event) => {
             const data = JSON.parse(event.data);
@@ -426,9 +449,16 @@ export class MultiplayerPage {
                     else this.renderConnectionScreen();
                     break;
                 case 'created':
+                    // Server explicitly created a private room for us (host)
                     this.roomId = data.roomId;
                     this.isHost = true;
                     this.status = 'waiting';
+                    this.renderConnectionScreen();
+                    break;
+                case 'waitingForOpponent':
+                    // Server placed us in matchmaking queue
+                    this.status = 'waiting';
+                    this.isHost = false;
                     this.renderConnectionScreen();
                     break;
                 case 'peerJoined':
@@ -437,10 +467,10 @@ export class MultiplayerPage {
                         const players: Array<{ player: number; user?: any | null }> = data.players;
                         const opponent = players.find(p => p.player !== this.playerNumber);
                         if (opponent && opponent.user) {
-                            this.opponentUser = { 
-                                id: opponent.user.id, 
-                                username: opponent.user.username, 
-                                display_name: opponent.user.display_name 
+                            this.opponentUser = {
+                                id: opponent.user.id,
+                                username: opponent.user.username,
+                                display_name: opponent.user.display_name
                             };
                         }
                     }
