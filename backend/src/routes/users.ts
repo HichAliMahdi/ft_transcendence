@@ -2,8 +2,7 @@ import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import jwt from 'jsonwebtoken';
 import { db } from '../database/db';
 import { config } from '../config';
-import { broadcastPresenceUpdate } from './websocket';
-import { sendDirectMessage } from './websocket';
+import { broadcastPresenceUpdate, sendNotificationUpdate, sendDirectMessage } from './websocket';
 
 export default async function userRoutes(fastify: FastifyInstance) {
   fastify.get('/users/:id/stats', async (request: FastifyRequest, reply: FastifyReply) => {
@@ -175,6 +174,9 @@ export default async function userRoutes(fastify: FastifyInstance) {
         const senderUsername = senderRow?.username || null;
         db.prepare('INSERT INTO notifications (user_id, actor_id, type, payload) VALUES (?, ?, ?, ?)')
           .run(targetId, senderId, 'friend_request', JSON.stringify({ senderId, senderUsername }));
+        
+        // TRIGGER REAL-TIME NOTIFICATION
+        sendNotificationUpdate(targetId);
       } catch (e) { /* non-fatal */ }
       return reply.code(201).send({ message: 'Friend request sent' });
     } catch (err) {
@@ -213,11 +215,14 @@ export default async function userRoutes(fastify: FastifyInstance) {
         const accepterUsername = accepterRow?.username || null;
         db.prepare('INSERT INTO notifications (user_id, actor_id, type, payload) VALUES (?, ?, ?, ?)')
           .run(requesterId, targetId, 'friend_accept', JSON.stringify({ accepterId: targetId, accepterUsername }));
-} catch (e) {
-  // non-fatal
-}
+        
+        // TRIGGER REAL-TIME NOTIFICATION
+        sendNotificationUpdate(requesterId);
+      } catch (e) {
+        // non-fatal
+      }
 
-return reply.code(200).send({ message: 'Friend request accepted' });
+      return reply.code(200).send({ message: 'Friend request accepted' });
     } catch (err) {
       request.log.error(err);
       return reply.code(500).send({ message: 'Failed to accept friend request' });
@@ -341,6 +346,9 @@ return reply.code(200).send({ message: 'Friend request accepted' });
         const senderUsername = senderRow?.username || null;
         db.prepare('INSERT INTO notifications (user_id, actor_id, type, payload) VALUES (?, ?, ?, ?)')
           .run(targetId, senderId, 'friend_request', JSON.stringify({ senderId, senderUsername }));
+        
+        // TRIGGER REAL-TIME NOTIFICATION
+        sendNotificationUpdate(targetId);
        } catch (e) { /* ignore */ }
 
       return reply.code(201).send({ message: 'Friend request sent' });
