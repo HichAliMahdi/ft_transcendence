@@ -381,4 +381,31 @@ export class AuthService {
             await this.parseResponseError(resp);
         }
     }
+
+    // Fetch conversation between current user and peer
+    static async getMessages(peerId: number): Promise<Array<{ id: number; sender_id: number; recipient_id: number; content: string; created_at: string }>> {
+        const token = this.getToken();
+        if (!token) throw new Error('Not authenticated');
+        const me = this.getUser();
+        if (!me) throw new Error('Not authenticated');
+        const resp = await fetch(`${API_BASE}/users/${me.id}/messages?peer_id=${encodeURIComponent(String(peerId))}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!resp.ok) await this.parseResponseError(resp);
+        const data = await resp.json();
+        return data.messages || [];
+    }
+
+    // Send a direct message to peerId
+    static async sendMessage(peerId: number, message: string): Promise<any> {
+        const token = this.getToken();
+        if (!token) throw new Error('Not authenticated');
+        const resp = await fetch(`${API_BASE}/users/${peerId}/messages`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message })
+        });
+        if (!resp.ok) await this.parseResponseError(resp);
+        return await resp.json();
+    }
 }
