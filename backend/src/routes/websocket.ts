@@ -40,6 +40,49 @@ export function broadcastPresenceUpdate(userId: number, status: string, isOnline
 export default async function websocketRoutes(fastify: FastifyInstance) {
   const rooms = new Map<string, GameRoom>();
 
+  // Simple matchmaking queue (FIFO)
+  const matchmakingQueue: Set<WS> = new Set();
+
+  function removeFromQueue(ws: WS) {
+    if (matchmakingQueue.has(ws)) {
+      matchmakingQueue.delete(ws);
+      try {
+        if (ws.readyState === 1) ws.send(JSON.stringify({ type: 'leftQueue' }));
+      } catch (e) {}
+    }
+  }
+
+  function tryMatchQueue() {
+    // pair sockets when available
+    while (matchmakingQueue.size >= 2) {
+      const iter = matchmakingQueue.values();
+      const a = iter.next().value as WS;
+      const b = iter.next().value as WS;
+      // sanity checks
+      if (!a || !b) break;
+      // remove from queue
+      matchmakingQueue.delete(a);
+      matchmakingQueue.delete(b);
+
+      // create room and add both sockets
+      const roomId = Math.random().toString(36).substring(2, 8).toUpperCase();
+      const room = new GameRoom(roomId);
+      rooms.set(roomId, room);
+
+      const assignA = room.addClient(a);
+      const assignB = room.addClient(b);
+
+      // send 'created' to host (A if assigned isHost true)
+      try {
+        const hostSocket = assignA.isHost ? a : (assignB.isHost ? b : a);
+        if (hostSocket && (hostSocket as any).readyState === 1) {
+          hostSocket.send(JSON.stringify({ type: 'created', roomId }));
+        }
+      } catch (e) {}
+      // GameRoom will broadcast peerJoined and ready as usual
+    }
+  }
+
   const wsHandler = (connection: any, request: FastifyRequest) => {
     const socket: WS = connection.socket;
     const params = (request.params as any) || {};
@@ -94,6 +137,54 @@ export default async function websocketRoutes(fastify: FastifyInstance) {
       fastify.log.debug('WS auth decode failed', err as any);
     }
 
+    // If client explicitly requested matchmaking queue via query param, enqueue and return
+    if (query && (query.queue === '1' || query.queue === 'true' || query.queue === 1 || query.queue === true)) {
+      // register presence as above (already done)
+      try {
+        matchmakingQueue.add(socket);
+        // send waiting notification
+        if (socket.readyState === 1) {
+          socket.send(JSON.stringify({ type: 'waitingForOpponent', room: null }));
+        }
+      } catch (e) {}
+
+      // wire basic message and close handlers to allow leave and cleanup
+      socket.on('message', (raw: any) => {
+        let payload: any = null;
+        try {
+          const text = typeof raw === 'string' ? raw : raw.toString();
+          payload = JSON.parse(text);
+        } catch (err) {
+          fastify.log.debug('Invalid WS message JSON (queue)', err as any);
+          return;
+        }
+        try {
+          if (payload?.type === 'leaveQueue') {
+            removeFromQueue(socket);
+          }
+          // ignore other messages while in queue
+        } catch (e) {
+          fastify.log.debug('Queue message handling error', e as any);
+        }
+      });
+
+      socket.on('close', () => {
+        try {
+          removeFromQueue(socket);
+        } catch (e) {
+          fastify.log.debug('Error removing socket from queue on close', e as any);
+        }
+
+        // presence cleanup follows below (reuse existing cleanup logic)
+        // Note: we'll fall through to the presence cleanup handled after add/remove logic
+      });
+
+      // Try to match immediately after enqueue
+      tryMatchQueue();
+      return;
+    }
+
+    // Non-queue flow: create/join a room immediately (existing behavior)
     if (!roomId) {
       roomId = Math.random().toString(36).substring(2, 8).toUpperCase();
     }
@@ -105,6 +196,15 @@ export default async function websocketRoutes(fastify: FastifyInstance) {
 
     const assignment = room.addClient(socket);
     fastify.log.info(`Socket joined room ${roomId} as player ${assignment.player} host=${assignment.isHost} user=${socketUserId || 'anonymous'}`);
+
+    // If this connection created a fresh room and it's the host, send a created message
+    try {
+      if (assignment.isHost && room.getPlayerCount && room.getPlayerCount() === 1) {
+        if (socket.readyState === 1) {
+          socket.send(JSON.stringify({ type: 'created', roomId }));
+        }
+      }
+    } catch (e) {}
 
     socket.on('message', (raw: any) => {
       let payload: any = null;
@@ -132,7 +232,7 @@ export default async function websocketRoutes(fastify: FastifyInstance) {
       } catch (err) {
         fastify.log.debug('Error during ws close', err as any);
       }
-      
+
       // Handle presence cleanup
       if (socketUserId) {
         const userSockets = presenceConnections.get(socketUserId);
