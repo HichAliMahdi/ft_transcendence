@@ -541,7 +541,6 @@ export class FriendWidget {
         const closeBtn = document.createElement('button');
         closeBtn.className = 'text-white text-xl';
         closeBtn.innerHTML = '&times;';
-        closeBtn.onclick = () => { if (document.body.contains(overlay)) document.body.removeChild(overlay); };
         header.appendChild(closeBtn);
 
         const messagesWrap = document.createElement('div');
@@ -566,14 +565,17 @@ export class FriendWidget {
         overlay.appendChild(modal);
         document.body.appendChild(overlay);
 
-        // Load history
+        // Load history using imported AuthService
         try {
-            const history = await (window as any).AuthService?.getMessages ? await (window as any).AuthService.getMessages(peerId) : await (await import('../game/AuthService')).AuthService.getMessages(peerId);
+            const history = await AuthService.getMessages(peerId);
             messagesWrap.innerHTML = '';
             history.forEach((m: any) => {
                 const el = document.createElement('div');
-                el.className = `mb-2 ${m.sender_id === (window as any).AuthService.getUser()?.id ? 'text-right' : 'text-left'}`;
-                el.innerHTML = `<div class="inline-block px-3 py-1 rounded ${m.sender_id === (window as any).AuthService.getUser()?.id ? 'bg-blue-600' : 'bg-gray-700'}">${m.content}</div><div class="text-xs text-gray-400 mt-1">${m.created_at}</div>`;
+                const isMine = m.sender_id === AuthService.getUser()?.id;
+                el.className = `mb-2 ${isMine ? 'text-right' : 'text-left'}`;
+                el.innerHTML =
+                    `<div class="inline-block px-3 py-1 rounded ${isMine ? 'bg-blue-600' : 'bg-gray-700'}">${m.content}</div>` +
+                    `<div class="text-xs text-gray-400 mt-1">${m.created_at}</div>`;
                 messagesWrap.appendChild(el);
             });
             messagesWrap.scrollTop = messagesWrap.scrollHeight;
@@ -581,13 +583,13 @@ export class FriendWidget {
             messagesWrap.textContent = 'Failed to load messages';
         }
 
-        // Send handler
+        // Send handler using imported AuthService
         sendBtn.onclick = async () => {
             const txt = input.value.trim();
             if (!txt) return;
             sendBtn.disabled = true;
             try {
-                await (window as any).AuthService.sendMessage(peerId, txt);
+                await AuthService.sendMessage(peerId, txt);
                 // append locally
                 const el = document.createElement('div');
                 el.className = 'mb-2 text-right';
@@ -596,14 +598,14 @@ export class FriendWidget {
                 messagesWrap.scrollTop = messagesWrap.scrollHeight;
                 input.value = '';
             } catch (err: any) {
-                await (window as any).app.showInfo('Send failed', (window as any).AuthService?.extractErrorMessage ? (window as any).AuthService.extractErrorMessage(err) : String(err));
+                await (window as any).app.showInfo('Send failed', AuthService.extractErrorMessage(err) || String(err));
             } finally {
                 sendBtn.disabled = false;
             }
         };
 
         // Listen for incoming messages and append if from this peer
-        const handler = (ev: Event) => {
+        let handler: ((ev: Event) => void) | null = (ev: Event) => {
             const detail = (ev as CustomEvent).detail;
             if (!detail || detail.type !== 'direct_message') return;
             if (detail.from === peerId) {
@@ -614,13 +616,23 @@ export class FriendWidget {
                 messagesWrap.scrollTop = messagesWrap.scrollHeight;
             }
         };
-        window.addEventListener('direct_message', handler as any);
+        window.addEventListener('direct_message', handler as EventListener);
 
-        // Clean up listener when modal closed
+        // Close actions must remove handler to avoid leaks
+        const removeAndClose = () => {
+            if (handler) {
+                window.removeEventListener('direct_message', handler as EventListener);
+                handler = null;
+            }
+            if (document.body.contains(overlay)) document.body.removeChild(overlay);
+        };
+
+        closeBtn.onclick = removeAndClose;
+
+        // Clean up listener when clicking outside modal
         overlay.addEventListener('click', (e) => {
             if (e.target === overlay) {
-                if (document.body.contains(overlay)) document.body.removeChild(overlay);
-                window.removeEventListener('direct_message', handler as any);
+                removeAndClose();
             }
         });
     }
