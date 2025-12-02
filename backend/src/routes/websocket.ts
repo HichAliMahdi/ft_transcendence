@@ -51,6 +51,23 @@ export function sendDirectMessage(targetUserId: number, payload: any): void {
   }
 }
 
+// NEW: Helper to send notification updates to a specific user
+export function sendNotificationUpdate(targetUserId: number): void {
+  const message = JSON.stringify({
+    type: 'notification_update'
+  });
+  
+  const sockets = presenceConnections.get(targetUserId);
+  if (!sockets) return;
+  for (const s of sockets) {
+    try {
+      if (s.readyState === 1) s.send(message);
+    } catch (e) {
+      // ignore
+    }
+  }
+}
+
 export default async function websocketRoutes(fastify: FastifyInstance) {
   const rooms = new Map<string, GameRoom>();
 
