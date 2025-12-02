@@ -272,6 +272,19 @@ export class FriendWidget {
 
         // register global incoming direct message handler so widget can react (unread / refresh)
         this.registerGlobalMessageListener();
+
+        // Listen for direct_message events and update timestamps in open chat windows
+        window.addEventListener('direct_message', (ev: Event) => {
+            const d = (ev as CustomEvent).detail;
+            if (!d) return;
+            const fromId = Number(d.from);
+            const chat = this.openChats.get(fromId);
+            if (chat) {
+                // Optionally, update timestamps for all messages (if needed)
+                // For new messages, timestamp is handled in registerGlobalMessageListener
+                // If you want to update all timestamps, you could re-render or update here
+            }
+        });
     }
 
     closePanel(): void {
@@ -514,9 +527,24 @@ export class FriendWidget {
                 const chat = this.openChats.get(fromId);
                 if (chat) {
                     // Append the new message directly (no reload)
+                    // Format timestamp for display
+                    const formatTime = (dateString: string): string => {
+                        if (!dateString) return '';
+                        const date = new Date(dateString);
+                        const now = new Date();
+                        const diff = now.getTime() - date.getTime();
+                        const minutes = Math.floor(diff / 60000);
+                        const hours = Math.floor(minutes / 60);
+                        const days = Math.floor(hours / 24);
+                        if (minutes < 1) return 'Just now';
+                        if (minutes < 60) return `${minutes}m ago`;
+                        if (hours < 24) return `${hours}h ago`;
+                        if (days < 7) return `${days}d ago`;
+                        return date.toLocaleDateString();
+                    };
                     const el = document.createElement('div');
                     el.className = `mb-2 text-left`;
-                    el.innerHTML = `<div class="inline-block px-3 py-1 rounded bg-gray-700">${d.content}</div><div class="text-xs text-gray-400 mt-1">${d.created_at}</div>`;
+                    el.innerHTML = `<div class="inline-block px-3 py-1 rounded bg-gray-700">${d.content}</div><div class="text-xs text-gray-400 mt-1">${formatTime(d.created_at)}</div>`;
                     chat.messagesEl.appendChild(el);
                     chat.messagesEl.scrollTop = chat.messagesEl.scrollHeight;
                     // if minimized, increment unread badge
@@ -557,7 +585,7 @@ export class FriendWidget {
 
     // Ensure polling helper is syntactically correct
     private startPolling(): void {
-        if (this.intervalId) return;
+        if this.intervalId) return;
 
         this.intervalId = window.setInterval(() => {
             if (this.visible) this.refreshNow();
