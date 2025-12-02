@@ -37,6 +37,20 @@ export function broadcastPresenceUpdate(userId: number, status: string, isOnline
   }
 }
 
+// Add helper to send direct messages to a specific user's connected sockets
+export function sendDirectMessage(targetUserId: number, payload: any): void {
+  const message = JSON.stringify(payload);
+  const sockets = presenceConnections.get(targetUserId);
+  if (!sockets) return;
+  for (const s of sockets) {
+    try {
+      if (s.readyState === 1) s.send(message);
+    } catch (e) {
+      // ignore
+    }
+  }
+}
+
 export default async function websocketRoutes(fastify: FastifyInstance) {
   const rooms = new Map<string, GameRoom>();
 

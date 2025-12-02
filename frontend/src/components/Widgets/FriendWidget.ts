@@ -10,6 +10,14 @@ export class FriendWidget {
     private searchBtn: HTMLButtonElement | null = null;
     private authWatcherId: number | null = null;
     private authChangeHandler: ((e?: Event) => void) | null = null;
+    private chatContainer: HTMLElement | null = null;
+    private openChats: Map<number, {
+        box: HTMLElement;
+        messagesEl: HTMLElement;
+        inputEl: HTMLInputElement;
+        minimized: boolean;
+    }> = new Map();
+    private unreadCounts: Map<number, number> = new Map();
 
 
     mount(): void {
@@ -90,6 +98,37 @@ export class FriendWidget {
         this.panel.id = 'friend-widget-panel';
         this.panel.className = 'glass-effect p-4 rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.6)] w-[340px] max-h-[70vh] overflow-auto absolute bottom-16 right-0 hidden';
         this.root.appendChild(this.panel);
+
+        // Chat windows container (bottom-right, holds chat boxes like Facebook)
+        this.chatContainer = document.createElement('div');
+        this.chatContainer.id = 'chat-windows-root';
+        // base classes (position fixed); we'll compute a right offset so it doesn't overlap widgets
+        this.chatContainer.className = 'fixed bottom-5 flex flex-row-reverse gap-3 z-[10000]';
+        document.body.appendChild(this.chatContainer);
+
+        // Compute offset to avoid overlapping the friend/notification widgets.
+        // Sum widths of known widgets if present (friend widget, notification widget), add larger safety gap.
+        try {
+            let offset = 24; // base gap in px
+            const fw = document.getElementById('friend-widget-root');
+            if (fw) {
+                const r = fw.getBoundingClientRect();
+                offset += Math.round(r.width) + 12; // small spacing after widget
+            }
+            const nw = document.getElementById('notification-widget-root');
+            if (nw) {
+                const r2 = nw.getBoundingClientRect();
+                offset += Math.round(r2.width) + 12;
+            }
+            // Add extra safety margin to ensure no overlap with other UI chrome
+            offset += 40;
+            // Increase minimum offset to keep chat clearly left of widgets
+            if (offset < 260) offset = 260;
+            this.chatContainer.style.right = `${offset}px`;
+        } catch (e) {
+            // best-effort: ensure it's not exactly on top
+            this.chatContainer.style.right = '260px';
+        }
 
         // Personal Status Section
         const statusSection = document.createElement('div');
@@ -230,6 +269,9 @@ export class FriendWidget {
 
         this.refreshNow();
         this.startPolling();
+
+        // register global incoming direct message handler so widget can react (unread / refresh)
+        this.registerGlobalMessageListener();
     }
 
     closePanel(): void {
@@ -242,7 +284,7 @@ export class FriendWidget {
             this.btn.classList.remove('bg-accent-pink');
         }
     }
-
+    
     private async fetchAndRender(): Promise<void> {
         const listEl = this.panel ? this.panel.querySelector('#friend-list') as HTMLElement | null : null;
         if (!listEl) return;
@@ -278,6 +320,9 @@ export class FriendWidget {
                 const name = document.createElement('div');
                 name.className = 'text-white font-medium';
                 name.textContent = f.display_name || f.username;
+                // clicking the name opens chat window (bottom-right)
+                name.style.cursor = 'pointer';
+                name.onclick = () => this.openChatWindow(f.id, f.display_name || f.username);
                 
                 // Status badge with emoji and color coding
                 const statusBadge = document.createElement('span');
@@ -459,10 +504,56 @@ export class FriendWidget {
         await this.fetchAndRender();
     }
 
+    // Global listener to react to incoming direct messages (keeps UI updated)
+    private registerGlobalMessageListener(): void {
+        window.addEventListener('direct_message', (ev: Event) => {
+            try {
+                const d = (ev as CustomEvent).detail;
+                if (!d) return;
+                // If a chat window for the sender is open, append the message
+                const fromId = Number(d.from);
+                const chat = this.openChats.get(fromId);
+                if (chat) {
+                    const el = document.createElement('div');
+                    el.className = 'mb-2 text-left';
+                    el.innerHTML = `<div class="inline-block px-3 py-1 rounded bg-gray-700">${d.content}</div><div class="text-xs text-gray-400 mt-1">${d.created_at || 'now'}</div>`;
+                    chat.messagesEl.appendChild(el);
+                    chat.messagesEl.scrollTop = chat.messagesEl.scrollHeight;
+                    // if minimized, increment unread badge
+                    if (chat.minimized) {
+                        const headerBadge = chat.box.querySelector('.chat-unread') as HTMLElement | null;
+                        const prev = this.unreadCounts.get(fromId) || 0;
+                        this.unreadCounts.set(fromId, prev + 1);
+                        if (headerBadge) headerBadge.textContent = String(this.unreadCounts.get(fromId));
+                    }
+                } else {
+                    // No open chat: increment unread for friend list, show small indicator
+                    const prev = this.unreadCounts.get(fromId) || 0;
+                    this.unreadCounts.set(fromId, prev + 1);
+                    // Find friend row and mark unread badge
+                    const row = this.panel?.querySelector(`div[data-friend-id="${fromId}"]`) as HTMLElement | null;
+                    if (row) {
+                        let badge = row.querySelector('.friend-unread') as HTMLElement | null;
+                        if (!badge) {
+                            badge = document.createElement('span');
+                            badge.className = 'friend-unread bg-accent-pink text-white rounded-full text-xs px-2 py-0.5 ml-2';
+                            (row.querySelector('div.flex.flex-col') || row).appendChild(badge);
+                        }
+                        badge.textContent = String(this.unreadCounts.get(fromId));
+                    }
+                }
+                // also refresh friend list presence if visible
+                if (this.visible) this.refreshNow();
+            } catch (e) {
+                // ignore
+            }
+        });
+    }
 
+    // Ensure polling helper is syntactically correct
     private startPolling(): void {
         if (this.intervalId) return;
-        
+
         this.intervalId = window.setInterval(() => {
             if (this.visible) this.refreshNow();
         }, 15000) as unknown as number;
@@ -485,17 +576,183 @@ export class FriendWidget {
             document.body.removeChild(this.root);
         }
 
+        // Remove chat windows container
+        if (this.chatContainer && document.body.contains(this.chatContainer)) {
+            document.body.removeChild(this.chatContainer);
+        }
+        this.openChats.clear();
+        this.unreadCounts.clear();
+
         // clean global reference if it points to this instance
         try {
             if ((window as any)._friendWidget === this) delete (window as any)._friendWidget;
-        } catch (e) {}
-        
+        } catch (e) { }
+
         // Clear all references
         this.root = null;
         this.panel = null;
         this.btn = null;
         this.searchInput = null;
         this.searchBtn = null;
+    }
 
+    // Open a persistent chat window (bottom-right). Focus existing if already open.
+    private async openChatWindow(peerId: number, peerName: string): Promise<void> {
+        // Ensure chat container exists
+        if (!this.chatContainer) {
+            this.chatContainer = document.getElementById('chat-windows-root') as HTMLElement | null;
+            if (!this.chatContainer) {
+                this.chatContainer = document.createElement('div');
+                this.chatContainer.id = 'chat-windows-root';
+                this.chatContainer.className = 'fixed bottom-5 right-5 flex flex-row-reverse gap-3 z-[10000]';
+                document.body.appendChild(this.chatContainer);
+            }
+        }
+
+        // If already open, restore/focus
+        const existing = this.openChats.get(peerId);
+        if (existing) {
+            if (existing.minimized) {
+                existing.minimized = false;
+                existing.box.classList.remove('chat-minimized');
+                existing.messagesEl.style.display = '';
+                existing.inputEl.style.display = '';
+                const badge = existing.box.querySelector('.chat-unread') as HTMLElement | null;
+                if (badge) { badge.classList.add('hidden'); badge.textContent = ''; }
+            }
+            existing.inputEl.focus();
+            this.unreadCounts.delete(peerId);
+            return;
+        }
+
+        // Build chat box
+        const box = document.createElement('div');
+        box.className = 'w-80 bg-game-dark rounded-lg shadow-lg flex flex-col overflow-hidden chat-box';
+        box.setAttribute('data-chat-user', String(peerId));
+
+        // Header
+        const header = document.createElement('div');
+        header.className = 'flex items-center justify-between px-3 py-2 bg-[#0b1220]';
+        const title = document.createElement('div');
+        title.className = 'text-sm text-white font-semibold truncate';
+        title.textContent = peerName;
+        const controls = document.createElement('div');
+        controls.className = 'flex items-center gap-2';
+        const unreadBadge = document.createElement('span');
+        unreadBadge.className = 'chat-unread bg-accent-pink text-white rounded-full text-xs px-2 py-0.5 hidden';
+        unreadBadge.setAttribute('aria-hidden', 'true');
+        const minBtn = document.createElement('button');
+        minBtn.className = 'text-gray-300 hover:text-white';
+        minBtn.title = 'Minimize';
+        minBtn.textContent = '−';
+        const closeBtn = document.createElement('button');
+        closeBtn.className = 'text-gray-300 hover:text-white';
+        closeBtn.title = 'Close';
+        closeBtn.textContent = '✕';
+        controls.appendChild(unreadBadge);
+        controls.appendChild(minBtn);
+        controls.appendChild(closeBtn);
+        header.appendChild(title);
+        header.appendChild(controls);
+
+        // Messages area
+        const messagesEl = document.createElement('div');
+        messagesEl.className = 'px-3 py-2 flex-1 overflow-auto text-sm';
+        messagesEl.style.maxHeight = '240px';
+        messagesEl.textContent = 'Loading...';
+
+        // Input
+        const inputRow = document.createElement('div');
+        inputRow.className = 'px-3 py-2 flex gap-2 border-t border-gray-700';
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.placeholder = 'Write a message…';
+        input.className = 'flex-1 px-3 py-2 rounded bg-[#0f1724] text-white text-sm';
+        const send = document.createElement('button');
+        send.className = 'px-3 py-2 btn-primary text-sm';
+        send.textContent = 'Send';
+        inputRow.appendChild(input);
+        inputRow.appendChild(send);
+
+        box.appendChild(header);
+        box.appendChild(messagesEl);
+        box.appendChild(inputRow);
+
+        // Insert box so newest is nearest the friend widget
+        if (this.chatContainer) this.chatContainer.insertBefore(box, this.chatContainer.firstChild);
+
+        this.openChats.set(peerId, { box, messagesEl, inputEl: input, minimized: false });
+
+        // Load history
+        try {
+            const history = await AuthService.getMessages(peerId);
+            messagesEl.innerHTML = '';
+            history.forEach((m: any) => {
+                const el = document.createElement('div');
+                const isMine = m.sender_id === AuthService.getUser()?.id;
+                el.className = `mb-2 ${isMine ? 'text-right' : 'text-left'}`;
+                el.innerHTML = `<div class="inline-block px-3 py-1 rounded ${isMine ? 'bg-blue-600' : 'bg-gray-700'}">${m.content}</div><div class="text-xs text-gray-400 mt-1">${m.created_at}</div>`;
+                messagesEl.appendChild(el);
+            });
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+        } catch (e) {
+            messagesEl.textContent = 'Failed to load messages';
+        }
+
+        // Send action
+        send.onclick = async () => {
+            const txt = input.value.trim();
+            if (!txt) return;
+            send.disabled = true;
+            try {
+                await AuthService.sendMessage(peerId, txt);
+                const el = document.createElement('div');
+                el.className = 'mb-2 text-right';
+                el.innerHTML = `<div class="inline-block px-3 py-1 rounded bg-blue-600">${txt}</div><div class="text-xs text-gray-400 mt-1">now</div>`;
+                messagesEl.appendChild(el);
+                messagesEl.scrollTop = messagesEl.scrollHeight;
+                input.value = '';
+            } catch (err: any) {
+                await (window as any).app.showInfo('Send failed', AuthService.extractErrorMessage(err) || String(err));
+            } finally {
+                send.disabled = false;
+            }
+        };
+
+        // Minimize / restore
+        minBtn.onclick = () => {
+            const info = this.openChats.get(peerId);
+            if (!info) return;
+            info.minimized = !info.minimized;
+            if (info.minimized) {
+                info.box.classList.add('chat-minimized');
+                info.messagesEl.style.display = 'none';
+                info.inputEl.style.display = 'none';
+                const badge = info.box.querySelector('.chat-unread') as HTMLElement | null;
+                if (badge) badge.classList.remove('hidden');
+            } else {
+                info.box.classList.remove('chat-minimized');
+                info.messagesEl.style.display = '';
+                info.inputEl.style.display = '';
+                const badge = info.box.querySelector('.chat-unread') as HTMLElement | null;
+                if (badge) { badge.classList.add('hidden'); badge.textContent = ''; }
+                this.unreadCounts.delete(peerId);
+            }
+        };
+
+        // Close chat
+        closeBtn.onclick = () => {
+            if (this.openChats.has(peerId)) {
+                const info = this.openChats.get(peerId)!;
+                if (this.chatContainer && this.chatContainer.contains(info.box)) {
+                    this.chatContainer.removeChild(info.box);
+                }
+                this.openChats.delete(peerId);
+                this.unreadCounts.delete(peerId);
+            }
+        };
+
+        // focus input
+        setTimeout(() => { input.focus(); }, 50);
     }
 }
