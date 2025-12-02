@@ -1,31 +1,40 @@
-Ft_transcendence
+ACTION PLAN TO REACH 100%
+Week 1: Critical Fixes
 
-/// TO DO FOR NEXT ////
-1 - ✅ Add online offline status (COMPLETED)
-2 - ✅ Add the possibility to see if the person is online or busy or offline (COMPLETED - with realtime updates)
-3 - Add avatars
-4 - Check for bugs and fixes
+Complete 2FA implementation (TOTP + backup codes)
+Fix tournament to work without registration
+Add XSS/CSRF protection
+Remove any security vulnerabilities
 
-/// IMPLEMENTED ///
-- Database migration system for safe schema updates
-- Realtime presence broadcasting via WebSocket
-- Full status system: Online (green), Busy (red), Away (yellow), Offline (gray)
-- Visual status indicators with color-coded dots and glowing effects
-- Automatic online/offline detection based on WebSocket connections
-- Status selector integrated into Friends widget for better UX
-- Real-time friend status updates without requiring widget refresh
-- Proper Offline status on logout and WebSocket disconnect
-- Beautiful status badges in friend widget with emojis and color coding
-- Personal status section at the top of Friends widget
-- Status indicator dot next to username in header
-- Clean, non-redundant status display throughout the UI
-- Fully Tailwind CSS-based styling (no inline styles)
-- Fixed widget positioning and z-index for proper click interaction
-- WebSocket authentication via query parameter for online multiplayer
+Week 2: Add 7th Major Module
+Choose one:
 
-/// RECENT IMPROVEMENTS ///
-- Fixed WebSocket authentication for online multiplayer matches
-- Token now passed as query parameter (?token=...) instead of headers
-- Backend WebSocket handler accepts token from both query param and auth header
-- Proper user info attached to WebSocket connections for friend features
-- Enhanced logging for WebSocket connections with user identification
+OAuth 2.0 (easiest, recommended)
+Blockchain score storage (impressive)
+WAF/ModSecurity (production-grade)
+
+Week 3: Polish & Testing
+
+Test all features thoroughly
+Fix any bugs discovered
+Ensure browser compatibility
+Prepare defense materials
+
+
+🚨 BLOCKING ISSUES FOR EVALUATION
+These MUST be fixed before submission:
+
+❌ 2FA incomplete - Major module not fully implemented
+❌ Tournament requires auth - Subject says it should work without
+⚠️ Security concerns - SQL injection, XSS, CSRF risks
+⚠️ Only 6/7 major modules - Need one more for 100%
+
+
+💡 QUICK WINS
+These are easy improvements:
+
+✅ Add input sanitization library (DOMPurify)
+✅ Implement rate limiting (already have package)
+✅ Add CSP headers via Helmet
+✅ Create anonymous tournament mode
+✅ Add OAuth 2.0 (Google) - ~1 day work
