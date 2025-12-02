@@ -506,17 +506,17 @@ export class FriendWidget {
 
     // Global listener to react to incoming direct messages (keeps UI updated)
     private registerGlobalMessageListener(): void {
-        window.addEventListener('direct_message', (ev: Event) => {
+        window.addEventListener('direct_message', async (ev: Event) => {
             try {
                 const d = (ev as CustomEvent).detail;
                 if (!d) return;
-                // If a chat window for the sender is open, append the message
                 const fromId = Number(d.from);
                 const chat = this.openChats.get(fromId);
                 if (chat) {
+                    // Append the new message directly (no reload)
                     const el = document.createElement('div');
-                    el.className = 'mb-2 text-left';
-                    el.innerHTML = `<div class="inline-block px-3 py-1 rounded bg-gray-700">${d.content}</div><div class="text-xs text-gray-400 mt-1">${d.created_at || 'now'}</div>`;
+                    el.className = `mb-2 text-left`;
+                    el.innerHTML = `<div class="inline-block px-3 py-1 rounded bg-gray-700">${d.content}</div><div class="text-xs text-gray-400 mt-1">${d.created_at}</div>`;
                     chat.messagesEl.appendChild(el);
                     chat.messagesEl.scrollTop = chat.messagesEl.scrollHeight;
                     // if minimized, increment unread badge
@@ -530,7 +530,6 @@ export class FriendWidget {
                     // No open chat: increment unread for friend list, show small indicator
                     const prev = this.unreadCounts.get(fromId) || 0;
                     this.unreadCounts.set(fromId, prev + 1);
-                    // Find friend row and mark unread badge
                     const row = this.panel?.querySelector(`div[data-friend-id="${fromId}"]`) as HTMLElement | null;
                     if (row) {
                         let badge = row.querySelector('.friend-unread') as HTMLElement | null;
@@ -542,8 +541,14 @@ export class FriendWidget {
                         badge.textContent = String(this.unreadCounts.get(fromId));
                     }
                 }
-                // also refresh friend list presence if visible
-                if (this.visible) this.refreshNow();
+                // Always refresh friend list to show new requests/status
+                this.refreshNow();
+
+                // Also refresh notifications if widget is present and visible
+                const nw = (window as any)._notificationWidget;
+                if (nw && typeof nw.refreshNow === 'function') {
+                    nw.refreshNow();
+                }
             } catch (e) {
                 // ignore
             }
