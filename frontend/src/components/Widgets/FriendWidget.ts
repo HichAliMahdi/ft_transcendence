@@ -267,8 +267,7 @@ export class FriendWidget {
         this.refreshNow();
         this.startPolling();
 
-        // register global incoming direct message handler so widget can react (unread / refresh)
-        // Only register once to avoid duplicate messages
+        // FIXED: Only register once to avoid duplicate messages
         if (!this.directMessageHandler) {
             this.registerGlobalMessageListener();
         }
@@ -505,6 +504,11 @@ export class FriendWidget {
 
     // Global listener to react to incoming direct messages (keeps UI updated)
     private registerGlobalMessageListener(): void {
+        // FIXED: Only register if not already registered
+        if (this.directMessageHandler) {
+            return;
+        }
+        
         this.directMessageHandler = async (ev: Event) => {
             try {
                 const d = (ev as CustomEvent).detail;
@@ -512,33 +516,40 @@ export class FriendWidget {
                 const fromId = Number(d.from);
                 const meId = AuthService.getUser()?.id;
                 
-                // Ignore messages from ourselves - we already displayed them when sending
+                // FIXED: Ignore messages from ourselves - we already displayed them when sending
                 if (fromId === meId) return;
                 
                 const chat = this.openChats.get(fromId);
                 if (chat) {
-                    // Append the new message directly (no reload)
-                    // Format timestamp for display
+                    // Format timestamp with proper timezone handling
                     const formatTime = (dateString: string): string => {
-                        if (!dateString) return '';
-                        const date = new Date(dateString);
-                        const now = new Date();
-                        const diff = now.getTime() - date.getTime();
-                        const minutes = Math.floor(diff / 60000);
-                        const hours = Math.floor(minutes / 60);
-                        const days = Math.floor(hours / 24);
-                        if (minutes < 1) return 'Just now';
-                        if (minutes < 60) return `${minutes}m ago`;
-                        if (hours < 24) return `${hours}h ago`;
-                        if (days < 7) return `${days}d ago`;
-                        return date.toLocaleDateString();
+                        if (!dateString) return 'Just now';
+                        try {
+                            const date = new Date(dateString + 'Z');
+                            if (isNaN(date.getTime())) return 'Just now';
+                            
+                            const now = new Date();
+                            const diffMs = now.getTime() - date.getTime();
+                            const diffSec = Math.floor(diffMs / 1000);
+                            const diffMin = Math.floor(diffSec / 60);
+                            const diffHour = Math.floor(diffMin / 60);
+                            const diffDay = Math.floor(diffHour / 24);
+                            
+                            if (diffSec < 10) return 'Just now';
+                            if (diffSec < 60) return `${diffSec}s ago`;
+                            if (diffMin < 60) return `${diffMin}m ago`;
+                            if (diffHour < 24) return `${diffHour}h ago`;
+                            if (diffDay < 7) return `${diffDay}d ago`;
+                            return date.toLocaleDateString();
+                        } catch (e) {
+                            return 'Just now';
+                        }
                     };
                     const el = document.createElement('div');
                     el.className = `mb-2 text-left`;
                     el.innerHTML = `<div class="inline-block px-3 py-1 rounded bg-gray-700">${d.content}</div><div class="text-xs text-gray-400 mt-1">${formatTime(d.created_at)}</div>`;
                     chat.messagesEl.appendChild(el);
                     chat.messagesEl.scrollTop = chat.messagesEl.scrollHeight;
-                    // if minimized, increment unread badge
                     if (chat.minimized) {
                         const headerBadge = chat.box.querySelector('.chat-unread') as HTMLElement | null;
                         const prev = this.unreadCounts.get(fromId) || 0;
@@ -546,7 +557,6 @@ export class FriendWidget {
                         if (headerBadge) headerBadge.textContent = String(this.unreadCounts.get(fromId));
                     }
                 } else {
-                    // No open chat: increment unread for friend list, show small indicator
                     const prev = this.unreadCounts.get(fromId) || 0;
                     this.unreadCounts.set(fromId, prev + 1);
                     const row = this.panel?.querySelector(`div[data-friend-id="${fromId}"]`) as HTMLElement | null;
@@ -560,10 +570,8 @@ export class FriendWidget {
                         badge.textContent = String(this.unreadCounts.get(fromId));
                     }
                 }
-                // Always refresh friend list to show new requests/status
                 this.refreshNow();
 
-                // Also refresh notifications if widget is present and visible
                 const nw = (window as any)._notificationWidget;
                 if (nw && typeof nw.refreshNow === 'function') {
                     nw.refreshNow();
@@ -718,11 +726,38 @@ export class FriendWidget {
         try {
             const history = await AuthService.getMessages(peerId);
             messagesEl.innerHTML = '';
+            
+            // Helper to format timestamps with proper timezone handling
+            const formatTimestamp = (dateString: string): string => {
+                if (!dateString) return 'Unknown time';
+                try {
+                    // Parse the timestamp (SQLite CURRENT_TIMESTAMP is UTC)
+                    const date = new Date(dateString + 'Z'); // Add Z to indicate UTC
+                    if (isNaN(date.getTime())) return 'Unknown time';
+                    
+                    const now = new Date();
+                    const diffMs = now.getTime() - date.getTime();
+                    const diffSec = Math.floor(diffMs / 1000);
+                    const diffMin = Math.floor(diffSec / 60);
+                    const diffHour = Math.floor(diffMin / 60);
+                    const diffDay = Math.floor(diffHour / 24);
+                    
+                    if (diffSec < 10) return 'Just now';
+                    if (diffSec < 60) return `${diffSec}s ago`;
+                    if (diffMin < 60) return `${diffMin}m ago`;
+                    if (diffHour < 24) return `${diffHour}h ago`;
+                    if (diffDay < 7) return `${diffDay}d ago`;
+                    return date.toLocaleDateString();
+                } catch (e) {
+                    return 'Unknown time';
+                }
+            };
+            
             history.forEach((m: any) => {
                 const el = document.createElement('div');
                 const isMine = m.sender_id === AuthService.getUser()?.id;
                 el.className = `mb-2 ${isMine ? 'text-right' : 'text-left'}`;
-                el.innerHTML = `<div class="inline-block px-3 py-1 rounded ${isMine ? 'bg-blue-600' : 'bg-gray-700'}">${m.content}</div><div class="text-xs text-gray-400 mt-1">${m.created_at}</div>`;
+                el.innerHTML = `<div class="inline-block px-3 py-1 rounded ${isMine ? 'bg-blue-600' : 'bg-gray-700'}">${m.content}</div><div class="text-xs text-gray-400 mt-1">${formatTimestamp(m.created_at)}</div>`;
                 messagesEl.appendChild(el);
             });
             messagesEl.scrollTop = messagesEl.scrollHeight;
@@ -737,9 +772,10 @@ export class FriendWidget {
             send.disabled = true;
             try {
                 await AuthService.sendMessage(peerId, txt);
+                // FIXED: Display message immediately with proper timestamp
                 const el = document.createElement('div');
                 el.className = 'mb-2 text-right';
-                el.innerHTML = `<div class="inline-block px-3 py-1 rounded bg-blue-600">${txt}</div><div class="text-xs text-gray-400 mt-1">now</div>`;
+                el.innerHTML = `<div class="inline-block px-3 py-1 rounded bg-blue-600">${txt}</div><div class="text-xs text-gray-400 mt-1">Just now</div>`;
                 messagesEl.appendChild(el);
                 messagesEl.scrollTop = messagesEl.scrollHeight;
                 input.value = '';
