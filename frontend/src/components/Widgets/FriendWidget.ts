@@ -585,7 +585,7 @@ export class FriendWidget {
 
     // Ensure polling helper is syntactically correct
     private startPolling(): void {
-        if this.intervalId) return;
+        if (this.intervalId) return;
 
         this.intervalId = window.setInterval(() => {
             if (this.visible) this.refreshNow();

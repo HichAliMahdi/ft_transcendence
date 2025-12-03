@@ -338,16 +338,12 @@ class App {
                     if (data.type === 'presence_update') {
                         this.handlePresenceUpdate(data.userId, data.status, data.isOnline);
                     } else if (data.type === 'direct_message') {
-                        // relay to UI components
                         window.dispatchEvent(new CustomEvent('direct_message', { detail: data }));
                     } else if (data.type === 'notification_update') {
-                        // NEW: Handle real-time notification updates
-                        // Trigger notification widget to refresh
                         const nw = (window as any)._notificationWidget;
                         if (nw && typeof nw.refreshNow === 'function') {
                             nw.refreshNow();
                         }
-                        // Also refresh friend widget in case it's a friend request
                         const fw = (window as any)._friendWidget;
                         if (fw && typeof fw.refreshNow === 'function') {
                             fw.refreshNow();
@@ -365,7 +361,6 @@ class App {
             this.presenceSocket.onclose = () => {
                 console.log('Presence WebSocket closed');
                 this.presenceSocket = null;
-                // Attempt reconnect after 5 seconds if still authenticated
                 setTimeout(() => {
                     if (AuthService.isAuthenticated() && !this.presenceSocket) {
                         this.connectPresenceSocket();
