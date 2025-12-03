@@ -18,6 +18,7 @@ export class FriendWidget {
         minimized: boolean;
     }> = new Map();
     private unreadCounts: Map<number, number> = new Map();
+    private messageListenerRegistered = false;
 
 
     mount(): void {
@@ -271,20 +272,11 @@ export class FriendWidget {
         this.startPolling();
 
         // register global incoming direct message handler so widget can react (unread / refresh)
-        this.registerGlobalMessageListener();
-
-        // Listen for direct_message events and update timestamps in open chat windows
-        window.addEventListener('direct_message', (ev: Event) => {
-            const d = (ev as CustomEvent).detail;
-            if (!d) return;
-            const fromId = Number(d.from);
-            const chat = this.openChats.get(fromId);
-            if (chat) {
-                // Optionally, update timestamps for all messages (if needed)
-                // For new messages, timestamp is handled in registerGlobalMessageListener
-                // If you want to update all timestamps, you could re-render or update here
-            }
-        });
+        // Only register once to avoid duplicate messages
+        if (!this.messageListenerRegistered) {
+            this.registerGlobalMessageListener();
+            this.messageListenerRegistered = true;
+        }
     }
 
     closePanel(): void {
@@ -731,8 +723,8 @@ export class FriendWidget {
             messagesEl.textContent = 'Failed to load messages';
         }
 
-        // Send action
-        send.onclick = async () => {
+        // Send action helper
+        const sendMessage = async () => {
             const txt = input.value.trim();
             if (!txt) return;
             send.disabled = true;
@@ -750,6 +742,19 @@ export class FriendWidget {
                 send.disabled = false;
             }
         };
+
+        // Send button click
+        send.onclick = sendMessage;
+
+        // Enter to send, Shift+Enter for new line
+        input.addEventListener('keydown', (e: KeyboardEvent) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+            // Shift+Enter: allow default behavior (new line) - but input is single-line, 
+            // so we need to convert to textarea for multi-line support
+        });
 
         // Minimize / restore
         minBtn.onclick = () => {
