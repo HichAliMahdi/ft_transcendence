@@ -18,7 +18,7 @@ export class FriendWidget {
         minimized: boolean;
     }> = new Map();
     private unreadCounts: Map<number, number> = new Map();
-    private messageListenerRegistered = false;
+    private directMessageHandler: ((ev: Event) => void) | null = null;
 
 
     mount(): void {
@@ -100,17 +100,13 @@ export class FriendWidget {
         this.panel.className = 'glass-effect p-4 rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.6)] w-[340px] max-h-[70vh] overflow-auto absolute bottom-16 right-0 hidden';
         this.root.appendChild(this.panel);
 
-        // Chat windows container (bottom-right, holds chat boxes like Facebook)
         this.chatContainer = document.createElement('div');
         this.chatContainer.id = 'chat-windows-root';
-        // base classes (position fixed); we'll compute a right offset so it doesn't overlap widgets
         this.chatContainer.className = 'fixed bottom-5 flex flex-row-reverse gap-3 z-[10000]';
         document.body.appendChild(this.chatContainer);
 
-        // Compute offset to avoid overlapping the friend/notification widgets.
-        // Sum widths of known widgets if present (friend widget, notification widget), add larger safety gap.
         try {
-            let offset = 24; // base gap in px
+            let offset = 24;
             const fw = document.getElementById('friend-widget-root');
             if (fw) {
                 const r = fw.getBoundingClientRect();
@@ -273,9 +269,8 @@ export class FriendWidget {
 
         // register global incoming direct message handler so widget can react (unread / refresh)
         // Only register once to avoid duplicate messages
-        if (!this.messageListenerRegistered) {
+        if (!this.directMessageHandler) {
             this.registerGlobalMessageListener();
-            this.messageListenerRegistered = true;
         }
     }
 
@@ -510,11 +505,16 @@ export class FriendWidget {
 
     // Global listener to react to incoming direct messages (keeps UI updated)
     private registerGlobalMessageListener(): void {
-        window.addEventListener('direct_message', async (ev: Event) => {
+        this.directMessageHandler = async (ev: Event) => {
             try {
                 const d = (ev as CustomEvent).detail;
                 if (!d) return;
                 const fromId = Number(d.from);
+                const meId = AuthService.getUser()?.id;
+                
+                // Ignore messages from ourselves - we already displayed them when sending
+                if (fromId === meId) return;
+                
                 const chat = this.openChats.get(fromId);
                 if (chat) {
                     // Append the new message directly (no reload)
@@ -571,7 +571,8 @@ export class FriendWidget {
             } catch (e) {
                 // ignore
             }
-        });
+        };
+        window.addEventListener('direct_message', this.directMessageHandler);
     }
 
     // Ensure polling helper is syntactically correct
@@ -593,6 +594,12 @@ export class FriendWidget {
         if (this.authWatcherId) {
             clearInterval(this.authWatcherId);
             this.authWatcherId = null;
+        }
+        
+        // Remove direct message listener
+        if (this.directMessageHandler) {
+            window.removeEventListener('direct_message', this.directMessageHandler);
+            this.directMessageHandler = null;
         }
         
         // Remove DOM elements
@@ -752,8 +759,6 @@ export class FriendWidget {
                 e.preventDefault();
                 sendMessage();
             }
-            // Shift+Enter: allow default behavior (new line) - but input is single-line, 
-            // so we need to convert to textarea for multi-line support
         });
 
         // Minimize / restore
