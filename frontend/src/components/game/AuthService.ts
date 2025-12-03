@@ -156,11 +156,9 @@ export class AuthService {
                     }
                 });
                 if (!response.ok) {
-                    // best-effort: parse server message but continue clearing local auth
-                    try { const data = await response.json(); console.warn('Logout server message:', data?.message || data?.error); } catch (_) {}
+                    try { await response.json(); } catch (_) {}
                 }
             } catch (error) {
-                console.error('Logout request failed:', error);
             }
         }
         this.clearAuth();
@@ -185,7 +183,6 @@ export class AuthService {
             const data = await response.json();
             return data.user;
         } catch (error: any) {
-            console.error('Error fetching current user:', error);
             this.clearAuth();
             return null;
         }

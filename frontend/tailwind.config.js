@@ -1,4 +1,3 @@
-/** @type {import('tailwindcss').Config} */
 export default {
   content: [
     "./src/**/*.{js,ts,jsx,tsx,html}",
@@ -20,7 +19,6 @@ export default {
         }
       },
       fontFamily: {
-        // Use system font stack — rely on Tailwind defaults / system fonts
         sans: ['ui-sans-serif', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial'],
       },
     },

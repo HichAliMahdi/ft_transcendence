@@ -13,7 +13,6 @@ class App {
         return String(input).replace(/\b127(?:\.\d{1,3}){3}\b/g, '').replace(/\blocalhost\b/gi, '').trim();
     }
 
-    // Show a visible overlay for fatal runtime errors (instance method so TypeScript sees it)
     private showFatalErrorOverlay(title: string, err: any): void {
         try {
             const existing = document.getElementById('fatal-error-overlay');
@@ -38,9 +37,7 @@ class App {
             document.body.appendChild(overlay);
             const closeBtn = document.getElementById('fatal-error-close');
             if (closeBtn) closeBtn.addEventListener('click', () => { overlay.remove(); });
-        } catch (e) {
-            // nothing
-        }
+        } catch (e) {}
     }
 
     constructor() {
@@ -49,7 +46,6 @@ class App {
     }
 
     private init(): void {
-        // expose small site-styled modal helpers on window.app
         (window as any).app = (window as any).app || {};
         if (!(window as any).app.showInfo) {
             (window as any).app.showInfo = (title: string, message: string) => {
@@ -181,7 +177,6 @@ class App {
                 (window as any)._friendWidget = fw;
             }
         } catch (e) {
-            console.error('Failed to mount FriendWidget:', e);
             this.showFatalErrorOverlay(this.sanitizeForUi('Failed to mount FriendWidget'), e);
         }
 
@@ -192,7 +187,6 @@ class App {
                 (window as any)._notificationWidget = nw;
             }
         } catch (e) {
-            console.error('Failed to mount NotificationWidget:', e);
             this.showFatalErrorOverlay(this.sanitizeForUi('Failed to mount NotificationWidget'), e);
         }
 
@@ -207,7 +201,6 @@ class App {
                     this.router.navigateTo(href);
                     setTimeout(() => this.updateAuthSection(), 0);
 
-                    // Collapse sidebar on small screens after navigation
                     const nav = document.getElementById('main-nav');
                     const toggleBtn = document.getElementById('nav-toggle-btn');
                     if (nav && window.innerWidth < 768) {
@@ -225,16 +218,13 @@ class App {
         });
 
         window.addEventListener('error', (event) => {
-            console.error('Global error caught:', event.error || event.message);
             try {
                 this.showFatalErrorOverlay('Unhandled Error', this.sanitizeForUi(event.error || event.message || 'Unknown error'));
             } catch (e) {}
-            // prevent default browser error UI (keeps overlay visible)
             try { event.preventDefault(); } catch (e) {}
         });
 
         window.addEventListener('unhandledrejection', (event) => {
-            console.error('Unhandled promise rejection:', event.reason);
             try {
                 this.showFatalErrorOverlay('Unhandled Promise Rejection', this.sanitizeForUi(event.reason));
             } catch (e) {}
@@ -276,7 +266,6 @@ class App {
                 if (toggleBtn) toggleBtn.style.display = 'none';
             };
 
-            // react immediately to auth changes (login/logout)
             const onAuthChange = () => {
                 this.updateAuthSection();
                 const auth = AuthService.isAuthenticated();
@@ -305,11 +294,10 @@ class App {
                     if (curAuth) showNav();
                     else hideNav();
                 }
-            }, 500); // check auth faster so nav responds quickly
+            }, 500);
 
         }
 
-        // Initialize presence WebSocket for realtime status updates
         this.connectPresenceSocket();
 
         this.router.handleRoute();
@@ -328,9 +316,7 @@ class App {
 
             this.presenceSocket = new WebSocket(wsUrl);
 
-            this.presenceSocket.onopen = () => {
-                console.log('Presence WebSocket connected');
-            };
+            this.presenceSocket.onopen = () => {};
 
             this.presenceSocket.onmessage = (event) => {
                 try {
@@ -349,17 +335,12 @@ class App {
                             fw.refreshNow();
                         }
                     }
-                } catch (e) {
-                    console.debug('Failed to parse presence message', e);
-                }
+                } catch (e) {}
             };
 
-            this.presenceSocket.onerror = (err) => {
-                console.debug('Presence WebSocket error', err);
-            };
+            this.presenceSocket.onerror = (_err) => {};
 
             this.presenceSocket.onclose = () => {
-                console.log('Presence WebSocket closed');
                 this.presenceSocket = null;
                 setTimeout(() => {
                     if (AuthService.isAuthenticated() && !this.presenceSocket) {
@@ -367,19 +348,15 @@ class App {
                     }
                 }, 5000);
             };
-        } catch (e) {
-            console.error('Failed to connect presence WebSocket', e);
-        }
+        } catch (e) {}
     }
 
     private handlePresenceUpdate(userId: number, status: string, isOnline: boolean): void {
-        // Update friend widget if it exists
         const fw = (window as any)._friendWidget;
         if (fw && typeof fw.updateFriendPresence === 'function') {
             fw.updateFriendPresence(userId, status, isOnline);
         }
 
-        // Dispatch custom event for other components
         window.dispatchEvent(new CustomEvent('user:presence', {
             detail: { userId, status, isOnline }
         }));
@@ -397,7 +374,6 @@ class App {
             const container = document.createElement('div');
             container.className = 'flex items-center gap-4';
 
-            // Welcome text with status indicator
             const welcomeContainer = document.createElement('div');
             welcomeContainer.className = 'flex items-center gap-2';
             
@@ -405,7 +381,6 @@ class App {
             welcomeText.className = 'text-white';
             welcomeText.textContent = `Welcome, ${user?.display_name || user?.username}!`;
             
-            // Status dot indicator
             const statusDot = document.createElement('span');
             statusDot.id = 'header-status-dot';
             
@@ -447,7 +422,6 @@ class App {
             }
 
         } else {
-            // Disconnect presence socket when user logs out
             if (this.presenceSocket) {
                 this.presenceSocket.close();
                 this.presenceSocket = null;

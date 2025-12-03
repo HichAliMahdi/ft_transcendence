@@ -40,7 +40,6 @@ export default async function userRoutes(fastify: FastifyInstance) {
           return reply.code(200).send(stats);
         }
       } catch (err) {
-        fastify.log.debug('user_stats query failed, falling back to defaults or aggregated queries');
       }
 
       const fallback = {
@@ -58,7 +57,6 @@ export default async function userRoutes(fastify: FastifyInstance) {
     }
   });
 
-  // Helper to verify token and return decoded payload or send 401
   function verifyAuth(request: FastifyRequest, reply: FastifyReply): { userId: number } | null {
     const authHeader = (request.headers.authorization || '') as string;
     const token = authHeader.startsWith('Bearer ') ? authHeader.split(' ')[1] : null;
@@ -75,7 +73,6 @@ export default async function userRoutes(fastify: FastifyInstance) {
     }
   }
 
-  // GET friend list for a user. If requester === target, include pending; otherwise only accepted.
   fastify.get('/users/:id/friends', async (request: FastifyRequest, reply: FastifyReply) => {
     const auth = verifyAuth(request, reply);
     if (!auth) return;
@@ -143,7 +140,6 @@ export default async function userRoutes(fastify: FastifyInstance) {
     }
   });
 
-  // Send a friend request to :id (authenticated user is sender)
   fastify.post('/users/:id/friends', async (request: FastifyRequest, reply: FastifyReply) => {
     const auth = verifyAuth(request, reply);
     if (!auth) return;
@@ -156,7 +152,6 @@ export default async function userRoutes(fastify: FastifyInstance) {
     }
 
     try {
-      // Check if already exists in either direction - explicitly type the result
       type ExistingFriend = { status: string } | undefined;
       const existing = db.prepare(
         'SELECT status FROM friends WHERE (user_id = ? AND friend_id = ?) OR (user_id = ? AND friend_id = ?)'
@@ -168,14 +163,12 @@ export default async function userRoutes(fastify: FastifyInstance) {
       }
 
       db.prepare('INSERT INTO friends (user_id, friend_id, status) VALUES (?, ?, ?)').run(senderId, targetId, 'pending');
-      // create notification for recipient (include sender username when available)
       try {
         const senderRow = db.prepare('SELECT username FROM users WHERE id = ?').get(senderId) as { username?: string } | undefined;
         const senderUsername = senderRow?.username || null;
         db.prepare('INSERT INTO notifications (user_id, actor_id, type, payload) VALUES (?, ?, ?, ?)')
           .run(targetId, senderId, 'friend_request', JSON.stringify({ senderId, senderUsername }));
         
-        // TRIGGER REAL-TIME NOTIFICATION
         sendNotificationUpdate(targetId);
       } catch (e) { /* non-fatal */ }
       return reply.code(201).send({ message: 'Friend request sent' });
@@ -185,7 +178,6 @@ export default async function userRoutes(fastify: FastifyInstance) {
     }
   });
 
-  // Accept a friend request: target user (userId param) accepts a request sent by friendId
   fastify.post('/users/:userId/friends/:friendId/accept', async (request: FastifyRequest, reply: FastifyReply) => {
     const auth = verifyAuth(request, reply);
     if (!auth) return;
@@ -209,14 +201,12 @@ export default async function userRoutes(fastify: FastifyInstance) {
 
       db.prepare('UPDATE friends SET status = ? WHERE user_id = ? AND friend_id = ?').run('accepted', requesterId, targetId);
 
-      // create a notification for the original requester (they have been accepted)
       try {
         const accepterRow = db.prepare('SELECT username FROM users WHERE id = ?').get(targetId) as { username?: string } | undefined;
         const accepterUsername = accepterRow?.username || null;
         db.prepare('INSERT INTO notifications (user_id, actor_id, type, payload) VALUES (?, ?, ?, ?)')
           .run(requesterId, targetId, 'friend_accept', JSON.stringify({ accepterId: targetId, accepterUsername }));
         
-        // TRIGGER REAL-TIME NOTIFICATION
         sendNotificationUpdate(requesterId);
       } catch (e) {
         // non-fatal
@@ -229,7 +219,6 @@ export default async function userRoutes(fastify: FastifyInstance) {
     }
   });
 
-  // Remove a friendship or cancel a pending request (either direction)
   fastify.delete('/users/:userId/friends/:friendId', async (request: FastifyRequest, reply: FastifyReply) => {
     const auth = verifyAuth(request, reply);
     if (!auth) return;
@@ -237,7 +226,6 @@ export default async function userRoutes(fastify: FastifyInstance) {
     const uid = Number((request.params as any).userId);
     const fid = Number((request.params as any).friendId);
 
-    // Only either participant may remove the friendship
     if (auth.userId !== uid && auth.userId !== fid) {
       return reply.status(403).send({ message: 'Forbidden' });
     }
@@ -254,7 +242,6 @@ export default async function userRoutes(fastify: FastifyInstance) {
     }
   });
 
-  // Get match history for a user (requires auth). Returns last N matches with opponent info and result for requested user.
   fastify.get('/users/:id/matches', async (request: FastifyRequest, reply: FastifyReply) => {
     const auth = verifyAuth(request, reply);
     if (!auth) return;
@@ -306,7 +293,6 @@ export default async function userRoutes(fastify: FastifyInstance) {
     }
   });
 
-  // Send friend request by username (authenticated)
   fastify.post('/users/friends', async (request: FastifyRequest, reply: FastifyReply) => {
     const auth = verifyAuth(request, reply);
     if (!auth) return;
@@ -340,14 +326,12 @@ export default async function userRoutes(fastify: FastifyInstance) {
 
       db.prepare('INSERT INTO friends (user_id, friend_id, status) VALUES (?, ?, ?)').run(senderId, targetId, 'pending');
  
-       // notify recipient
        try {
         const senderRow = db.prepare('SELECT username FROM users WHERE id = ?').get(senderId) as { username?: string } | undefined;
         const senderUsername = senderRow?.username || null;
         db.prepare('INSERT INTO notifications (user_id, actor_id, type, payload) VALUES (?, ?, ?, ?)')
           .run(targetId, senderId, 'friend_request', JSON.stringify({ senderId, senderUsername }));
         
-        // TRIGGER REAL-TIME NOTIFICATION
         sendNotificationUpdate(targetId);
        } catch (e) { /* ignore */ }
 
@@ -358,7 +342,6 @@ export default async function userRoutes(fastify: FastifyInstance) {
     }
   });
 
-  // Get conversation between authenticated user and a peer (peer passed as query ?peer_id=)
   fastify.get('/users/:id/messages', async (request: FastifyRequest, reply: FastifyReply) => {
     const auth = verifyAuth(request, reply);
     if (!auth) return;
@@ -380,7 +363,6 @@ export default async function userRoutes(fastify: FastifyInstance) {
     }
   });
 
-  // Send a direct message to :id (recipient). Authenticated user is sender.
   fastify.post('/users/:id/messages', async (request: FastifyRequest, reply: FastifyReply) => {
     const auth = verifyAuth(request, reply);
     if (!auth) return;
@@ -391,10 +373,8 @@ export default async function userRoutes(fastify: FastifyInstance) {
     if (!content) return reply.status(400).send({ message: 'Message content is required' });
     try {
       const info = db.prepare('INSERT INTO messages (sender_id, recipient_id, content) VALUES (?, ?, ?)').run(senderId, recipientId, content);
-      // better-sqlite3 returns unknown; cast to any to satisfy TS and access fields
       const created = db.prepare('SELECT id, sender_id, recipient_id, content, created_at FROM messages WHERE id = ?').get(info.lastInsertRowid) as any;
  
-      // deliver real-time notification if recipient online
       try {
         sendDirectMessage(recipientId, { type: 'direct_message', from: senderId, content, created_at: created.created_at, id: created.id });
       } catch (e) { /* ignore delivery errors */ }
@@ -406,7 +386,6 @@ export default async function userRoutes(fastify: FastifyInstance) {
     }
   });
 
-  // Get notifications for authenticated user
   fastify.get('/notifications', async (request: FastifyRequest, reply: FastifyReply) => {
     const auth = verifyAuth(request, reply);
     if (!auth) return;
@@ -425,7 +404,6 @@ export default async function userRoutes(fastify: FastifyInstance) {
     }
   });
 
-  // Delete a single notification (owner only)
   fastify.delete('/notifications/:id', async (request: FastifyRequest, reply: FastifyReply) => {
     const auth = verifyAuth(request, reply);
     if (!auth) return;
@@ -441,7 +419,6 @@ export default async function userRoutes(fastify: FastifyInstance) {
     }
   });
 
-  // Delete all notifications for the authenticated user
   fastify.delete('/notifications', async (request: FastifyRequest, reply: FastifyReply) => {
     const auth = verifyAuth(request, reply);
     if (!auth) return;
@@ -454,7 +431,6 @@ export default async function userRoutes(fastify: FastifyInstance) {
     }
   });
 
-  // Mark all notifications as read for the authenticated user
   fastify.post('/notifications/read-all', async (request: FastifyRequest, reply: FastifyReply) => {
     const auth = verifyAuth(request, reply);
     if (!auth) return;
@@ -467,7 +443,6 @@ export default async function userRoutes(fastify: FastifyInstance) {
     }
   });
 
-  // Mark notification as read
   fastify.post('/notifications/:id/read', async (request: FastifyRequest, reply: FastifyReply) => {
     const auth = verifyAuth(request, reply);
     if (!auth) return;
@@ -486,7 +461,6 @@ export default async function userRoutes(fastify: FastifyInstance) {
     }
   });
 
-  // Set user presence/status (owner only)
   fastify.post('/users/:id/status', async (request: FastifyRequest, reply: FastifyReply) => {
     const auth = verifyAuth(request, reply);
     if (!auth) return;
@@ -505,7 +479,6 @@ export default async function userRoutes(fastify: FastifyInstance) {
       const isOnline = status === 'Offline' ? 0 : 1;
       db.prepare('UPDATE users SET status = ?, is_online = ? WHERE id = ?').run(status, isOnline, targetId);
 
-      // Broadcast presence update to all connected clients
       broadcastPresenceUpdate(targetId, status, isOnline === 1);
 
       const updated = db.prepare('SELECT id, username, display_name, avatar_url, is_online, status, last_seen, created_at, updated_at FROM users WHERE id = ?').get(targetId);

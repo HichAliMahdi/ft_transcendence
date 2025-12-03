@@ -54,15 +54,10 @@ const start = async (): Promise<void> => {
       host: config.server.host, 
       port: config.server.port 
     });
-    
-    console.log(`🚀 Server running at http://${config.server.host}:${config.server.port}`);
-    console.log(`📊 Health check available at http://${config.server.host}:${config.server.port}/api/health`);
   } catch (err) {
     fastify.log.error(err);
     process.exit(1);
   }
 };
-
-
 
 start();

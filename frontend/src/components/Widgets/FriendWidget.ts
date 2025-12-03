@@ -444,7 +444,6 @@ export class FriendWidget {
             });
         } catch (err) {
             listEl.innerHTML = `<p class="text-red-400">Error loading friends</p>`;
-            console.error(err);
         }
     }
 

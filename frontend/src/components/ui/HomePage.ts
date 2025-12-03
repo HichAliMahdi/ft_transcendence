@@ -10,8 +10,7 @@ export class HomePage {
 		content.textContent = 'Loading stats...';
 		container.appendChild(content);
 
-		this.populate(content).catch(err => {
-			console.error('HomePage populate error:', err);
+		this.populate(content).catch(_err => {
 			content.textContent = 'Failed to load stats.';
 		});
 
@@ -121,7 +120,6 @@ export class HomePage {
 				<div>Win Rate: ${this.formatWinRate(wins, losses)}</div>
 			`;
 		} catch (e: any) {
-			console.warn('Could not load server stats, using defaults.', e);
 			sGames.val.textContent = '0';
 			sWins.val.textContent = '0';
 			sTournaments.val.textContent = '0';
