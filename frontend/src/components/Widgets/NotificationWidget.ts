@@ -173,7 +173,6 @@ export class NotificationWidget {
         try {
             const notifications = await AuthService.getNotifications();
             
-            // Update badge
             const badge = document.getElementById('notification-badge');
             if (badge) {
                 const unreadCount = notifications.filter(n => !n.is_read).length;

@@ -65,7 +65,6 @@ export class TournamentService {
             return false;
         }
 
-        // Case-insensitive alias check
         const normalizedAlias = alias.toLowerCase().trim();
         if (currentPlayers.some(p => p.alias.toLowerCase().trim() === normalizedAlias)) {
             return false;
@@ -87,7 +86,6 @@ export class TournamentService {
 
             return true;
         } catch (error) {
-            console.error('Error adding player:', error);
             return false;
         }
     }
@@ -107,7 +105,6 @@ export class TournamentService {
             const result = stmt.run(tournamentId, userId);
             return result.changes > 0;
         } catch (error) {
-            console.error('Error removing player:', error);
             return false;
         }
     }
@@ -250,7 +247,6 @@ export class TournamentService {
 
             return true;
         } catch (error) {
-            console.error('Error recording match result:', error);
             return false;
         }
     }
@@ -288,7 +284,6 @@ export class TournamentService {
             db.prepare(`DELETE FROM tournaments WHERE id = ?`).run(id);
             return true;
         } catch (error) {
-            console.error('Error deleting tournament:', error);
             return false;
         }
     }
@@ -307,7 +302,6 @@ export class TournamentService {
         `).run(id);
             return true;
         } catch (error) {
-            console.error('Error resetting tournament:', error);
             return false;
         }
     }
@@ -331,10 +325,8 @@ export class TournamentService {
                 }
             }
 
-            console.log(`Cleaned up ${deletedCount} abandoned tournaments`);
             return deletedCount;
         } catch (error) {
-            console.error('Error cleaning up abandoned tournaments:', error);
             return 0;
         }
     }
