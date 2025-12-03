@@ -18,7 +18,7 @@ export class FriendWidget {
         minimized: boolean;
     }> = new Map();
     private unreadCounts: Map<number, number> = new Map();
-    private messageListenerRegistered = false;
+    private directMessageHandler: ((ev: Event) => void) | null = null;
 
 
     mount(): void {
@@ -100,17 +100,13 @@ export class FriendWidget {
         this.panel.className = 'glass-effect p-4 rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.6)] w-[340px] max-h-[70vh] overflow-auto absolute bottom-16 right-0 hidden';
         this.root.appendChild(this.panel);
 
-        // Chat windows container (bottom-right, holds chat boxes like Facebook)
         this.chatContainer = document.createElement('div');
         this.chatContainer.id = 'chat-windows-root';
-        // base classes (position fixed); we'll compute a right offset so it doesn't overlap widgets
         this.chatContainer.className = 'fixed bottom-5 flex flex-row-reverse gap-3 z-[10000]';
         document.body.appendChild(this.chatContainer);
 
-        // Compute offset to avoid overlapping the friend/notification widgets.
-        // Sum widths of known widgets if present (friend widget, notification widget), add larger safety gap.
         try {
-            let offset = 24; // base gap in px
+            let offset = 24;
             const fw = document.getElementById('friend-widget-root');
             if (fw) {
                 const r = fw.getBoundingClientRect();
@@ -271,11 +267,9 @@ export class FriendWidget {
         this.refreshNow();
         this.startPolling();
 
-        // register global incoming direct message handler so widget can react (unread / refresh)
-        // Only register once to avoid duplicate messages
-        if (!this.messageListenerRegistered) {
+        // FIXED: Only register once to avoid duplicate messages
+        if (!this.directMessageHandler) {
             this.registerGlobalMessageListener();
-            this.messageListenerRegistered = true;
         }
     }
 
@@ -510,35 +504,52 @@ export class FriendWidget {
 
     // Global listener to react to incoming direct messages (keeps UI updated)
     private registerGlobalMessageListener(): void {
-        window.addEventListener('direct_message', async (ev: Event) => {
+        // FIXED: Only register if not already registered
+        if (this.directMessageHandler) {
+            return;
+        }
+        
+        this.directMessageHandler = async (ev: Event) => {
             try {
                 const d = (ev as CustomEvent).detail;
                 if (!d) return;
                 const fromId = Number(d.from);
+                const meId = AuthService.getUser()?.id;
+                
+                // FIXED: Ignore messages from ourselves - we already displayed them when sending
+                if (fromId === meId) return;
+                
                 const chat = this.openChats.get(fromId);
                 if (chat) {
-                    // Append the new message directly (no reload)
-                    // Format timestamp for display
+                    // Format timestamp with proper timezone handling
                     const formatTime = (dateString: string): string => {
-                        if (!dateString) return '';
-                        const date = new Date(dateString);
-                        const now = new Date();
-                        const diff = now.getTime() - date.getTime();
-                        const minutes = Math.floor(diff / 60000);
-                        const hours = Math.floor(minutes / 60);
-                        const days = Math.floor(hours / 24);
-                        if (minutes < 1) return 'Just now';
-                        if (minutes < 60) return `${minutes}m ago`;
-                        if (hours < 24) return `${hours}h ago`;
-                        if (days < 7) return `${days}d ago`;
-                        return date.toLocaleDateString();
+                        if (!dateString) return 'Just now';
+                        try {
+                            const date = new Date(dateString + 'Z');
+                            if (isNaN(date.getTime())) return 'Just now';
+                            
+                            const now = new Date();
+                            const diffMs = now.getTime() - date.getTime();
+                            const diffSec = Math.floor(diffMs / 1000);
+                            const diffMin = Math.floor(diffSec / 60);
+                            const diffHour = Math.floor(diffMin / 60);
+                            const diffDay = Math.floor(diffHour / 24);
+                            
+                            if (diffSec < 10) return 'Just now';
+                            if (diffSec < 60) return `${diffSec}s ago`;
+                            if (diffMin < 60) return `${diffMin}m ago`;
+                            if (diffHour < 24) return `${diffHour}h ago`;
+                            if (diffDay < 7) return `${diffDay}d ago`;
+                            return date.toLocaleDateString();
+                        } catch (e) {
+                            return 'Just now';
+                        }
                     };
                     const el = document.createElement('div');
                     el.className = `mb-2 text-left`;
                     el.innerHTML = `<div class="inline-block px-3 py-1 rounded bg-gray-700">${d.content}</div><div class="text-xs text-gray-400 mt-1">${formatTime(d.created_at)}</div>`;
                     chat.messagesEl.appendChild(el);
                     chat.messagesEl.scrollTop = chat.messagesEl.scrollHeight;
-                    // if minimized, increment unread badge
                     if (chat.minimized) {
                         const headerBadge = chat.box.querySelector('.chat-unread') as HTMLElement | null;
                         const prev = this.unreadCounts.get(fromId) || 0;
@@ -546,7 +557,6 @@ export class FriendWidget {
                         if (headerBadge) headerBadge.textContent = String(this.unreadCounts.get(fromId));
                     }
                 } else {
-                    // No open chat: increment unread for friend list, show small indicator
                     const prev = this.unreadCounts.get(fromId) || 0;
                     this.unreadCounts.set(fromId, prev + 1);
                     const row = this.panel?.querySelector(`div[data-friend-id="${fromId}"]`) as HTMLElement | null;
@@ -560,10 +570,8 @@ export class FriendWidget {
                         badge.textContent = String(this.unreadCounts.get(fromId));
                     }
                 }
-                // Always refresh friend list to show new requests/status
                 this.refreshNow();
 
-                // Also refresh notifications if widget is present and visible
                 const nw = (window as any)._notificationWidget;
                 if (nw && typeof nw.refreshNow === 'function') {
                     nw.refreshNow();
@@ -571,7 +579,8 @@ export class FriendWidget {
             } catch (e) {
                 // ignore
             }
-        });
+        };
+        window.addEventListener('direct_message', this.directMessageHandler);
     }
 
     // Ensure polling helper is syntactically correct
@@ -593,6 +602,12 @@ export class FriendWidget {
         if (this.authWatcherId) {
             clearInterval(this.authWatcherId);
             this.authWatcherId = null;
+        }
+        
+        // Remove direct message listener
+        if (this.directMessageHandler) {
+            window.removeEventListener('direct_message', this.directMessageHandler);
+            this.directMessageHandler = null;
         }
         
         // Remove DOM elements
@@ -711,11 +726,38 @@ export class FriendWidget {
         try {
             const history = await AuthService.getMessages(peerId);
             messagesEl.innerHTML = '';
+            
+            // Helper to format timestamps with proper timezone handling
+            const formatTimestamp = (dateString: string): string => {
+                if (!dateString) return 'Unknown time';
+                try {
+                    // Parse the timestamp (SQLite CURRENT_TIMESTAMP is UTC)
+                    const date = new Date(dateString + 'Z'); // Add Z to indicate UTC
+                    if (isNaN(date.getTime())) return 'Unknown time';
+                    
+                    const now = new Date();
+                    const diffMs = now.getTime() - date.getTime();
+                    const diffSec = Math.floor(diffMs / 1000);
+                    const diffMin = Math.floor(diffSec / 60);
+                    const diffHour = Math.floor(diffMin / 60);
+                    const diffDay = Math.floor(diffHour / 24);
+                    
+                    if (diffSec < 10) return 'Just now';
+                    if (diffSec < 60) return `${diffSec}s ago`;
+                    if (diffMin < 60) return `${diffMin}m ago`;
+                    if (diffHour < 24) return `${diffHour}h ago`;
+                    if (diffDay < 7) return `${diffDay}d ago`;
+                    return date.toLocaleDateString();
+                } catch (e) {
+                    return 'Unknown time';
+                }
+            };
+            
             history.forEach((m: any) => {
                 const el = document.createElement('div');
                 const isMine = m.sender_id === AuthService.getUser()?.id;
                 el.className = `mb-2 ${isMine ? 'text-right' : 'text-left'}`;
-                el.innerHTML = `<div class="inline-block px-3 py-1 rounded ${isMine ? 'bg-blue-600' : 'bg-gray-700'}">${m.content}</div><div class="text-xs text-gray-400 mt-1">${m.created_at}</div>`;
+                el.innerHTML = `<div class="inline-block px-3 py-1 rounded ${isMine ? 'bg-blue-600' : 'bg-gray-700'}">${m.content}</div><div class="text-xs text-gray-400 mt-1">${formatTimestamp(m.created_at)}</div>`;
                 messagesEl.appendChild(el);
             });
             messagesEl.scrollTop = messagesEl.scrollHeight;
@@ -730,9 +772,10 @@ export class FriendWidget {
             send.disabled = true;
             try {
                 await AuthService.sendMessage(peerId, txt);
+                // FIXED: Display message immediately with proper timestamp
                 const el = document.createElement('div');
                 el.className = 'mb-2 text-right';
-                el.innerHTML = `<div class="inline-block px-3 py-1 rounded bg-blue-600">${txt}</div><div class="text-xs text-gray-400 mt-1">now</div>`;
+                el.innerHTML = `<div class="inline-block px-3 py-1 rounded bg-blue-600">${txt}</div><div class="text-xs text-gray-400 mt-1">Just now</div>`;
                 messagesEl.appendChild(el);
                 messagesEl.scrollTop = messagesEl.scrollHeight;
                 input.value = '';
@@ -752,8 +795,6 @@ export class FriendWidget {
                 e.preventDefault();
                 sendMessage();
             }
-            // Shift+Enter: allow default behavior (new line) - but input is single-line, 
-            // so we need to convert to textarea for multi-line support
         });
 
         // Minimize / restore
