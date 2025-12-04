@@ -30,7 +30,7 @@ export class MultiplayerPage {
         this.container.innerHTML = '';
 
         const title = document.createElement('h1');
-        title.textContent = 'Online Multiplayer';
+        title.textContent = 'Online';
         title.className = 'text-4xl font-bold text-white text-center mb-8 gradient-text';
 
         const connectionCard = document.createElement('div');

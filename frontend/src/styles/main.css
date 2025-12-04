@@ -33,10 +33,17 @@
 /* Left sidebar navigation */
 #main-nav {
   @apply fixed left-0 top-0 h-screen w-72 transform translate-x-0 transition-transform duration-300 ease-in-out z-50 pt-5;
+  background: linear-gradient(135deg, rgba(30, 30, 60, 0.95) 0%, rgba(20, 20, 40, 0.95) 100%);
+  backdrop-filter: blur(12px);
 }
 
 #main-nav.collapsed {
   @apply -translate-x-full;
+}
+
+/* Active link styling */
+#main-nav .nav-link.active {
+  @apply bg-gradient-to-r from-accent-pink/20 to-accent-purple/20 border-l-4 border-accent-pink;
 }
 
 #content {
@@ -49,8 +56,9 @@ body.nav-collapsed #content {
 
 /* Toggle button */
 #nav-toggle-btn {
-  @apply fixed left-72 top-4 z-[60] bg-white/[0.04] text-white border border-white/[0.06] 
-         px-2.5 py-2 rounded-lg cursor-pointer transition-all duration-300 text-[1.05rem] leading-none;
+  @apply fixed left-72 top-4 z-[60] bg-gradient-to-br from-accent-pink/10 to-accent-purple/10 text-white border border-white/20
+         px-3 py-2.5 rounded-xl cursor-pointer transition-all duration-300 text-lg leading-none backdrop-blur-sm
+         hover:from-accent-pink/20 hover:to-accent-purple/20 hover:border-accent-pink/50 hover:shadow-lg hover:shadow-accent-pink/30;
 }
 
 body.nav-collapsed #nav-toggle-btn {
