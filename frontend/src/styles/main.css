@@ -111,3 +111,35 @@ body.nav-collapsed #nav-toggle-btn {
 .animate-scale-in {
   animation: scale-in 0.2s ease-out;
 }
+
+/* Chat window styles */
+.chat-box {
+  height: 400px;
+  transition: height 0.3s ease;
+}
+
+.chat-box.chat-minimized {
+  height: auto;
+}
+
+.chat-box .chat-messages {
+  max-height: 280px;
+  min-height: 280px;
+}
+
+.chat-box.chat-minimized .chat-messages {
+  display: none;
+}
+
+.chat-box.chat-minimized .chat-input-row {
+  display: none;
+}
+
+/* Chat window minimized state */
+.chat-minimized .bg-\[\#0b1220\] {
+  cursor: pointer;
+}
+
+.chat-minimized .bg-\[\#0b1220\]:hover {
+  background-color: rgba(15, 25, 45, 1);
+}

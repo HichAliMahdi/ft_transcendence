@@ -216,9 +216,7 @@ export class NotificationWidget {
 
                 const icon = document.createElement('span');
                 icon.className = 'text-2xl';
-                icon.textContent = notif.type === 'friend_request' ? '👤' : 
-                                   notif.type === 'game_invite' ? '🎮' : 
-                                   notif.type === 'tournament' ? '🏆' : '📢';
+                icon.textContent = '🔔';
                 
                 const textContainer = document.createElement('div');
                 textContainer.className = 'flex-1';

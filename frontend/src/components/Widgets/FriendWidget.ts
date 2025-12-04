@@ -139,10 +139,10 @@ export class FriendWidget {
         statusSelector.className = 'flex flex-col gap-2';
         
         const statuses: Array<{value: string; label: string; color: string; emoji: string}> = [
-            { value: 'Online', label: 'Online', color: '#22c55e', emoji: '🟢' },
-            { value: 'Busy', label: 'Busy', color: '#ef4444', emoji: '🔴' },
-            { value: 'Away', label: 'Away', color: '#f59e0b', emoji: '🟡' },
-            { value: 'Offline', label: 'Offline', color: '#94a3b8', emoji: '⚫' }
+            { value: 'Online', label: 'Online', color: '#22c55e', emoji: '' },
+            { value: 'Busy', label: 'Busy', color: '#ef4444', emoji: '' },
+            { value: 'Away', label: 'Away', color: '#f59e0b', emoji: '' },
+            { value: 'Offline', label: 'Offline', color: '#94a3b8', emoji: '' }
         ];
         
         const user = AuthService.getUser();
@@ -160,7 +160,7 @@ export class FriendWidget {
             
             const label = document.createElement('span');
             label.className = 'text-white text-sm flex-1';
-            label.textContent = `${s.emoji} ${s.label}`;
+            label.textContent = s.label;
             
             const checkmark = document.createElement('span');
             checkmark.textContent = isActive ? '✓' : '';
@@ -345,21 +345,21 @@ export class FriendWidget {
                 const userStatus = (f as any).user_status || 'Offline';
                 
                 if (f.status === 'pending') {
-                    statusBadge.textContent = '⏳ Pending';
+                    statusBadge.textContent = 'Pending';
                     statusBadge.className += ' bg-gray-500/20 text-gray-400';
                 } else if (f.is_online) {
                     if (userStatus === 'Busy') {
-                        statusBadge.textContent = '🔴 Busy';
+                        statusBadge.textContent = 'Busy';
                         statusBadge.className += ' bg-red-500/20 text-red-400';
                     } else if (userStatus === 'Away') {
-                        statusBadge.textContent = '🟡 Away';
+                        statusBadge.textContent = 'Away';
                         statusBadge.className += ' bg-amber-500/20 text-amber-400';
                     } else {
-                        statusBadge.textContent = '🟢 Online';
+                        statusBadge.textContent = 'Online';
                         statusBadge.className += ' bg-green-500/20 text-green-400';
                     }
                 } else {
-                    statusBadge.textContent = '⚫ Offline';
+                    statusBadge.textContent = 'Offline';
                     statusBadge.className += ' bg-slate-500/20 text-slate-400';
                 }
                 
@@ -469,17 +469,17 @@ export class FriendWidget {
                     
                     if (isOnline) {
                         if (status === 'Busy') {
-                            statusBadge.textContent = '🔴 Busy';
+                            statusBadge.textContent = 'Busy';
                             statusBadge.className += ' bg-red-500/20 text-red-400';
                         } else if (status === 'Away') {
-                            statusBadge.textContent = '🟡 Away';
+                            statusBadge.textContent = 'Away';
                             statusBadge.className += ' bg-amber-500/20 text-amber-400';
                         } else {
-                            statusBadge.textContent = '🟢 Online';
+                            statusBadge.textContent = 'Online';
                             statusBadge.className += ' bg-green-500/20 text-green-400';
                         }
                     } else {
-                        statusBadge.textContent = '⚫ Offline';
+                        statusBadge.textContent = 'Offline';
                         statusBadge.className += ' bg-slate-500/20 text-slate-400';
                     }
                 }
@@ -675,10 +675,13 @@ export class FriendWidget {
             if (existing.minimized) {
                 existing.minimized = false;
                 existing.box.classList.remove('chat-minimized');
-                existing.messagesEl.style.display = '';
-                existing.inputEl.style.display = '';
+                existing.messagesEl.classList.remove('hidden');
+                const inputRow = existing.box.querySelector('.chat-input-row') as HTMLElement | null;
+                if (inputRow) inputRow.classList.remove('hidden');
                 const badge = existing.box.querySelector('.chat-unread') as HTMLElement | null;
                 if (badge) { badge.classList.add('hidden'); badge.textContent = ''; }
+                const minBtn = existing.box.querySelector('button[title="Minimize"]') as HTMLElement | null;
+                if (minBtn) minBtn.style.display = '';
             }
             existing.inputEl.focus();
             this.unreadCounts.delete(peerId);
@@ -687,12 +690,12 @@ export class FriendWidget {
 
         // Build chat box
         const box = document.createElement('div');
-        box.className = 'w-80 bg-game-dark rounded-lg shadow-lg flex flex-col overflow-hidden chat-box';
+        box.className = 'w-80 bg-game-dark rounded-lg shadow-lg flex flex-col chat-box';
         box.setAttribute('data-chat-user', String(peerId));
 
         // Header
         const header = document.createElement('div');
-        header.className = 'flex items-center justify-between px-3 py-2 bg-[#0b1220]';
+        header.className = 'flex items-center justify-between px-3 py-2 bg-[#0b1220] flex-shrink-0';
         const title = document.createElement('div');
         title.className = 'text-sm text-white font-semibold truncate';
         title.textContent = peerName;
@@ -717,13 +720,12 @@ export class FriendWidget {
 
         // Messages area
         const messagesEl = document.createElement('div');
-        messagesEl.className = 'px-3 py-2 flex-1 overflow-auto text-sm';
-        messagesEl.style.maxHeight = '240px';
+        messagesEl.className = 'px-3 py-2 flex-1 overflow-auto text-sm chat-messages';
         messagesEl.textContent = 'Loading...';
 
         // Input
         const inputRow = document.createElement('div');
-        inputRow.className = 'px-3 py-2 flex gap-2 border-t border-gray-700';
+        inputRow.className = 'px-3 py-2 flex gap-2 border-t border-gray-700 flex-shrink-0 chat-input-row';
         const input = document.createElement('input');
         input.type = 'text';
         input.placeholder = 'Write a message…';
@@ -825,17 +827,21 @@ export class FriendWidget {
             info.minimized = !info.minimized;
             if (info.minimized) {
                 info.box.classList.add('chat-minimized');
-                info.messagesEl.style.display = 'none';
-                info.inputEl.style.display = 'none';
+                info.messagesEl.classList.add('hidden');
+                const inputRow = info.box.querySelector('.chat-input-row') as HTMLElement | null;
+                if (inputRow) inputRow.classList.add('hidden');
                 const badge = info.box.querySelector('.chat-unread') as HTMLElement | null;
                 if (badge) badge.classList.remove('hidden');
+                minBtn.style.display = 'none';
             } else {
                 info.box.classList.remove('chat-minimized');
-                info.messagesEl.style.display = '';
-                info.inputEl.style.display = '';
+                info.messagesEl.classList.remove('hidden');
+                const inputRow = info.box.querySelector('.chat-input-row') as HTMLElement | null;
+                if (inputRow) inputRow.classList.remove('hidden');
                 const badge = info.box.querySelector('.chat-unread') as HTMLElement | null;
                 if (badge) { badge.classList.add('hidden'); badge.textContent = ''; }
                 this.unreadCounts.delete(peerId);
+                minBtn.style.display = '';
             }
         };
 
@@ -849,6 +855,25 @@ export class FriendWidget {
                 this.openChats.delete(peerId);
                 this.unreadCounts.delete(peerId);
             }
+        };
+
+        // Make the entire header clickable to restore when minimized
+        header.onclick = (e: MouseEvent) => {
+            const info = this.openChats.get(peerId);
+            if (!info || !info.minimized) return;
+            
+            if ((e.target as HTMLElement).closest('button')?.title === 'Close') return;
+            
+            info.minimized = false;
+            info.box.classList.remove('chat-minimized');
+            info.messagesEl.classList.remove('hidden');
+            const inputRow = info.box.querySelector('.chat-input-row') as HTMLElement | null;
+            if (inputRow) inputRow.classList.remove('hidden');
+            const badge = info.box.querySelector('.chat-unread') as HTMLElement | null;
+            if (badge) { badge.classList.add('hidden'); badge.textContent = ''; }
+            this.unreadCounts.delete(peerId);
+            minBtn.style.display = '';
+            input.focus();
         };
 
         // focus input
