@@ -7,6 +7,7 @@ export class NotificationWidget {
     private intervalId: number | null = null;
     private visible = false;
     private authChangeHandler: ((e?: Event) => void) | null = null;
+    private clickOutsideHandler: ((e: MouseEvent) => void) | null = null;
 
     mount(): void {
         // Single stable auth change handler: mount on login, unmount on logout.
@@ -70,7 +71,7 @@ export class NotificationWidget {
     private createUI(): void {
         this.root = document.createElement('div');
         this.root.id = 'notification-widget-root';
-        this.root.className = 'fixed bottom-5 right-24 z-[9999]';
+        this.root.className = 'fixed top-5 right-5 z-[9999]';
         document.body.appendChild(this.root);
 
         // expose global reference so other widgets can interact with notification widget
@@ -91,7 +92,7 @@ export class NotificationWidget {
 
         this.panel = document.createElement('div');
         this.panel.id = 'notification-widget-panel';
-        this.panel.className = 'glass-effect p-4 rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.6)] w-[360px] max-h-[60vh] overflow-auto absolute bottom-16 right-0 hidden';
+        this.panel.className = 'glass-effect p-4 rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.6)] w-[360px] max-h-[60vh] overflow-auto absolute top-16 right-0 hidden';
         this.root.appendChild(this.panel);
 
         const header = document.createElement('div');
@@ -122,6 +123,20 @@ export class NotificationWidget {
 
         this.refreshNow();
         this.startPolling();
+        this.setupClickOutsideListener();
+    }
+
+    private setupClickOutsideListener(): void {
+        this.clickOutsideHandler = (e: MouseEvent) => {
+            if (!this.visible || !this.root) return;
+            
+            const target = e.target as Node;
+            if (!this.root.contains(target)) {
+                this.closePanel();
+            }
+        };
+        
+        document.addEventListener('click', this.clickOutsideHandler);
     }
 
     closePanel(): void {
@@ -291,6 +306,11 @@ export class NotificationWidget {
         if (this.authChangeHandler) {
             window.removeEventListener('auth:change', this.authChangeHandler);
             this.authChangeHandler = null;
+        }
+        
+        if (this.clickOutsideHandler) {
+            document.removeEventListener('click', this.clickOutsideHandler);
+            this.clickOutsideHandler = null;
         }
         
         if (this.root && document.body.contains(this.root)) {

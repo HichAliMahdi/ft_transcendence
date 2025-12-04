@@ -19,6 +19,7 @@ export class FriendWidget {
     }> = new Map();
     private unreadCounts: Map<number, number> = new Map();
     private directMessageHandler: ((ev: Event) => void) | null = null;
+    private clickOutsideHandler: ((e: MouseEvent) => void) | null = null;
 
 
     mount(): void {
@@ -110,21 +111,14 @@ export class FriendWidget {
             const fw = document.getElementById('friend-widget-root');
             if (fw) {
                 const r = fw.getBoundingClientRect();
-                offset += Math.round(r.width) + 12; // small spacing after widget
+                offset += Math.round(r.width) + 12;
             }
-            const nw = document.getElementById('notification-widget-root');
-            if (nw) {
-                const r2 = nw.getBoundingClientRect();
-                offset += Math.round(r2.width) + 12;
-            }
-            // Add extra safety margin to ensure no overlap with other UI chrome
+            // Notification widget is now at top, so we don't need to account for it in bottom positioning
             offset += 40;
-            // Increase minimum offset to keep chat clearly left of widgets
-            if (offset < 260) offset = 260;
+            if (offset < 180) offset = 180;
             this.chatContainer.style.right = `${offset}px`;
         } catch (e) {
-            // best-effort: ensure it's not exactly on top
-            this.chatContainer.style.right = '260px';
+            this.chatContainer.style.right = '180px';
         }
 
         // Personal Status Section
@@ -271,6 +265,27 @@ export class FriendWidget {
         if (!this.directMessageHandler) {
             this.registerGlobalMessageListener();
         }
+        
+        this.setupClickOutsideListener();
+    }
+
+    private setupClickOutsideListener(): void {
+        this.clickOutsideHandler = (e: MouseEvent) => {
+            if (!this.visible || !this.root) return;
+            
+            const target = e.target as Node;
+            // Don't close if clicking inside the widget or any chat windows
+            if (this.root.contains(target)) return;
+            
+            // Check if clicking inside any chat window
+            for (const [_, chat] of this.openChats) {
+                if (chat.box.contains(target)) return;
+            }
+            
+            this.closePanel();
+        };
+        
+        document.addEventListener('click', this.clickOutsideHandler);
     }
 
     closePanel(): void {
@@ -608,6 +623,12 @@ export class FriendWidget {
         if (this.directMessageHandler) {
             window.removeEventListener('direct_message', this.directMessageHandler);
             this.directMessageHandler = null;
+        }
+        
+        // Remove click outside listener
+        if (this.clickOutsideHandler) {
+            document.removeEventListener('click', this.clickOutsideHandler);
+            this.clickOutsideHandler = null;
         }
         
         // Remove DOM elements
