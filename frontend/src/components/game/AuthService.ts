@@ -379,6 +379,37 @@ export class AuthService {
         }
     }
 
+    // Update display name
+    static async updateDisplayName(newDisplayName: string): Promise<User> {
+        const token = this.getToken();
+        const user = this.getUser();
+        if (!token || !user) throw new Error('Not authenticated');
+        
+        const resp = await fetch(`${API_BASE}/users/${user.id}/display-name`, {
+            method: 'PUT',
+            headers: { 
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ display_name: newDisplayName })
+        });
+        
+        if (!resp.ok) {
+            await this.parseResponseError(resp);
+        }
+        
+        const data = await resp.json();
+        const updatedUser = data.user;
+        
+        // Update local cache
+        try {
+            localStorage.setItem(this.USER_KEY, JSON.stringify(updatedUser));
+            window.dispatchEvent(new Event('auth:change'));
+        } catch (e) {}
+        
+        return updatedUser;
+    }
+
     // Fetch conversation between current user and peer
     static async getMessages(peerId: number): Promise<Array<{ id: number; sender_id: number; recipient_id: number; content: string; created_at: string }>> {
         const token = this.getToken();
