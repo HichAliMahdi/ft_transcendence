@@ -4,6 +4,7 @@ import { TournamentPage } from '../components/ui/TournamentPage';
 import { MultiplayerPage } from '../components/ui/MultiPlayerPage';
 import { LoginPage } from '../components/ui/LoginPage';
 import { RegisterPage } from '../components/ui/RegisterPage';
+import { SettingsPage } from '../components/ui/SettingsPage';
 import { AuthService } from '../components/game/AuthService';
 
 interface Route {
@@ -23,6 +24,7 @@ export class Router {
             { path: '/game', view: () => new GamePage(), requiresAuth: true },
             { path: '/tournament', view: () => new TournamentPage(), requiresAuth: true },
             { path: '/multiplayer', view: () => new MultiplayerPage(), requiresAuth: true },
+            { path: '/settings', view: () => new SettingsPage(), requiresAuth: true },
             { path: '/login', view: () => new LoginPage(), requiresAuth: false },
             { path: '/register', view: () => new RegisterPage(), requiresAuth: false },
         ];
