@@ -803,29 +803,31 @@ export class FriendWidget {
             existing.inputEl.focus();
             this.unreadCounts.delete(peerId);
             this.openingChats.delete(peerId);
+            // Minimize the friend list when focusing existing chat
+            this.closePanel();
             return;
         }
 
         const box = document.createElement('div');
-        box.className = 'w-80 bg-game-dark rounded-lg shadow-lg flex flex-col chat-box';
+        box.className = 'w-80 rounded-2xl shadow-2xl flex flex-col chat-box bg-gradient-to-b from-game-dark to-blue-900/90 border border-white/10 transition-all duration-300';
         box.setAttribute('data-chat-user', String(peerId));
 
         const header = document.createElement('div');
-        header.className = 'flex items-center justify-between px-3 py-2 bg-[#0b1220] flex-shrink-0';
+        header.className = 'flex items-center justify-between px-4 py-3 bg-gradient-to-r from-accent-pink/20 to-accent-purple/20 backdrop-blur-sm rounded-t-2xl border-b border-white/10 flex-shrink-0';
         const title = document.createElement('div');
-        title.className = 'text-sm text-white font-semibold truncate';
-        title.textContent = peerName;
+        title.className = 'text-sm text-white font-bold truncate flex items-center gap-2';
+        title.innerHTML = `<span class="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>${peerName}`;
         const controls = document.createElement('div');
         controls.className = 'flex items-center gap-2';
         const unreadBadge = document.createElement('span');
-        unreadBadge.className = 'chat-unread bg-accent-pink text-white rounded-full text-xs px-2 py-0.5 hidden';
+        unreadBadge.className = 'chat-unread bg-gradient-to-r from-accent-pink to-accent-purple text-white rounded-full text-xs px-2 py-1 hidden font-bold shadow-lg';
         unreadBadge.setAttribute('aria-hidden', 'true');
         const minBtn = document.createElement('button');
-        minBtn.className = 'text-gray-300 hover:text-white';
+        minBtn.className = 'text-gray-300 hover:text-white hover:bg-white/10 rounded-lg px-2 py-1 transition-all duration-200';
         minBtn.title = 'Minimize';
         minBtn.textContent = '−';
         const closeBtn = document.createElement('button');
-        closeBtn.className = 'text-gray-300 hover:text-white';
+        closeBtn.className = 'text-gray-300 hover:text-red-400 hover:bg-red-500/10 rounded-lg px-2 py-1 transition-all duration-200';
         closeBtn.title = 'Close';
         closeBtn.textContent = '✕';
         controls.appendChild(unreadBadge);
@@ -835,17 +837,17 @@ export class FriendWidget {
         header.appendChild(controls);
 
         const messagesEl = document.createElement('div');
-        messagesEl.className = 'px-3 py-2 flex-1 overflow-auto text-sm chat-messages';
+        messagesEl.className = 'px-4 py-3 flex-1 overflow-auto text-sm chat-messages bg-gradient-to-b from-transparent to-black/20';
         messagesEl.textContent = 'Loading...';
 
         const inputRow = document.createElement('div');
-        inputRow.className = 'px-3 py-2 flex gap-2 border-t border-gray-700 flex-shrink-0 chat-input-row';
+        inputRow.className = 'px-4 py-3 flex gap-2 border-t border-white/10 flex-shrink-0 chat-input-row bg-gradient-to-r from-accent-pink/10 to-accent-purple/10 rounded-b-2xl';
         const input = document.createElement('input');
         input.type = 'text';
         input.placeholder = 'Write a message…';
-        input.className = 'flex-1 px-3 py-2 rounded bg-[#0f1724] text-white text-sm';
+        input.className = 'flex-1 px-3 py-2 rounded-lg bg-white/5 border border-white/10 focus:border-accent-pink/50 text-white text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-accent-pink/30 transition-all duration-200';
         const send = document.createElement('button');
-        send.className = 'px-3 py-2 btn-primary text-sm';
+        send.className = 'px-4 py-2 bg-gradient-to-r from-accent-pink to-accent-purple hover:from-pink-600 hover:to-purple-700 text-white rounded-lg text-sm font-medium transition-all duration-200 hover:scale-105 shadow-lg';
         send.textContent = 'Send';
         inputRow.appendChild(input);
         inputRow.appendChild(send);
@@ -866,20 +868,20 @@ export class FriendWidget {
         try {
             const history = await AuthService.getMessages(peerId);
             messagesEl.innerHTML = '';
-            
+
             const formatTimestamp = (dateString: string): string => {
                 if (!dateString) return 'Unknown time';
                 try {
                     const date = new Date(dateString + 'Z');
                     if (isNaN(date.getTime())) return 'Unknown time';
-                    
+
                     const now = new Date();
                     const diffMs = now.getTime() - date.getTime();
                     const diffSec = Math.floor(diffMs / 1000);
                     const diffMin = Math.floor(diffSec / 60);
                     const diffHour = Math.floor(diffMin / 60);
                     const diffDay = Math.floor(diffHour / 24);
-                    
+
                     if (diffSec < 10) return 'Just now';
                     if (diffSec < 60) return `${diffSec}s ago`;
                     if (diffMin < 60) return `${diffMin}m ago`;
@@ -890,7 +892,7 @@ export class FriendWidget {
                     return 'Unknown time';
                 }
             };
-            
+
             history.forEach((m: any) => {
                 const el = document.createElement('div');
                 const isMine = m.sender_id === AuthService.getUser()?.id;
@@ -911,8 +913,8 @@ export class FriendWidget {
             try {
                 await AuthService.sendMessage(peerId, txt);
                 const el = document.createElement('div');
-                el.className = 'mb-2 text-right';
-                el.innerHTML = `<div class="inline-block px-3 py-1 rounded bg-blue-600">${txt}</div><div class="text-xs text-gray-400 mt-1">Just now</div>`;
+                el.className = 'mb-3 text-right animate-scale-in';
+                el.innerHTML = `<div class="inline-block px-4 py-2 rounded-2xl bg-gradient-to-r from-blue-500 to-blue-600 shadow-lg">${txt}</div><div class="text-xs text-gray-400 mt-1">Just now</div>`;
                 messagesEl.appendChild(el);
                 messagesEl.scrollTop = messagesEl.scrollHeight;
                 input.value = '';
@@ -936,25 +938,39 @@ export class FriendWidget {
             e.stopPropagation();
             const info = this.openChats.get(peerId);
             if (!info) return;
+
             info.minimized = !info.minimized;
+
             if (info.minimized) {
+                // Minimize
                 info.box.classList.add('chat-minimized');
-                info.messagesEl.classList.add('hidden');
-                const inputRow = info.box.querySelector('.chat-input-row') as HTMLElement | null;
-                if (inputRow) inputRow.classList.add('hidden');
-                const badge = info.box.querySelector('.chat-unread') as HTMLElement | null;
-                if (badge) badge.classList.remove('hidden');
+                messagesEl.style.display = 'none';
+                inputRow.style.display = 'none';
                 minBtn.style.display = 'none';
+                unreadBadge.classList.remove('hidden');
+
+                // Update header appearance when minimized
+                header.style.cursor = 'pointer';
+                header.classList.add('hover:bg-white/10');
             } else {
+                // Restore
                 info.box.classList.remove('chat-minimized');
-                info.messagesEl.classList.remove('hidden');
-                const inputRow = info.box.querySelector('.chat-input-row') as HTMLElement | null;
-                if (inputRow) inputRow.classList.remove('hidden');
-                const badge = info.box.querySelector('.chat-unread') as HTMLElement | null;
-                if (badge) { badge.classList.add('hidden'); badge.textContent = ''; }
-                this.unreadCounts.delete(peerId);
+                messagesEl.style.display = '';
+                inputRow.style.display = '';
                 minBtn.style.display = '';
-                input.focus();
+                unreadBadge.classList.add('hidden');
+                unreadBadge.textContent = '';
+                this.unreadCounts.delete(peerId);
+
+                // Reset header appearance
+                header.style.cursor = 'default';
+                header.classList.remove('hover:bg-white/10');
+
+                // Focus input and scroll to bottom
+                setTimeout(() => {
+                    input.focus();
+                    messagesEl.scrollTop = messagesEl.scrollHeight;
+                }, 100);
             }
         };
 
@@ -963,7 +979,14 @@ export class FriendWidget {
             if (this.openChats.has(peerId)) {
                 const info = this.openChats.get(peerId)!;
                 if (this.chatContainer && this.chatContainer.contains(info.box)) {
-                    this.chatContainer.removeChild(info.box);
+                    // Add fade-out animation
+                    info.box.style.opacity = '0';
+                    info.box.style.transform = 'scale(0.95)';
+                    setTimeout(() => {
+                        if (this.chatContainer && this.chatContainer.contains(info.box)) {
+                            this.chatContainer.removeChild(info.box);
+                        }
+                    }, 200);
                 }
                 this.openChats.delete(peerId);
                 this.unreadCounts.delete(peerId);
@@ -973,22 +996,32 @@ export class FriendWidget {
         header.onclick = (e: MouseEvent) => {
             const info = this.openChats.get(peerId);
             if (!info || !info.minimized) return;
-            
+
             const target = e.target as HTMLElement;
             if (target.closest('button')) return;
-            
+
+            // Restore the chat
             info.minimized = false;
             info.box.classList.remove('chat-minimized');
-            info.messagesEl.classList.remove('hidden');
-            const inputRow = info.box.querySelector('.chat-input-row') as HTMLElement | null;
-            if (inputRow) inputRow.classList.remove('hidden');
-            const badge = info.box.querySelector('.chat-unread') as HTMLElement | null;
-            if (badge) { badge.classList.add('hidden'); badge.textContent = ''; }
-            this.unreadCounts.delete(peerId);
+            messagesEl.style.display = '';
+            inputRow.style.display = '';
             minBtn.style.display = '';
-            input.focus();
+            unreadBadge.classList.add('hidden');
+            unreadBadge.textContent = '';
+            this.unreadCounts.delete(peerId);
+
+            header.style.cursor = 'default';
+            header.classList.remove('hover:bg-white/10');
+
+            setTimeout(() => {
+                input.focus();
+                messagesEl.scrollTop = messagesEl.scrollHeight;
+            }, 100);
         };
 
-        setTimeout(() => { input.focus(); }, 50);
+        setTimeout(() => {
+            input.focus();
+            this.closePanel();
+        }, 50);
     }
 }
