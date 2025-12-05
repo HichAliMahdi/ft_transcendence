@@ -114,44 +114,94 @@ body.nav-collapsed #nav-toggle-btn {
 
 /* Chat window styles */
 .chat-box {
-  height: 400px;
-  transition: height 0.3s ease;
+  height: 450px;
+  transition: height 0.3s ease, transform 0.3s ease;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  align-self: flex-end;
 }
 
 .chat-box.chat-minimized {
-  height: auto;
+  height: 56px;
+  overflow: hidden;
 }
 
 .chat-box .chat-messages {
-  max-height: 280px;
-  min-height: 280px;
+  max-height: 320px;
+  min-height: 320px;
   transition: all 0.3s ease;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .chat-box.chat-minimized .chat-messages {
   display: none;
   max-height: 0;
   min-height: 0;
+  opacity: 0;
 }
 
 .chat-box .chat-input-row {
   transition: all 0.3s ease;
+  opacity: 1;
 }
 
 .chat-box.chat-minimized .chat-input-row {
   display: none;
+  opacity: 0;
+  height: 0;
+  overflow: hidden;
 }
 
 /* Chat window minimized state */
 .chat-minimized .bg-\[\#0b1220\] {
   cursor: pointer;
+  background: linear-gradient(135deg, rgba(15, 23, 42, 1) 0%, rgba(30, 41, 59, 1) 100%);
 }
 
 .chat-minimized .bg-\[\#0b1220\]:hover {
-  background-color: rgba(15, 25, 45, 1);
+  background: linear-gradient(135deg, rgba(30, 41, 59, 1) 0%, rgba(51, 65, 85, 1) 100%);
+}
+
+/* Chat unread badge animation */
+.chat-unread {
+  animation: pulse-badge 2s ease-in-out infinite;
+}
+
+@keyframes pulse-badge {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.1);
+  }
 }
 
 /* Ensure minimize button is visible when not minimized */
 .chat-box:not(.chat-minimized) button[title="Minimize"] {
-  display: inline-block;
+  display: inline-flex;
+}
+
+.chat-box.chat-minimized button[title="Minimize"] {
+  display: none !important;
+}
+
+/* Custom scrollbar for chat messages */
+.chat-messages::-webkit-scrollbar {
+  width: 6px;
+}
+
+.chat-messages::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 3px;
+}
+
+.chat-messages::-webkit-scrollbar-thumb {
+  background: linear-gradient(to bottom, #ec4899, #a855f7);
+  border-radius: 3px;
+}
+
+.chat-messages::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(to bottom, #db2777, #9333ea);
 }
