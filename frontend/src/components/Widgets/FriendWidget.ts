@@ -460,9 +460,8 @@ export class FriendWidget {
                     actions.appendChild(accept);
                     actions.appendChild(decline);
                 } else if (f.status === 'pending' && f.relation === 'outgoing') {
-                    // outgoing pending -> allow cancel
                     const cancel = document.createElement('button');
-                    cancel.className = 'bg-gray-600 hover:bg-gray-700 text-white px-3 py-1.5 rounded text-sm transition-colors';
+                    cancel.className = 'bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-lg text-xs font-medium transition-all duration-300 border border-white/10';
                     cancel.textContent = 'Cancel';
                     cancel.onclick = async () => {
                         const ok = await (window as any).app.confirm('Cancel request', `Cancel friend request to ${f.display_name || f.username}?`);
@@ -476,9 +475,8 @@ export class FriendWidget {
                     };
                     actions.appendChild(cancel);
                 } else {
-                    // accepted friend -> show remove
                     const remove = document.createElement('button');
-                    remove.className = 'bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded text-xs transition-colors';
+                    remove.className = 'opacity-0 group-hover:opacity-100 bg-red-500/20 hover:bg-red-500/30 text-red-400 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-300 border border-red-500/30 hover:border-red-500/50';
                     remove.textContent = 'Remove';
                     remove.onclick = async () => {
                         const ok = await (window as any).app.confirm(`Remove ${f.display_name || f.username}`, 'Are you sure you want to remove this friend?');
@@ -498,7 +496,7 @@ export class FriendWidget {
                 listEl.appendChild(row);
             });
         } catch (err) {
-            listEl.innerHTML = `<p class="text-red-400">Error loading friends</p>`;
+            listEl.innerHTML = `<p class="text-red-400 text-center py-8">Error loading friends</p>`;
         }
     }
 
@@ -506,21 +504,21 @@ export class FriendWidget {
     updateFriendPresence(userId: number, status: string, isOnline: boolean): void {
         // Update even when not visible - this keeps the data fresh for when user opens the panel
         if (!this.panel) return;
-        
+
         const listEl = this.panel.querySelector('#friend-list') as HTMLElement | null;
         if (!listEl) return;
-        
+
         // Find the friend row and update its status indicator
         const rows = listEl.querySelectorAll('div[data-friend-id]');
         rows.forEach((row) => {
             const friendId = parseInt(row.getAttribute('data-friend-id') || '0');
             if (friendId === userId) {
                 const statusBadge = row.querySelector('.status-text') as HTMLElement | null;
-                
+
                 if (statusBadge && !statusBadge.textContent?.includes('Pending')) {
                     // Reset classes
                     statusBadge.className = 'status-text text-xs px-2 py-0.5 rounded-full inline-block mt-1 w-fit';
-                    
+
                     if (isOnline) {
                         if (status === 'Busy') {
                             statusBadge.textContent = 'Busy';
@@ -544,13 +542,37 @@ export class FriendWidget {
     toggle(): void {
         this.visible = !this.visible;
         if (!this.panel || !this.btn) return;
-        
+
         // If opening, ask notification widget to close to avoid overlap
         if (this.visible) {
             const nw = (window as any)._notificationWidget;
             if (nw && nw !== this && typeof nw.closePanel === 'function') {
                 try { nw.closePanel(); } catch (e) { /* ignore */ }
             }
+
+            // Minimize all open chat windows when opening friend list
+            this.openChats.forEach((chat) => {
+                if (!chat.minimized) {
+                    chat.minimized = true;
+                    chat.box.classList.add('chat-minimized');
+                    chat.messagesEl.style.display = 'none';
+                    chat.inputEl.parentElement!.style.display = 'none';
+
+                    // Update header appearance
+                    const header = chat.box.querySelector('.flex.items-center.justify-between') as HTMLElement;
+                    if (header) {
+                        header.style.cursor = 'pointer';
+                        header.classList.add('hover:bg-white/10');
+                    }
+
+                    // Hide minimize button, show unread badge
+                    const minBtn = chat.box.querySelector('button[title="Minimize"]') as HTMLElement | null;
+                    if (minBtn) minBtn.style.display = 'none';
+
+                    const unreadBadge = chat.box.querySelector('.chat-unread') as HTMLElement | null;
+                    if (unreadBadge) unreadBadge.classList.remove('hidden');
+                }
+            });
         }
 
         if (this.visible) {
@@ -560,9 +582,9 @@ export class FriendWidget {
             this.panel.classList.remove('block');
             this.panel.classList.add('hidden');
         }
-        
+
         this.btn.classList.toggle('bg-accent-pink', this.visible);
-        
+
         if (this.visible) this.refreshNow();
     }
 
@@ -575,7 +597,7 @@ export class FriendWidget {
         if (this.directMessageHandler) {
             return;
         }
-        
+
         this.directMessageHandler = async (ev: Event) => {
             try {
                 const d = (ev as CustomEvent).detail;
@@ -583,10 +605,10 @@ export class FriendWidget {
                 const fromId = Number(d.from);
                 const meId = AuthService.getUser()?.id;
                 const msgId = d.id ? Number(d.id) : null;
-                
+
                 // Ignore messages from ourselves
                 if (fromId === meId) return;
-                
+
                 // Prevent duplicate display by tracking message IDs
                 if (msgId && this.displayedMessageIds.has(msgId)) {
                     return;
@@ -601,24 +623,24 @@ export class FriendWidget {
                         }
                     }
                 }
-                
+
                 const chat = this.openChats.get(fromId);
                 const isOpening = this.openingChats.has(fromId);
-                
+
                 if (chat) {
                     const formatTime = (dateString: string): string => {
                         if (!dateString) return 'Just now';
                         try {
                             const date = new Date(dateString + 'Z');
                             if (isNaN(date.getTime())) return 'Just now';
-                            
+
                             const now = new Date();
                             const diffMs = now.getTime() - date.getTime();
                             const diffSec = Math.floor(diffMs / 1000);
                             const diffMin = Math.floor(diffSec / 60);
                             const diffHour = Math.floor(diffMin / 60);
                             const diffDay = Math.floor(diffHour / 24);
-                            
+
                             if (diffSec < 10) return 'Just now';
                             if (diffSec < 60) return `${diffSec}s ago`;
                             if (diffMin < 60) return `${diffMin}m ago`;
@@ -635,7 +657,7 @@ export class FriendWidget {
                     el.innerHTML = `<div class="inline-block px-3 py-1 rounded bg-gray-700">${d.content}</div><div class="text-xs text-gray-400 mt-1">${formatTime(d.created_at)}</div>`;
                     chat.messagesEl.appendChild(el);
                     chat.messagesEl.scrollTop = chat.messagesEl.scrollHeight;
-                    
+
                     if (chat.minimized) {
                         chat.minimized = false;
                         chat.box.classList.remove('chat-minimized');
