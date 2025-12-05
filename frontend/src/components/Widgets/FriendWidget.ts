@@ -672,7 +672,7 @@ export class FriendWidget {
                     }
                 } else if (!isOpening) {
                     this.openingChats.add(fromId);
-                    
+
                     const friendName = await this.getFriendName(fromId);
                     if (friendName) {
                         await this.openChatWindow(fromId, friendName);
@@ -709,7 +709,7 @@ export class FriendWidget {
         try {
             const me = AuthService.getUser();
             if (!me) return null;
-            
+
             const friends = await AuthService.getFriends(me.id);
             const friend = friends.find((f: any) => f.id === userId);
             return friend ? (friend.display_name || friend.username) : null;
@@ -736,19 +736,19 @@ export class FriendWidget {
             clearInterval(this.authWatcherId);
             this.authWatcherId = null;
         }
-        
+
         // Remove direct message listener
         if (this.directMessageHandler) {
             window.removeEventListener('direct_message', this.directMessageHandler);
             this.directMessageHandler = null;
         }
-        
+
         // Remove click outside listener
         if (this.clickOutsideHandler) {
             document.removeEventListener('click', this.clickOutsideHandler);
             this.clickOutsideHandler = null;
         }
-        
+
         // Remove DOM elements
         if (this.root && document.body.contains(this.root)) {
             document.body.removeChild(this.root);
@@ -782,7 +782,7 @@ export class FriendWidget {
             if (!this.chatContainer) {
                 this.chatContainer = document.createElement('div');
                 this.chatContainer.id = 'chat-windows-root';
-                this.chatContainer.className = 'fixed bottom-5 right-5 flex flex-row-reverse gap-3 z-[10000]';
+                this.chatContainer.className = 'fixed bottom-5 flex flex-row-reverse gap-3 z-[10000] items-end';
                 document.body.appendChild(this.chatContainer);
             }
         }
