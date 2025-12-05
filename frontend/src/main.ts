@@ -372,18 +372,32 @@ class App {
             const user = AuthService.getUser();
             
             const container = document.createElement('div');
-            container.className = 'flex items-center gap-4';
+            container.className = 'relative';
 
-            const welcomeContainer = document.createElement('div');
-            welcomeContainer.className = 'flex items-center gap-2';
+            // Gear button with user info
+            const gearButton = document.createElement('button');
+            gearButton.id = 'auth-menu-btn';
+            gearButton.className = 'w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-white/5 hover:bg-white/10 transition-all duration-300 group';
             
-            const welcomeText = document.createElement('span');
-            welcomeText.className = 'text-white';
-            welcomeText.textContent = `Welcome, ${user?.display_name || user?.username}!`;
+            const leftSection = document.createElement('div');
+            leftSection.className = 'flex items-center gap-3 flex-1 min-w-0';
+            
+            const avatar = document.createElement('div');
+            avatar.className = 'w-10 h-10 rounded-full bg-gradient-to-br from-accent-pink to-accent-purple flex items-center justify-center text-white font-bold text-sm ring-2 ring-white/20 flex-shrink-0';
+            avatar.textContent = (user?.display_name || user?.username || 'U').charAt(0).toUpperCase();
+            
+            const userInfo = document.createElement('div');
+            userInfo.className = 'flex flex-col items-start min-w-0 flex-1';
+            
+            const userName = document.createElement('span');
+            userName.className = 'text-white font-semibold text-sm truncate w-full text-left';
+            userName.textContent = user?.display_name || user?.username || 'User';
+            
+            const statusContainer = document.createElement('div');
+            statusContainer.className = 'flex items-center gap-1.5';
             
             const statusDot = document.createElement('span');
             statusDot.id = 'header-status-dot';
-            
             const currentStatus = (user && (user as any).status) ? (user as any).status : 'Online';
             const statusColors: {[key: string]: string} = {
                 'Online': '#22c55e',
@@ -391,18 +405,50 @@ class App {
                 'Away': '#f59e0b',
                 'Offline': '#94a3b8'
             };
-            
             const hasGlow = currentStatus !== 'Offline';
-            statusDot.className = `w-2.5 h-2.5 rounded-full inline-block ${hasGlow ? 'shadow-[0_0_8px_currentColor]' : ''}`;
+            statusDot.className = `w-2 h-2 rounded-full ${hasGlow ? 'shadow-[0_0_8px_currentColor]' : ''}`;
             statusDot.style.backgroundColor = statusColors[currentStatus] || '#94a3b8';
             
-            welcomeContainer.appendChild(welcomeText);
-            welcomeContainer.appendChild(statusDot);
+            const statusText = document.createElement('span');
+            statusText.className = 'text-xs text-gray-400';
+            statusText.textContent = currentStatus;
+            
+            statusContainer.appendChild(statusDot);
+            statusContainer.appendChild(statusText);
+            
+            userInfo.appendChild(userName);
+            userInfo.appendChild(statusContainer);
+            
+            leftSection.appendChild(avatar);
+            leftSection.appendChild(userInfo);
+            
+            const gearIcon = document.createElement('span');
+            gearIcon.className = 'text-xl text-gray-400 group-hover:text-accent-pink transition-colors duration-300 group-hover:rotate-90 transition-transform';
+            gearIcon.textContent = '⚙️';
+            
+            gearButton.appendChild(leftSection);
+            gearButton.appendChild(gearIcon);
 
+            // Dropdown menu
+            const dropdown = document.createElement('div');
+            dropdown.id = 'auth-dropdown';
+            dropdown.className = 'absolute bottom-full left-0 right-0 mb-2 bg-gradient-to-br from-game-dark to-blue-900/95 backdrop-blur-xl rounded-xl shadow-2xl border border-white/10 overflow-hidden hidden opacity-0 transition-all duration-300';
+            
+            const dropdownContent = document.createElement('div');
+            dropdownContent.className = 'p-2';
+            
+            const settingsLink = document.createElement('a');
+            settingsLink.href = '/settings';
+            settingsLink.setAttribute('data-link', '');
+            settingsLink.className = 'flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-white/10 transition-colors duration-200 text-white';
+            settingsLink.innerHTML = '<span class="text-lg">⚙️</span><span>Settings</span>';
+            
+            const divider = document.createElement('div');
+            divider.className = 'h-px bg-white/10 my-2';
+            
             const logoutBtn = document.createElement('button');
-            logoutBtn.id = 'logout-btn';
-            logoutBtn.className = 'bg-game-red hover:bg-red-600 text-white px-4 py-2 rounded-lg transition-colors duration-300';
-            logoutBtn.textContent = 'Logout';
+            logoutBtn.className = 'w-full flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-red-500/20 transition-colors duration-200 text-red-400 hover:text-red-300';
+            logoutBtn.innerHTML = '<span class="text-lg">🚪</span><span>Logout</span>';
             logoutBtn.onclick = async () => {
                 if (this.presenceSocket) {
                     this.presenceSocket.close();
@@ -412,9 +458,42 @@ class App {
                 this.updateAuthSection();
                 this.router.navigateTo('/login');
             };
+            
+            dropdownContent.appendChild(settingsLink);
+            dropdownContent.appendChild(divider);
+            dropdownContent.appendChild(logoutBtn);
+            dropdown.appendChild(dropdownContent);
 
-            container.appendChild(welcomeContainer);
-            container.appendChild(logoutBtn);
+            // Toggle dropdown
+            let isOpen = false;
+            gearButton.onclick = (e) => {
+                e.stopPropagation();
+                isOpen = !isOpen;
+                if (isOpen) {
+                    dropdown.classList.remove('hidden');
+                    setTimeout(() => {
+                        dropdown.classList.remove('opacity-0');
+                        dropdown.classList.add('opacity-100');
+                    }, 10);
+                } else {
+                    dropdown.classList.remove('opacity-100');
+                    dropdown.classList.add('opacity-0');
+                    setTimeout(() => dropdown.classList.add('hidden'), 300);
+                }
+            };
+
+            // Close dropdown when clicking outside
+            document.addEventListener('click', (e) => {
+                if (isOpen && !container.contains(e.target as Node)) {
+                    isOpen = false;
+                    dropdown.classList.remove('opacity-100');
+                    dropdown.classList.add('opacity-0');
+                    setTimeout(() => dropdown.classList.add('hidden'), 300);
+                }
+            });
+
+            container.appendChild(dropdown);
+            container.appendChild(gearButton);
             authSection.appendChild(container);
 
             if (!this.presenceSocket || this.presenceSocket.readyState !== WebSocket.OPEN) {
@@ -428,18 +507,18 @@ class App {
             }
 
             const container = document.createElement('div');
-            container.className = 'flex gap-4';
+            container.className = 'flex flex-col gap-3';
 
             const loginLink = document.createElement('a');
             loginLink.href = '/login';
             loginLink.setAttribute('data-link', '');
-            loginLink.className = 'bg-accent-purple hover:bg-purple-600 text-white px-4 py-2 rounded-lg transition-colors duration-300';
+            loginLink.className = 'bg-accent-purple hover:bg-purple-600 text-white px-4 py-3 rounded-xl transition-all duration-300 text-center font-semibold';
             loginLink.textContent = 'Login';
 
             const registerLink = document.createElement('a');
             registerLink.href = '/register';
             registerLink.setAttribute('data-link', '');
-            registerLink.className = 'bg-accent-pink hover:bg-pink-600 text-white px-4 py-2 rounded-lg transition-colors duration-300';
+            registerLink.className = 'bg-accent-pink hover:bg-pink-600 text-white px-4 py-3 rounded-xl transition-all duration-300 text-center font-semibold';
             registerLink.textContent = 'Register';
 
             container.appendChild(loginLink);
