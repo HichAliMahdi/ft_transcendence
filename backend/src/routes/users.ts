@@ -495,4 +495,42 @@ export default async function userRoutes(fastify: FastifyInstance) {
       return reply.code(500).send({ message: 'Failed to set status' });
     }
   });
+
+  fastify.put('/users/:id/display-name', async (request: FastifyRequest, reply: FastifyReply) => {
+    const auth = verifyAuth(request, reply);
+    if (!auth) return;
+    
+    const targetId = Number((request.params as any).id);
+    if (auth.userId !== targetId) {
+      return reply.status(403).send({ message: 'Forbidden' });
+    }
+
+    try {
+      const body = (request.body || {}) as any;
+      const newDisplayName = (body.display_name || '').toString().trim();
+      
+      if (!newDisplayName) {
+        return reply.status(400).send({ message: 'Display name cannot be empty' });
+      }
+      
+      if (newDisplayName.length > 50) {
+        return reply.status(400).send({ message: 'Display name must be 50 characters or less' });
+      }
+
+      // Check if display name is already taken by another user
+      const existing = db.prepare('SELECT id FROM users WHERE display_name = ? AND id != ?').get(newDisplayName, targetId) as { id?: number } | undefined;
+      if (existing) {
+        return reply.status(409).send({ message: 'Display name already taken' });
+      }
+
+      db.prepare('UPDATE users SET display_name = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(newDisplayName, targetId);
+
+      const updated = db.prepare('SELECT id, username, email, display_name, avatar_url, is_online, status, last_seen, created_at, updated_at FROM users WHERE id = ?').get(targetId);
+      
+      return reply.code(200).send({ user: updated, message: 'Display name updated successfully' });
+    } catch (err) {
+      request.log.error(err);
+      return reply.code(500).send({ message: 'Failed to update display name' });
+    }
+  });
 }
