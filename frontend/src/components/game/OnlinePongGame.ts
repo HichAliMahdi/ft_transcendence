@@ -85,14 +85,16 @@ export class OnlinePongGame {
                 e.preventDefault();
                 const down = e.type === 'keydown';
                 this.keys[e.key] = down;
-                if (this.socket && (this.socket as any).readyState === 1) {
+                if (this.socket && this.socket.readyState === WebSocket.OPEN) {
                     try {
                         this.socket.send(JSON.stringify({
                             type: 'paddleMove',
                             direction: e.key === 'w' ? 'up' : 'down',
                             keydown: down
                         }));
-                    } catch (e) {}
+                    } catch (e) {
+                        console.error('Failed to send paddle move:', e);
+                    }
                 }
             }
         };

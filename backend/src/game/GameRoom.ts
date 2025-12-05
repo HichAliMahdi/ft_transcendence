@@ -168,8 +168,9 @@ export class GameRoom {
     const player = this.playerMap.get(socket);
     switch (msg.type) {
       case 'paddleMove':
-        if (!player) return;
-        this.engine.applyInput(player, msg.direction, !!msg.keydown);
+        if (!player || (player !== 1 && player !== 2)) return;
+        if (!msg.direction || typeof msg.keydown !== 'boolean') return;
+        this.engine.applyInput(player, msg.direction, msg.keydown);
         break;
       case 'create':
       case 'join':

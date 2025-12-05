@@ -103,6 +103,64 @@ export default async function websocketRoutes(fastify: FastifyInstance) {
       const assignA = room.addClient(a);
       const assignB = room.addClient(b);
 
+      // Setup proper message handlers for both sockets
+      const setupSocketForRoom = (socket: WS, socketRoom: GameRoom, socketRoomId: string) => {
+        // Remove old queue message handler
+        socket.removeAllListeners('message');
+        
+        // Add new room message handler
+        socket.on('message', (raw: any) => {
+          let payload: any = null;
+          try {
+            const text = typeof raw === 'string' ? raw : raw.toString();
+            payload = JSON.parse(text);
+          } catch (err) {
+            fastify.log.debug('Invalid WS message JSON (matched)', err as any);
+            return;
+          }
+          try {
+            socketRoom.handleMessage(socket, payload);
+          } catch (e) {
+            fastify.log.debug('Room handle message error (matched)', e as any);
+          }
+        });
+
+        // Setup close handler for room cleanup
+        socket.removeAllListeners('close');
+        socket.on('close', () => {
+          try {
+            socketRoom.removeClient(socket);
+            if (socketRoom.getClientCount && socketRoom.getClientCount() === 0) {
+              rooms.delete(socketRoomId);
+              fastify.log.info(`Room ${socketRoomId} deleted (empty)`);
+            }
+          } catch (err) {
+            fastify.log.debug('Error during ws close (matched)', err as any);
+          }
+
+          // Handle presence cleanup
+          const userId = (socket as any).user?.id;
+          if (userId) {
+            const userSockets = presenceConnections.get(userId);
+            if (userSockets) {
+              userSockets.delete(socket);
+              if (userSockets.size === 0) {
+                presenceConnections.delete(userId);
+                try {
+                  db.prepare('UPDATE users SET is_online = 0, status = ?, last_seen = CURRENT_TIMESTAMP WHERE id = ?').run('Offline', userId);
+                  broadcastPresenceUpdate(userId, 'Offline', false);
+                } catch (e) {
+                  fastify.log.debug({ err: e }, 'Failed to update user offline status');
+                }
+              }
+            }
+          }
+        });
+      };
+
+      setupSocketForRoom(a, room, roomId);
+      setupSocketForRoom(b, room, roomId);
+
       // send 'created' to host (A if assigned isHost true)
       try {
         const hostSocket = assignA.isHost ? a : (assignB.isHost ? b : a);

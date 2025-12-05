@@ -80,9 +80,15 @@ export class GameEngine {
   }
 
   public applyInput(player: 1 | 2, direction: 'up' | 'down', keydown: boolean): void {
+    if (player !== 1 && player !== 2) return;
+    if (direction !== 'up' && direction !== 'down') return;
+    
     const target = player === 1 ? this.inputs.p1 : this.inputs.p2;
-    if (direction === 'up') target.up = keydown;
-    else target.down = keydown;
+    if (direction === 'up') {
+      target.up = keydown;
+    } else {
+      target.down = keydown;
+    }
   }
 
   private step(deltaMs: number): void {
