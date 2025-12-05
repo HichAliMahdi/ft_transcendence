@@ -20,6 +20,8 @@ export class FriendWidget {
     private unreadCounts: Map<number, number> = new Map();
     private directMessageHandler: ((ev: Event) => void) | null = null;
     private clickOutsideHandler: ((e: MouseEvent) => void) | null = null;
+    private openingChats: Set<number> = new Set(); // Track chats being opened
+    private displayedMessageIds: Set<number> = new Set(); // Track displayed messages
 
 
     mount(): void {
@@ -517,9 +519,7 @@ export class FriendWidget {
         await this.fetchAndRender();
     }
 
-    // Global listener to react to incoming direct messages (keeps UI updated)
     private registerGlobalMessageListener(): void {
-        // FIXED: Only register if not already registered
         if (this.directMessageHandler) {
             return;
         }
@@ -530,13 +530,30 @@ export class FriendWidget {
                 if (!d) return;
                 const fromId = Number(d.from);
                 const meId = AuthService.getUser()?.id;
+                const msgId = d.id ? Number(d.id) : null;
                 
-                // FIXED: Ignore messages from ourselves - we already displayed them when sending
+                // Ignore messages from ourselves
                 if (fromId === meId) return;
                 
+                // Prevent duplicate display by tracking message IDs
+                if (msgId && this.displayedMessageIds.has(msgId)) {
+                    return;
+                }
+                if (msgId) {
+                    this.displayedMessageIds.add(msgId);
+                    // Keep only last 100 message IDs in memory
+                    if (this.displayedMessageIds.size > 100) {
+                        const firstId = this.displayedMessageIds.values().next().value;
+                        if (firstId !== undefined) {
+                            this.displayedMessageIds.delete(firstId);
+                        }
+                    }
+                }
+                
                 const chat = this.openChats.get(fromId);
+                const isOpening = this.openingChats.has(fromId);
+                
                 if (chat) {
-                    // Format timestamp with proper timezone handling
                     const formatTime = (dateString: string): string => {
                         if (!dateString) return 'Just now';
                         try {
@@ -562,27 +579,43 @@ export class FriendWidget {
                     };
                     const el = document.createElement('div');
                     el.className = `mb-2 text-left`;
+                    el.setAttribute('data-message-id', String(msgId || ''));
                     el.innerHTML = `<div class="inline-block px-3 py-1 rounded bg-gray-700">${d.content}</div><div class="text-xs text-gray-400 mt-1">${formatTime(d.created_at)}</div>`;
                     chat.messagesEl.appendChild(el);
                     chat.messagesEl.scrollTop = chat.messagesEl.scrollHeight;
+                    
                     if (chat.minimized) {
-                        const headerBadge = chat.box.querySelector('.chat-unread') as HTMLElement | null;
+                        chat.minimized = false;
+                        chat.box.classList.remove('chat-minimized');
+                        chat.messagesEl.classList.remove('hidden');
+                        const inputRow = chat.box.querySelector('.chat-input-row') as HTMLElement | null;
+                        if (inputRow) inputRow.classList.remove('hidden');
+                        const badge = chat.box.querySelector('.chat-unread') as HTMLElement | null;
+                        if (badge) { badge.classList.add('hidden'); badge.textContent = ''; }
+                        const minBtn = chat.box.querySelector('button[title="Minimize"]') as HTMLElement | null;
+                        if (minBtn) minBtn.style.display = '';
+                        this.unreadCounts.delete(fromId);
+                    }
+                } else if (!isOpening) {
+                    this.openingChats.add(fromId);
+                    
+                    const friendName = await this.getFriendName(fromId);
+                    if (friendName) {
+                        await this.openChatWindow(fromId, friendName);
+                    } else {
+                        this.openingChats.delete(fromId);
                         const prev = this.unreadCounts.get(fromId) || 0;
                         this.unreadCounts.set(fromId, prev + 1);
-                        if (headerBadge) headerBadge.textContent = String(this.unreadCounts.get(fromId));
-                    }
-                } else {
-                    const prev = this.unreadCounts.get(fromId) || 0;
-                    this.unreadCounts.set(fromId, prev + 1);
-                    const row = this.panel?.querySelector(`div[data-friend-id="${fromId}"]`) as HTMLElement | null;
-                    if (row) {
-                        let badge = row.querySelector('.friend-unread') as HTMLElement | null;
-                        if (!badge) {
-                            badge = document.createElement('span');
-                            badge.className = 'friend-unread bg-accent-pink text-white rounded-full text-xs px-2 py-0.5 ml-2';
-                            (row.querySelector('div.flex.flex-col') || row).appendChild(badge);
+                        const row = this.panel?.querySelector(`div[data-friend-id="${fromId}"]`) as HTMLElement | null;
+                        if (row) {
+                            let badge = row.querySelector('.friend-unread') as HTMLElement | null;
+                            if (!badge) {
+                                badge = document.createElement('span');
+                                badge.className = 'friend-unread bg-accent-pink text-white rounded-full text-xs px-2 py-0.5 ml-2';
+                                (row.querySelector('div.flex.flex-col') || row).appendChild(badge);
+                            }
+                            badge.textContent = String(this.unreadCounts.get(fromId));
                         }
-                        badge.textContent = String(this.unreadCounts.get(fromId));
                     }
                 }
                 this.refreshNow();
@@ -598,7 +631,19 @@ export class FriendWidget {
         window.addEventListener('direct_message', this.directMessageHandler);
     }
 
-    // Ensure polling helper is syntactically correct
+    private async getFriendName(userId: number): Promise<string | null> {
+        try {
+            const me = AuthService.getUser();
+            if (!me) return null;
+            
+            const friends = await AuthService.getFriends(me.id);
+            const friend = friends.find((f: any) => f.id === userId);
+            return friend ? (friend.display_name || friend.username) : null;
+        } catch (e) {
+            return null;
+        }
+    }
+
     private startPolling(): void {
         if (this.intervalId) return;
 
@@ -606,7 +651,6 @@ export class FriendWidget {
             if (this.visible) this.refreshNow();
         }, 15000) as unknown as number;
     }
-
 
     unmount(): void {
         // Stop polling
@@ -642,6 +686,7 @@ export class FriendWidget {
         }
         this.openChats.clear();
         this.unreadCounts.clear();
+        this.displayedMessageIds.clear();
 
         // clean global reference if it points to this instance
         try {
@@ -658,7 +703,6 @@ export class FriendWidget {
 
     // Open a persistent chat window (bottom-right). Focus existing if already open.
     private async openChatWindow(peerId: number, peerName: string): Promise<void> {
-        // Ensure chat container exists
         if (!this.chatContainer) {
             this.chatContainer = document.getElementById('chat-windows-root') as HTMLElement | null;
             if (!this.chatContainer) {
@@ -669,7 +713,6 @@ export class FriendWidget {
             }
         }
 
-        // If already open, restore/focus
         const existing = this.openChats.get(peerId);
         if (existing) {
             if (existing.minimized) {
@@ -685,15 +728,14 @@ export class FriendWidget {
             }
             existing.inputEl.focus();
             this.unreadCounts.delete(peerId);
+            this.openingChats.delete(peerId);
             return;
         }
 
-        // Build chat box
         const box = document.createElement('div');
         box.className = 'w-80 bg-game-dark rounded-lg shadow-lg flex flex-col chat-box';
         box.setAttribute('data-chat-user', String(peerId));
 
-        // Header
         const header = document.createElement('div');
         header.className = 'flex items-center justify-between px-3 py-2 bg-[#0b1220] flex-shrink-0';
         const title = document.createElement('div');
@@ -718,12 +760,10 @@ export class FriendWidget {
         header.appendChild(title);
         header.appendChild(controls);
 
-        // Messages area
         const messagesEl = document.createElement('div');
         messagesEl.className = 'px-3 py-2 flex-1 overflow-auto text-sm chat-messages';
         messagesEl.textContent = 'Loading...';
 
-        // Input
         const inputRow = document.createElement('div');
         inputRow.className = 'px-3 py-2 flex gap-2 border-t border-gray-700 flex-shrink-0 chat-input-row';
         const input = document.createElement('input');
@@ -743,19 +783,20 @@ export class FriendWidget {
         // Insert box so newest is nearest the friend widget
         if (this.chatContainer) this.chatContainer.insertBefore(box, this.chatContainer.firstChild);
 
+        // Register IMMEDIATELY before loading history - this prevents race condition
         this.openChats.set(peerId, { box, messagesEl, inputEl: input, minimized: false });
+        // Clear opening flag IMMEDIATELY after registering
+        this.openingChats.delete(peerId);
 
         // Load history
         try {
             const history = await AuthService.getMessages(peerId);
             messagesEl.innerHTML = '';
             
-            // Helper to format timestamps with proper timezone handling
             const formatTimestamp = (dateString: string): string => {
                 if (!dateString) return 'Unknown time';
                 try {
-                    // Parse the timestamp (SQLite CURRENT_TIMESTAMP is UTC)
-                    const date = new Date(dateString + 'Z'); // Add Z to indicate UTC
+                    const date = new Date(dateString + 'Z');
                     if (isNaN(date.getTime())) return 'Unknown time';
                     
                     const now = new Date();
@@ -795,7 +836,6 @@ export class FriendWidget {
             send.disabled = true;
             try {
                 await AuthService.sendMessage(peerId, txt);
-                // FIXED: Display message immediately with proper timestamp
                 const el = document.createElement('div');
                 el.className = 'mb-2 text-right';
                 el.innerHTML = `<div class="inline-block px-3 py-1 rounded bg-blue-600">${txt}</div><div class="text-xs text-gray-400 mt-1">Just now</div>`;
@@ -809,10 +849,8 @@ export class FriendWidget {
             }
         };
 
-        // Send button click
         send.onclick = sendMessage;
 
-        // Enter to send, Shift+Enter for new line
         input.addEventListener('keydown', (e: KeyboardEvent) => {
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
@@ -820,8 +858,8 @@ export class FriendWidget {
             }
         });
 
-        // Minimize / restore
-        minBtn.onclick = () => {
+        minBtn.onclick = (e: MouseEvent) => {
+            e.stopPropagation();
             const info = this.openChats.get(peerId);
             if (!info) return;
             info.minimized = !info.minimized;
@@ -842,11 +880,12 @@ export class FriendWidget {
                 if (badge) { badge.classList.add('hidden'); badge.textContent = ''; }
                 this.unreadCounts.delete(peerId);
                 minBtn.style.display = '';
+                input.focus();
             }
         };
 
-        // Close chat
-        closeBtn.onclick = () => {
+        closeBtn.onclick = (e: MouseEvent) => {
+            e.stopPropagation();
             if (this.openChats.has(peerId)) {
                 const info = this.openChats.get(peerId)!;
                 if (this.chatContainer && this.chatContainer.contains(info.box)) {
@@ -857,12 +896,12 @@ export class FriendWidget {
             }
         };
 
-        // Make the entire header clickable to restore when minimized
         header.onclick = (e: MouseEvent) => {
             const info = this.openChats.get(peerId);
             if (!info || !info.minimized) return;
             
-            if ((e.target as HTMLElement).closest('button')?.title === 'Close') return;
+            const target = e.target as HTMLElement;
+            if (target.closest('button')) return;
             
             info.minimized = false;
             info.box.classList.remove('chat-minimized');
@@ -876,7 +915,6 @@ export class FriendWidget {
             input.focus();
         };
 
-        // focus input
         setTimeout(() => { input.focus(); }, 50);
     }
 }
