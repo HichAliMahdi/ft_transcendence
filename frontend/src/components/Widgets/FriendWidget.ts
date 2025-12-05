@@ -21,8 +21,7 @@ export class FriendWidget {
     private directMessageHandler: ((ev: Event) => void) | null = null;
     private clickOutsideHandler: ((e: MouseEvent) => void) | null = null;
     private openingChats: Set<number> = new Set(); // Track chats being opened
-    private displayedMessageIds: Set<number> = new Set(); // Track displayed messages
-
+    private displayedMessageIds: Set<number> = new Set();
 
     mount(): void {
         if (!this.authChangeHandler) {
@@ -93,19 +92,19 @@ export class FriendWidget {
         this.btn = document.createElement('button');
         this.btn.id = 'friend-widget-btn';
         this.btn.title = 'Friends';
-        this.btn.className = 'bg-game-dark hover:bg-blue-800 text-white rounded-full w-14 h-14 flex items-center justify-center shadow-lg cursor-pointer text-2xl relative z-10';
-        this.btn.innerHTML = '👥';
+        this.btn.className = 'bg-gradient-to-br from-accent-pink to-accent-purple hover:from-pink-600 hover:to-purple-700 text-white rounded-full w-16 h-16 flex items-center justify-center shadow-[0_8px_24px_rgba(236,72,153,0.4)] hover:shadow-[0_12px_32px_rgba(236,72,153,0.6)] cursor-pointer text-3xl relative z-10 transition-all duration-300 hover:scale-110';
+        this.btn.innerHTML = '<span class="relative">👥<span class="absolute -top-1 -right-1 w-3 h-3 bg-green-400 rounded-full ring-2 ring-game-dark animate-pulse"></span></span>';
         this.btn.onclick = () => this.toggle();
         this.root.appendChild(this.btn);
 
         this.panel = document.createElement('div');
         this.panel.id = 'friend-widget-panel';
-        this.panel.className = 'glass-effect p-4 rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.6)] w-[340px] max-h-[70vh] overflow-auto absolute bottom-16 right-0 hidden';
+        this.panel.className = 'glass-effect backdrop-blur-xl bg-gradient-to-br from-game-dark/95 to-blue-900/95 p-6 rounded-3xl shadow-[0_20px_60px_rgba(0,0,0,0.8)] border border-white/10 w-[380px] max-h-[75vh] overflow-hidden flex flex-col absolute bottom-20 right-0 hidden';
         this.root.appendChild(this.panel);
 
         this.chatContainer = document.createElement('div');
         this.chatContainer.id = 'chat-windows-root';
-        this.chatContainer.className = 'fixed bottom-5 flex flex-row-reverse gap-3 z-[10000]';
+        this.chatContainer.className = 'fixed bottom-5 flex flex-row-reverse gap-3 z-[10000] items-end';
         document.body.appendChild(this.chatContainer);
 
         try {
@@ -115,84 +114,90 @@ export class FriendWidget {
                 const r = fw.getBoundingClientRect();
                 offset += Math.round(r.width) + 12;
             }
-            // Notification widget is now at top, so we don't need to account for it in bottom positioning
             offset += 40;
-            if (offset < 180) offset = 180;
+            if (offset < 200) offset = 200;
             this.chatContainer.style.right = `${offset}px`;
         } catch (e) {
-            this.chatContainer.style.right = '180px';
+            this.chatContainer.style.right = '200px';
         }
 
-        // Personal Status Section
+        // Personal Status Section with enhanced design
         const statusSection = document.createElement('div');
-        statusSection.className = 'mb-4 pb-4 border-b border-gray-600';
-        
+        statusSection.className = 'mb-6 pb-6 border-b border-gradient-to-r from-transparent via-white/20 to-transparent';
+
         const statusHeader = document.createElement('div');
-        statusHeader.className = 'flex items-center justify-between mb-2';
-        
+        statusHeader.className = 'flex items-center justify-between mb-4';
+
         const myStatusLabel = document.createElement('h4');
         myStatusLabel.textContent = 'My Status';
-        myStatusLabel.className = 'text-sm font-semibold text-gray-400';
+        myStatusLabel.className = 'text-base font-bold text-white flex items-center gap-2';
+        myStatusLabel.innerHTML = '<span class="text-accent-pink">●</span> My Status';
         statusHeader.appendChild(myStatusLabel);
-        
+
         statusSection.appendChild(statusHeader);
-        
+
         const statusSelector = document.createElement('div');
-        statusSelector.className = 'flex flex-col gap-2';
-        
-        const statuses: Array<{value: string; label: string; color: string; emoji: string}> = [
-            { value: 'Online', label: 'Online', color: '#22c55e', emoji: '' },
-            { value: 'Busy', label: 'Busy', color: '#ef4444', emoji: '' },
-            { value: 'Away', label: 'Away', color: '#f59e0b', emoji: '' },
-            { value: 'Offline', label: 'Offline', color: '#94a3b8', emoji: '' }
+        statusSelector.className = 'grid grid-cols-2 gap-2';
+
+        const statuses: Array<{value: string; label: string; color: string; icon: string}> = [
+            { value: 'Online', label: 'Online', color: '#22c55e', icon: '✓' },
+            { value: 'Busy', label: 'Busy', color: '#ef4444', icon: '🚫' },
+            { value: 'Away', label: 'Away', color: '#f59e0b', icon: '⏰' },
+            { value: 'Offline', label: 'Offline', color: '#94a3b8', icon: '○' }
         ];
-        
+
         const user = AuthService.getUser();
         const currentStatus = (user && (user as any).status) ? (user as any).status : 'Online';
-        
+
         statuses.forEach(s => {
             const statusBtn = document.createElement('button');
             const isActive = currentStatus === s.value;
-            statusBtn.className = `flex items-center gap-3 p-2 rounded-lg hover:bg-blue-800 transition-colors text-left ${isActive ? 'bg-blue-500/30' : 'bg-transparent'}`;
-            
+            statusBtn.className = `group relative flex items-center gap-2 p-3 rounded-xl hover:bg-white/10 transition-all duration-300 text-left ${isActive ? 'bg-gradient-to-r from-accent-pink/20 to-accent-purple/20 ring-2 ring-accent-pink/50' : 'bg-white/5 hover:scale-105'}`;
+
             const dot = document.createElement('span');
-            const glowClass = s.value !== 'Offline' && isActive ? 'shadow-[0_0_8px_currentColor]' : '';
-            dot.className = `w-3 h-3 rounded-full inline-block ${glowClass}`;
+            const glowClass = s.value !== 'Offline' && isActive ? 'shadow-[0_0_12px_currentColor] animate-pulse' : '';
+            dot.className = `w-3 h-3 rounded-full inline-block ${glowClass} transition-all duration-300`;
             dot.style.backgroundColor = s.color;
-            
+
+            const content = document.createElement('div');
+            content.className = 'flex-1';
+
             const label = document.createElement('span');
-            label.className = 'text-white text-sm flex-1';
+            label.className = `text-white text-sm font-medium ${isActive ? 'text-accent-pink' : ''}`;
             label.textContent = s.label;
-            
-            const checkmark = document.createElement('span');
-            checkmark.textContent = isActive ? '✓' : '';
-            checkmark.className = 'text-green-400 font-bold';
-            
+
+            content.appendChild(label);
+
+            const icon = document.createElement('span');
+            icon.className = `text-lg ${isActive ? 'scale-125' : 'scale-0 group-hover:scale-100'} transition-transform duration-300`;
+            icon.textContent = isActive ? '✓' : s.icon;
+
             statusBtn.appendChild(dot);
-            statusBtn.appendChild(label);
-            statusBtn.appendChild(checkmark);
-            
+            statusBtn.appendChild(content);
+            statusBtn.appendChild(icon);
+
             statusBtn.onclick = async () => {
                 try {
                     await AuthService.setStatus(s.value as any);
-                    // Update UI
                     statusSelector.querySelectorAll('button').forEach(btn => {
-                        btn.className = 'flex items-center gap-3 p-2 rounded-lg hover:bg-blue-800 transition-colors text-left bg-transparent';
-                        const check = btn.querySelector('span:last-child');
-                        if (check) check.textContent = '';
+                        btn.className = 'group relative flex items-center gap-2 p-3 rounded-xl hover:bg-white/10 transition-all duration-300 text-left bg-white/5 hover:scale-105';
+                        const lbl = btn.querySelector('span:nth-child(2) span');
+                        if (lbl) lbl.className = 'text-white text-sm font-medium';
+                        const ic = btn.querySelector('span:last-child');
+                        if (ic) ic.className = 'text-lg scale-0 group-hover:scale-100 transition-transform duration-300';
                     });
-                    statusBtn.className = 'flex items-center gap-3 p-2 rounded-lg hover:bg-blue-800 transition-colors text-left bg-blue-500/30';
-                    checkmark.textContent = '✓';
-                    
-                    // Update dot glow
+                    statusBtn.className = 'group relative flex items-center gap-2 p-3 rounded-xl hover:bg-white/10 transition-all duration-300 text-left bg-gradient-to-r from-accent-pink/20 to-accent-purple/20 ring-2 ring-accent-pink/50';
+                    label.className = 'text-white text-sm font-medium text-accent-pink';
+                    icon.className = 'text-lg scale-125 transition-transform duration-300';
+                    icon.textContent = '✓';
+
                     statusSelector.querySelectorAll('button span:first-child').forEach(d => {
-                        (d as HTMLElement).className = 'w-3 h-3 rounded-full inline-block';
+                        (d as HTMLElement).className = 'w-3 h-3 rounded-full inline-block transition-all duration-300';
                     });
                     if (s.value !== 'Offline') {
-                        dot.className = 'w-3 h-3 rounded-full inline-block shadow-[0_0_8px_currentColor]';
+                        dot.className = 'w-3 h-3 rounded-full inline-block shadow-[0_0_12px_currentColor] animate-pulse transition-all duration-300';
                     }
-                    
-                    // Update header status dot
+
                     const headerDot = document.getElementById('header-status-dot');
                     if (headerDot) {
                         headerDot.style.backgroundColor = s.color;
