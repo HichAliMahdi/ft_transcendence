@@ -3,6 +3,10 @@ import jwt from 'jsonwebtoken';
 import { db } from '../database/db';
 import { config } from '../config';
 import { broadcastPresenceUpdate, sendNotificationUpdate, sendDirectMessage } from './websocket';
+import fs from 'fs';
+import path from 'path';
+import { pipeline } from 'stream/promises';
+import crypto from 'crypto';
 
 export default async function userRoutes(fastify: FastifyInstance) {
   fastify.get('/users/:id/stats', async (request: FastifyRequest, reply: FastifyReply) => {
@@ -531,6 +535,117 @@ export default async function userRoutes(fastify: FastifyInstance) {
     } catch (err) {
       request.log.error(err);
       return reply.code(500).send({ message: 'Failed to update display name' });
+    }
+  });
+
+  fastify.post('/users/:id/avatar', async (request: FastifyRequest, reply: FastifyReply) => {
+    const auth = verifyAuth(request, reply);
+    if (!auth) return;
+    
+    const targetId = Number((request.params as any).id);
+    if (auth.userId !== targetId) {
+      return reply.status(403).send({ message: 'Forbidden' });
+    }
+
+    try {
+      const data = await request.file();
+      if (!data) {
+        return reply.status(400).send({ message: 'No file uploaded' });
+      }
+
+      // Validate file type
+      const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+      if (!allowedMimeTypes.includes(data.mimetype)) {
+        return reply.status(400).send({ 
+          message: 'Invalid file type. Only JPEG, PNG, GIF, and WebP are allowed' 
+        });
+      }
+
+      // Validate file size (max 5MB)
+      const maxSize = 5 * 1024 * 1024;
+      const chunks: Buffer[] = [];
+      for await (const chunk of data.file) {
+        chunks.push(chunk);
+        const currentSize = chunks.reduce((acc, c) => acc + c.length, 0);
+        if (currentSize > maxSize) {
+          return reply.status(400).send({ message: 'File too large. Maximum size is 5MB' });
+        }
+      }
+
+      const buffer = Buffer.concat(chunks);
+
+      // Create uploads directory if it doesn't exist
+      const uploadsDir = path.join(process.cwd(), 'uploads', 'avatars');
+      if (!fs.existsSync(uploadsDir)) {
+        fs.mkdirSync(uploadsDir, { recursive: true });
+      }
+
+      // Generate unique filename
+      const fileExt = data.mimetype.split('/')[1];
+      const filename = `${targetId}_${crypto.randomBytes(8).toString('hex')}.${fileExt}`;
+      const filepath = path.join(uploadsDir, filename);
+
+      // Delete old avatar if exists
+      const oldUser = db.prepare('SELECT avatar_url FROM users WHERE id = ?').get(targetId) as { avatar_url?: string } | undefined;
+      if (oldUser?.avatar_url && oldUser.avatar_url !== '/default-avatar.png') {
+        const oldPath = path.join(process.cwd(), 'uploads', oldUser.avatar_url.replace('/uploads/', ''));
+        if (fs.existsSync(oldPath)) {
+          fs.unlinkSync(oldPath);
+        }
+      }
+
+      // Save new avatar
+      fs.writeFileSync(filepath, buffer);
+
+      // Update database
+      const avatarUrl = `/uploads/avatars/${filename}`;
+      db.prepare('UPDATE users SET avatar_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+        .run(avatarUrl, targetId);
+
+      const updated = db.prepare('SELECT id, username, email, display_name, avatar_url, is_online, status, last_seen, created_at, updated_at FROM users WHERE id = ?').get(targetId);
+      
+      return reply.code(200).send({ 
+        user: updated, 
+        message: 'Avatar updated successfully' 
+      });
+    } catch (err) {
+      request.log.error(err);
+      return reply.code(500).send({ message: 'Failed to update avatar' });
+    }
+  });
+
+  // Add endpoint to delete avatar
+  fastify.delete('/users/:id/avatar', async (request: FastifyRequest, reply: FastifyReply) => {
+    const auth = verifyAuth(request, reply);
+    if (!auth) return;
+    
+    const targetId = Number((request.params as any).id);
+    if (auth.userId !== targetId) {
+      return reply.status(403).send({ message: 'Forbidden' });
+    }
+
+    try {
+      const user = db.prepare('SELECT avatar_url FROM users WHERE id = ?').get(targetId) as { avatar_url?: string } | undefined;
+      
+      if (user?.avatar_url && user.avatar_url !== '/default-avatar.png') {
+        const filepath = path.join(process.cwd(), 'uploads', user.avatar_url.replace('/uploads/', ''));
+        if (fs.existsSync(filepath)) {
+          fs.unlinkSync(filepath);
+        }
+      }
+
+      db.prepare('UPDATE users SET avatar_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+        .run('/default-avatar.png', targetId);
+
+      const updated = db.prepare('SELECT id, username, email, display_name, avatar_url, is_online, status, last_seen, created_at, updated_at FROM users WHERE id = ?').get(targetId);
+      
+      return reply.code(200).send({ 
+        user: updated, 
+        message: 'Avatar deleted successfully' 
+      });
+    } catch (err) {
+      request.log.error(err);
+      return reply.code(500).send({ message: 'Failed to delete avatar' });
     }
   });
 }
