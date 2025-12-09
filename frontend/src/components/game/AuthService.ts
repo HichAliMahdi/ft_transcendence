@@ -480,4 +480,71 @@ export class AuthService {
         if (!resp.ok) await this.parseResponseError(resp);
         return await resp.json();
     }
+
+    // Upload avatar
+    static async uploadAvatar(file: File): Promise<User> {
+        const token = this.getToken();
+        const user = this.getUser();
+        if (!token || !user) throw new Error('Not authenticated');
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const resp = await fetch(`${API_BASE}/users/${user.id}/avatar`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` },
+            body: formData
+        });
+
+        if (!resp.ok) await this.parseResponseError(resp);
+
+        const data = await resp.json();
+        const updatedUser = data.user;
+
+        // Update local cache
+        try {
+            localStorage.setItem(this.USER_KEY, JSON.stringify(updatedUser));
+            window.dispatchEvent(new Event('auth:change'));
+        } catch (e) {}
+
+        return updatedUser;
+    }
+
+    // Delete avatar
+    static async deleteAvatar(): Promise<User> {
+        const token = this.getToken();
+        const user = this.getUser();
+        if (!token || !user) throw new Error('Not authenticated');
+
+        const resp = await fetch(`${API_BASE}/users/${user.id}/avatar`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (!resp.ok) await this.parseResponseError(resp);
+
+        const data = await resp.json();
+        const updatedUser = data.user;
+
+        // Update local cache
+        try {
+            localStorage.setItem(this.USER_KEY, JSON.stringify(updatedUser));
+            window.dispatchEvent(new Event('auth:change'));
+        } catch (e) {}
+
+        return updatedUser;
+    }
+
+    // Get avatar URL (handles both local and default avatars)
+    static getAvatarUrl(user: User | null): string {
+        if (!user?.avatar_url || user.avatar_url === '/default-avatar.png') {
+            // Return initials-based avatar as fallback
+            return '';
+        }
+        // Handle relative URLs from backend
+        if (user.avatar_url.startsWith('/uploads/')) {
+            return `${window.location.origin}${user.avatar_url}`;
+        }
+        return user.avatar_url;
+    }
 }
