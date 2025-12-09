@@ -24,6 +24,7 @@ interface User {
 export class AuthService {
     private static TOKEN_KEY = 'auth_token';
     private static USER_KEY = 'user_data';
+    private static PREVIOUS_STATUS_KEY = 'previous_status';
 
     // Normalize various error shapes into a user-friendly single-line message
     static extractErrorMessage(err: any): string {
@@ -209,6 +210,49 @@ export class AuthService {
             try { window.dispatchEvent(new Event('auth:change')); } catch (e) {}
         } catch (e) {}
         return updated;
+    }
+
+    // Store current status before changing (for restoration)
+    static savePreviousStatus(): void {
+        const user = this.getUser();
+        if (user && (user as any).status) {
+            const currentStatus = (user as any).status;
+            // Don't save 'Busy' as previous status (it's auto-set during games)
+            if (currentStatus !== 'Busy') {
+                try {
+                    localStorage.setItem(this.PREVIOUS_STATUS_KEY, currentStatus);
+                } catch (e) {}
+            }
+        }
+    }
+
+    // Get previously saved status (defaults to 'Online' if none saved)
+    static getPreviousStatus(): 'Online'|'Busy'|'Away'|'Offline' {
+        try {
+            const saved = localStorage.getItem(this.PREVIOUS_STATUS_KEY);
+            if (saved && ['Online', 'Busy', 'Away', 'Offline'].includes(saved)) {
+                return saved as 'Online'|'Busy'|'Away'|'Offline';
+            }
+        } catch (e) {}
+        return 'Online';
+    }
+
+    // Clear saved previous status
+    static clearPreviousStatus(): void {
+        try {
+            localStorage.removeItem(this.PREVIOUS_STATUS_KEY);
+        } catch (e) {}
+    }
+
+    // Check if user is in Busy mode
+    static isUserBusy(userId?: number): boolean {
+        const user = this.getUser();
+        if (userId && user?.id !== userId) {
+            // For other users, we'd need to fetch their status from friends list
+            // This is a basic check for current user
+            return false;
+        }
+        return (user as any)?.status === 'Busy';
     }
 
     static isAuthenticated(): boolean {
