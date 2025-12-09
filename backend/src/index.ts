@@ -1,6 +1,9 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import websocketPlugin from '@fastify/websocket';
+import multipart from '@fastify/multipart';
+import fastifyStatic from '@fastify/static';
+import path from 'path';
 import { config } from './config';
 import { initializeDatabase } from './database/db';
 import { runMigrations } from './database/migrations';
@@ -42,6 +45,21 @@ fastify.register(websocketPlugin, {
   options: {
     maxPayload: 1024 * 1024
   }
+});
+
+// Register multipart for file uploads
+fastify.register(multipart, {
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB max file size
+    files: 1 // Only one file per request
+  }
+});
+
+// Serve static files from uploads directory
+fastify.register(fastifyStatic, {
+  root: path.join(process.cwd(), 'uploads'),
+  prefix: '/uploads/',
+  decorateReply: false
 });
 
 // Register routes
