@@ -413,7 +413,7 @@ class App {
 
                 try {
                     await AuthService.uploadAvatar(file);
-                    this.updateAuthSection(); // Refresh UI
+                    this.updateAuthSection();
                 } catch (err: any) {
                     await (window as any).app.showInfo('Upload Failed', AuthService.extractErrorMessage(err));
                 }

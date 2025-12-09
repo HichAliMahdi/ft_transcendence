@@ -60,9 +60,8 @@ export class SettingsPage {
         const displayNameInput = document.createElement('input');
         displayNameInput.type = 'text';
         displayNameInput.value = user?.display_name || '';
-        displayNameInput.maxLength = 50;
-        displayNameInput.className = 'flex-1 px-4 py-3 rounded-lg bg-game-dark text-white border-2 border-accent-pink focus:outline-none transition-colors duration-300';
-        displayNameInput.placeholder = 'Enter your display name';
+        displayNameInput.placeholder = 'Enter display name';
+        displayNameInput.className = 'flex-1 px-4 py-3 rounded-lg bg-game-dark text-white border-2 border-gray-600 focus:border-accent-pink focus:outline-none';
 
         const saveBtn = document.createElement('button');
         saveBtn.textContent = 'Save';
@@ -205,7 +204,7 @@ export class SettingsPage {
 
         const avatarImg = document.createElement('div');
         avatarImg.className = 'w-24 h-24 rounded-full bg-gradient-to-br from-accent-pink to-accent-purple flex items-center justify-center text-white font-bold text-3xl ring-4 ring-white/20 overflow-hidden';
-        const avatarUrl = AuthService.getAvatarUrl(user);
+        const avatarUrl = user ? AuthService.getAvatarUrl(user) : '';
         if (avatarUrl) {
             const img = document.createElement('img');
             img.src = avatarUrl;
@@ -214,7 +213,7 @@ export class SettingsPage {
             avatarImg.innerHTML = '';
             avatarImg.appendChild(img);
         } else {
-            avatarImg.textContent = (user.display_name || user.username).charAt(0).toUpperCase();
+            avatarImg.textContent = user ? (user.display_name || user.username).charAt(0).toUpperCase() : 'U';
         }
 
         avatarPreview.appendChild(avatarImg);

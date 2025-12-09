@@ -557,21 +557,14 @@ export class MultiplayerPage {
     }
  
     public cleanup(): void {
-        // Ensure status is restored on cleanup
-        if (!this.statusRestored) {
-            this.statusRestored = true;
+        // Clean up friend widget if it exists
+        const fw = (window as any)._friendWidget;
+        if (fw && typeof fw.refreshNow === 'function') {
             try {
-                const previousStatus = AuthService.getPreviousStatus();
-                AuthService.setStatus(previousStatus).catch(e => console.error('Failed to restore status:', e));
+                fw.refreshNow();
             } catch (e) {
-                console.error('Failed to restore status:', e);
+                console.error('Failed to refresh friend widget:', e);
             }
-        }
-
-        this.disconnect();
-        if (this.friendWidget) {
-            this.friendWidget.unmount();
-            this.friendWidget = null;
         }
     }
 

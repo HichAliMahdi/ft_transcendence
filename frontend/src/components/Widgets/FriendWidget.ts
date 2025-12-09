@@ -8,7 +8,6 @@ export class FriendWidget {
     private visible = false;
     private searchInput: HTMLInputElement | null = null;
     private searchBtn: HTMLButtonElement | null = null;
-    private authWatcherId: number | null = null;
     private authChangeHandler: ((e?: Event) => void) | null = null;
     private chatContainer: HTMLElement | null = null;
     private openChats: Map<number, {
@@ -17,11 +16,8 @@ export class FriendWidget {
         inputEl: HTMLInputElement;
         minimized: boolean;
     }> = new Map();
-    private unreadCounts: Map<number, number> = new Map();
-    private directMessageHandler: ((ev: Event) => void) | null = null;
     private clickOutsideHandler: ((e: MouseEvent) => void) | null = null;
-    private openingChats: Set<number> = new Set(); // Track chats being opened
-    private displayedMessageIds: Set<number> = new Set();
+    private directMessageHandler: ((ev: Event) => void) | null = null;
 
     mount(): void {
         if (!this.authChangeHandler) {
@@ -295,9 +291,7 @@ export class FriendWidget {
         this.refreshNow();
         this.startPolling();
 
-        if (!this.directMessageHandler) {
-            this.registerGlobalMessageListener();
-        }
+        this.registerGlobalMessageListener();
 
         this.setupClickOutsideListener();
     }
@@ -332,6 +326,10 @@ export class FriendWidget {
         }
     }
 
+    async refreshNow(): Promise<void> {
+        await this.fetchAndRender();
+    }
+
     private async fetchAndRender(): Promise<void> {
         const listEl = this.panel ? this.panel.querySelector('#friend-list') as HTMLElement | null : null;
         if (!listEl) return;
@@ -364,8 +362,20 @@ export class FriendWidget {
                 avatarContainer.className = 'relative flex-shrink-0';
 
                 const avatar = document.createElement('div');
-                avatar.className = 'w-12 h-12 rounded-full bg-gradient-to-br from-accent-pink to-accent-purple flex items-center justify-center text-white font-bold text-lg ring-2 ring-white/20 group-hover:ring-accent-pink/50 transition-all duration-300';
-                avatar.textContent = (f.display_name || f.username).charAt(0).toUpperCase();
+                avatar.className = 'w-12 h-12 rounded-full bg-gradient-to-br from-accent-pink to-accent-purple flex items-center justify-center text-white font-bold text-lg ring-2 ring-white/20 group-hover:ring-accent-pink/50 transition-all duration-300 overflow-hidden';
+                
+                // Display avatar if exists, otherwise show initials
+                const avatarUrl = AuthService.getAvatarUrl(f as any);
+                if (avatarUrl) {
+                    const img = document.createElement('img');
+                    img.src = avatarUrl;
+                    img.className = 'w-full h-full object-cover';
+                    img.alt = f.display_name || f.username;
+                    avatar.appendChild(img);
+                } else {
+                    avatar.textContent = (f.display_name || f.username).charAt(0).toUpperCase();
+                }
+                
                 avatarContainer.appendChild(avatar);
 
                 const statusIndicator = document.createElement('span');
@@ -393,7 +403,6 @@ export class FriendWidget {
                 name.textContent = f.display_name || f.username;
                 name.onclick = () => {
                     this.openChatWindow(f.id, f.display_name || f.username);
-                    // Minimize the friend list when opening a chat
                     this.closePanel();
                 };
 
@@ -404,6 +413,7 @@ export class FriendWidget {
                     statusBadge.textContent = '⏳ Pending';
                     statusBadge.className += ' bg-gray-500/20 text-gray-300 border border-gray-500/30';
                 } else if (f.is_online) {
+                    const userStatus = (f as any).user_status || 'Offline';
                     if (userStatus === 'Busy') {
                         statusBadge.textContent = '🚫 Busy';
                         statusBadge.className += ' bg-red-500/20 text-red-300 border border-red-500/30';
@@ -561,36 +571,19 @@ export class FriendWidget {
                     // Update header appearance
                     const header = chat.box.querySelector('.flex.items-center.justify-between') as HTMLElement;
                     if (header) {
-                        header.style.cursor = 'pointer';
-                        header.classList.add('hover:bg-white/10');
+                        header.classList.add('opacity-50');
+                        const title = header.querySelector('span.text-lg') as HTMLElement;
+                        if (title) {
+                            title.classList.add('line-clamp-1');
+                        }
                     }
-
-                    // Hide minimize button, show unread badge
-                    const minBtn = chat.box.querySelector('button[title="Minimize"]') as HTMLElement | null;
-                    if (minBtn) minBtn.style.display = 'none';
-
-                    const unreadBadge = chat.box.querySelector('.chat-unread') as HTMLElement | null;
-                    if (unreadBadge) unreadBadge.classList.remove('hidden');
                 }
             });
         }
 
-        if (this.visible) {
-            this.panel.classList.remove('hidden');
-            this.panel.classList.add('block');
-        } else {
-            this.panel.classList.remove('block');
-            this.panel.classList.add('hidden');
-        }
-
-        this.btn.classList.toggle('bg-accent-pink', this.visible);
-
-        if (this.visible) this.refreshNow();
-    }
-
-
-    async refreshNow(): Promise<void> {
-        await this.fetchAndRender();
+        this.panel.classList.toggle('hidden', !this.visible);
+        this.panel.classList.toggle('block', this.visible);
+        this.btn!.classList.toggle('bg-accent-pink', this.visible);
     }
 
     private registerGlobalMessageListener(): void {
@@ -604,131 +597,19 @@ export class FriendWidget {
                 if (!d) return;
                 const fromId = Number(d.from);
                 const meId = AuthService.getUser()?.id;
-                const msgId = d.id ? Number(d.id) : null;
 
-                // Ignore messages from ourselves
                 if (fromId === meId) return;
 
-                // Prevent duplicate display by tracking message IDs
-                if (msgId && this.displayedMessageIds.has(msgId)) {
-                    return;
-                }
-                if (msgId) {
-                    this.displayedMessageIds.add(msgId);
-                    // Keep only last 100 message IDs in memory
-                    if (this.displayedMessageIds.size > 100) {
-                        const firstId = this.displayedMessageIds.values().next().value;
-                        if (firstId !== undefined) {
-                            this.displayedMessageIds.delete(firstId);
-                        }
-                    }
-                }
-
                 const chat = this.openChats.get(fromId);
-                const isOpening = this.openingChats.has(fromId);
-
-                // Check if current user is in Busy mode
-                const iAmBusy = AuthService.isUserBusy();
 
                 if (chat) {
-                    const formatTime = (dateString: string): string => {
-                        if (!dateString) return 'Just now';
-                        try {
-                            const date = new Date(dateString + 'Z');
-                            if (isNaN(date.getTime())) return 'Just now';
-
-                            const now = new Date();
-                            const diffMs = now.getTime() - date.getTime();
-                            const diffSec = Math.floor(diffMs / 1000);
-                            const diffMin = Math.floor(diffSec / 60);
-                            const diffHour = Math.floor(diffMin / 60);
-                            const diffDay = Math.floor(diffHour / 24);
-
-                            if (diffSec < 10) return 'Just now';
-                            if (diffSec < 60) return `${diffSec}s ago`;
-                            if (diffMin < 60) return `${diffMin}m ago`;
-                            if (diffHour < 24) return `${diffHour}h ago`;
-                            if (diffDay < 7) return `${diffDay}d ago`;
-                            return date.toLocaleDateString();
-                        } catch (e) {
-                            return 'Just now';
-                        }
-                    };
                     const el = document.createElement('div');
                     el.className = `mb-2 text-left`;
-                    el.setAttribute('data-message-id', String(msgId || ''));
-                    el.innerHTML = `<div class="inline-block px-3 py-1 rounded bg-gray-700">${d.content}</div><div class="text-xs text-gray-400 mt-1">${formatTime(d.created_at)}</div>`;
+                    el.innerHTML = `<div class="inline-block px-3 py-1 rounded bg-gray-700">${d.content}</div>`;
                     chat.messagesEl.appendChild(el);
                     chat.messagesEl.scrollTop = chat.messagesEl.scrollHeight;
-
-                    // Only auto-restore chat if user is NOT in Busy mode
-                    if (chat.minimized && !iAmBusy) {
-                        chat.minimized = false;
-                        chat.box.classList.remove('chat-minimized');
-                        chat.messagesEl.classList.remove('hidden');
-                        const inputRow = chat.box.querySelector('.chat-input-row') as HTMLElement | null;
-                        if (inputRow) inputRow.classList.remove('hidden');
-                        const badge = chat.box.querySelector('.chat-unread') as HTMLElement | null;
-                        if (badge) { badge.classList.add('hidden'); badge.textContent = ''; }
-                        const minBtn = chat.box.querySelector('button[title="Minimize"]') as HTMLElement | null;
-                        if (minBtn) minBtn.style.display = '';
-                        this.unreadCounts.delete(fromId);
-                    } else if (chat.minimized && iAmBusy) {
-                        // User is busy - just update unread count
-                        const count = this.unreadCounts.get(fromId) || 0;
-                        this.unreadCounts.set(fromId, count + 1);
-                        const badge = chat.box.querySelector('.chat-unread') as HTMLElement | null;
-                        if (badge) {
-                            badge.textContent = String(this.unreadCounts.get(fromId));
-                            badge.classList.remove('hidden');
-                        }
-                    }
-                } else if (!isOpening) {
-                    // Don't auto-open new chat windows if user is in Busy mode
-                    if (iAmBusy) {
-                        // Just increment unread counter and show notification in friend list
-                        const prev = this.unreadCounts.get(fromId) || 0;
-                        this.unreadCounts.set(fromId, prev + 1);
-                        const row = this.panel?.querySelector(`div[data-friend-id="${fromId}"]`) as HTMLElement | null;
-                        if (row) {
-                            let badge = row.querySelector('.friend-unread') as HTMLElement | null;
-                            if (!badge) {
-                                badge = document.createElement('span');
-                                badge.className = 'friend-unread bg-accent-pink text-white rounded-full text-xs px-2 py-0.5 ml-2';
-                                (row.querySelector('div.flex.flex-col') || row).appendChild(badge);
-                            }
-                            badge.textContent = String(this.unreadCounts.get(fromId));
-                        }
-                    } else {
-                        // Normal behavior - auto-open chat
-                        this.openingChats.add(fromId);
-
-                        const friendName = await this.getFriendName(fromId);
-                        if (friendName) {
-                            await this.openChatWindow(fromId, friendName);
-                        } else {
-                            this.openingChats.delete(fromId);
-                            const prev = this.unreadCounts.get(fromId) || 0;
-                            this.unreadCounts.set(fromId, prev + 1);
-                            const row = this.panel?.querySelector(`div[data-friend-id="${fromId}"]`) as HTMLElement | null;
-                            if (row) {
-                                let badge = row.querySelector('.friend-unread') as HTMLElement | null;
-                                if (!badge) {
-                                    badge = document.createElement('span');
-                                    badge.className = 'friend-unread bg-accent-pink text-white rounded-full text-xs px-2 py-0.5 ml-2';
-                                    (row.querySelector('div.flex.flex-col') || row).appendChild(badge);
-                                }
-                                badge.textContent = String(this.unreadCounts.get(fromId));
-                            }
-                        }
-                    }
                 }
-                this.refreshNow();
-
-                const nw = (window as any)._notificationWidget;
-                if (nw && typeof nw.refreshNow === 'function') {
-                    nw.refreshNow();
-                }
+                await this.refreshNow();
             } catch (e) {
                 // ignore
             }
@@ -736,77 +617,13 @@ export class FriendWidget {
         window.addEventListener('direct_message', this.directMessageHandler);
     }
 
-    private async getFriendName(userId: number): Promise<string | null> {
-        try {
-            const me = AuthService.getUser();
-            if (!me) return null;
-
-            const friends = await AuthService.getFriends(me.id);
-            const friend = friends.find((f: any) => f.id === userId);
-            return friend ? (friend.display_name || friend.username) : null;
-        } catch (e) {
-            return null;
-        }
-    }
-
     private startPolling(): void {
         if (this.intervalId) return;
-
         this.intervalId = window.setInterval(() => {
             if (this.visible) this.refreshNow();
         }, 15000) as unknown as number;
     }
 
-    unmount(): void {
-        // Stop polling
-        if (this.intervalId) {
-            clearInterval(this.intervalId);
-            this.intervalId = null;
-        }
-        if (this.authWatcherId) {
-            clearInterval(this.authWatcherId);
-            this.authWatcherId = null;
-        }
-
-        // Remove direct message listener
-        if (this.directMessageHandler) {
-            window.removeEventListener('direct_message', this.directMessageHandler);
-            this.directMessageHandler = null;
-        }
-
-        // Remove click outside listener
-        if (this.clickOutsideHandler) {
-            document.removeEventListener('click', this.clickOutsideHandler);
-            this.clickOutsideHandler = null;
-        }
-
-        // Remove DOM elements
-        if (this.root && document.body.contains(this.root)) {
-            document.body.removeChild(this.root);
-        }
-
-        // Remove chat windows container
-        if (this.chatContainer && document.body.contains(this.chatContainer)) {
-            document.body.removeChild(this.chatContainer);
-        }
-        this.openChats.clear();
-        this.unreadCounts.clear();
-        this.displayedMessageIds.clear();
-
-        // clean global reference if it points to this instance
-        try {
-            if ((window as any)._friendWidget === this) delete (window as any)._friendWidget;
-        } catch (e) { }
-
-        // Clear all references
-        this.root = null;
-        this.panel = null;
-        this.btn = null;
-        this.searchInput = null;
-        this.searchBtn = null;
-    }
-
-    // Open a persistent chat window (bottom-right). Focus existing if already open.
     private async openChatWindow(peerId: number, peerName: string): Promise<void> {
         if (!this.chatContainer) {
             this.chatContainer = document.getElementById('chat-windows-root') as HTMLElement | null;
@@ -832,54 +649,48 @@ export class FriendWidget {
                 if (minBtn) minBtn.style.display = '';
             }
             existing.inputEl.focus();
-            this.unreadCounts.delete(peerId);
-            this.openingChats.delete(peerId);
-            // Minimize the friend list when focusing existing chat
             this.closePanel();
             return;
         }
 
         const box = document.createElement('div');
         box.className = 'w-80 rounded-2xl shadow-2xl flex flex-col chat-box bg-gradient-to-b from-game-dark to-blue-900/90 border border-white/10 transition-all duration-300';
-        box.setAttribute('data-chat-user', String(peerId));
 
         const header = document.createElement('div');
         header.className = 'flex items-center justify-between px-4 py-3 bg-gradient-to-r from-accent-pink/20 to-accent-purple/20 backdrop-blur-sm rounded-t-2xl border-b border-white/10 flex-shrink-0';
+        
         const title = document.createElement('div');
-        title.className = 'text-sm text-white font-bold truncate flex items-center gap-2';
-        title.innerHTML = `<span class="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>${peerName}`;
-        const controls = document.createElement('div');
-        controls.className = 'flex items-center gap-2';
-        const unreadBadge = document.createElement('span');
-        unreadBadge.className = 'chat-unread bg-gradient-to-r from-accent-pink to-accent-purple text-white rounded-full text-xs px-2 py-1 hidden font-bold shadow-lg';
-        unreadBadge.setAttribute('aria-hidden', 'true');
-        const minBtn = document.createElement('button');
-        minBtn.className = 'text-gray-300 hover:text-white hover:bg-white/10 rounded-lg px-2 py-1 transition-all duration-200';
-        minBtn.title = 'Minimize';
-        minBtn.textContent = '−';
+        title.className = 'text-sm text-white font-bold truncate';
+        title.textContent = peerName;
+
         const closeBtn = document.createElement('button');
-        closeBtn.className = 'text-gray-300 hover:text-red-400 hover:bg-red-500/10 rounded-lg px-2 py-1 transition-all duration-200';
-        closeBtn.title = 'Close';
         closeBtn.textContent = '✕';
-        controls.appendChild(unreadBadge);
-        controls.appendChild(minBtn);
-        controls.appendChild(closeBtn);
+        closeBtn.className = 'text-gray-300 hover:text-red-400';
+        closeBtn.onclick = () => {
+            if (this.chatContainer && this.chatContainer.contains(box)) {
+                this.chatContainer.removeChild(box);
+            }
+            this.openChats.delete(peerId);
+        };
+
         header.appendChild(title);
-        header.appendChild(controls);
+        header.appendChild(closeBtn);
 
         const messagesEl = document.createElement('div');
-        messagesEl.className = 'px-4 py-3 flex-1 overflow-auto text-sm chat-messages bg-gradient-to-b from-transparent to-black/20';
-        messagesEl.textContent = 'Loading...';
+        messagesEl.className = 'px-4 py-3 flex-1 overflow-auto text-sm chat-messages';
 
         const inputRow = document.createElement('div');
-        inputRow.className = 'px-4 py-3 flex gap-2 border-t border-white/10 flex-shrink-0 chat-input-row bg-gradient-to-r from-accent-pink/10 to-accent-purple/10 rounded-b-2xl';
+        inputRow.className = 'px-4 py-3 flex gap-2 border-t border-white/10 chat-input-row';
+
         const input = document.createElement('input');
         input.type = 'text';
         input.placeholder = 'Write a message…';
-        input.className = 'flex-1 px-3 py-2 rounded-lg bg-white/5 border border-white/10 focus:border-accent-pink/50 text-white text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-accent-pink/30 transition-all duration-200';
+        input.className = 'flex-1 px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white text-sm';
+
         const send = document.createElement('button');
-        send.className = 'px-4 py-2 bg-gradient-to-r from-accent-pink to-accent-purple hover:from-pink-600 hover:to-purple-700 text-white rounded-lg text-sm font-medium transition-all duration-200 hover:scale-105 shadow-lg';
         send.textContent = 'Send';
+        send.className = 'px-4 py-2 bg-gradient-to-r from-accent-pink to-accent-purple text-white rounded-lg text-sm';
+
         inputRow.appendChild(input);
         inputRow.appendChild(send);
 
@@ -887,77 +698,27 @@ export class FriendWidget {
         box.appendChild(messagesEl);
         box.appendChild(inputRow);
 
-        // Insert box so newest is nearest the friend widget
         if (this.chatContainer) this.chatContainer.insertBefore(box, this.chatContainer.firstChild);
 
-        // Register IMMEDIATELY before loading history - this prevents race condition
         this.openChats.set(peerId, { box, messagesEl, inputEl: input, minimized: false });
-        // Clear opening flag IMMEDIATELY after registering
-        this.openingChats.delete(peerId);
 
-        // Load history
-        try {
-            const history = await AuthService.getMessages(peerId);
-            messagesEl.innerHTML = '';
-
-            const formatTimestamp = (dateString: string): string => {
-                if (!dateString) return 'Unknown time';
-                try {
-                    const date = new Date(dateString + 'Z');
-                    if (isNaN(date.getTime())) return 'Unknown time';
-
-                    const now = new Date();
-                    const diffMs = now.getTime() - date.getTime();
-                    const diffSec = Math.floor(diffMs / 1000);
-                    const diffMin = Math.floor(diffSec / 60);
-                    const diffHour = Math.floor(diffMin / 60);
-                    const diffDay = Math.floor(diffHour / 24);
-
-                    if (diffSec < 10) return 'Just now';
-                    if (diffSec < 60) return `${diffSec}s ago`;
-                    if (diffMin < 60) return `${diffMin}m ago`;
-                    if (diffHour < 24) return `${diffHour}h ago`;
-                    if (diffDay < 7) return `${diffDay}d ago`;
-                    return date.toLocaleDateString();
-                } catch (e) {
-                    return 'Unknown time';
-                }
-            };
-
-            history.forEach((m: any) => {
-                const el = document.createElement('div');
-                const isMine = m.sender_id === AuthService.getUser()?.id;
-                el.className = `mb-2 ${isMine ? 'text-right' : 'text-left'}`;
-                el.innerHTML = `<div class="inline-block px-3 py-1 rounded ${isMine ? 'bg-blue-600' : 'bg-gray-700'}">${m.content}</div><div class="text-xs text-gray-400 mt-1">${formatTimestamp(m.created_at)}</div>`;
-                messagesEl.appendChild(el);
-            });
-            messagesEl.scrollTop = messagesEl.scrollHeight;
-        } catch (e) {
-            messagesEl.textContent = 'Failed to load messages';
-        }
-
-        // Send action helper
         const sendMessage = async () => {
             const txt = input.value.trim();
             if (!txt) return;
-            send.disabled = true;
             try {
                 await AuthService.sendMessage(peerId, txt);
                 const el = document.createElement('div');
-                el.className = 'mb-3 text-right animate-scale-in';
-                el.innerHTML = `<div class="inline-block px-4 py-2 rounded-2xl bg-gradient-to-r from-blue-500 to-blue-600 shadow-lg">${txt}</div><div class="text-xs text-gray-400 mt-1">Just now</div>`;
+                el.className = 'mb-2 text-right';
+                el.innerHTML = `<div class="inline-block px-3 py-1 rounded bg-blue-600">${txt}</div>`;
                 messagesEl.appendChild(el);
                 messagesEl.scrollTop = messagesEl.scrollHeight;
                 input.value = '';
             } catch (err: any) {
-                await (window as any).app.showInfo('Send failed', AuthService.extractErrorMessage(err) || String(err));
-            } finally {
-                send.disabled = false;
+                await (window as any).app.showInfo('Send failed', AuthService.extractErrorMessage(err));
             }
         };
 
         send.onclick = sendMessage;
-
         input.addEventListener('keydown', (e: KeyboardEvent) => {
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
@@ -965,94 +726,40 @@ export class FriendWidget {
             }
         });
 
-        minBtn.onclick = (e: MouseEvent) => {
-            e.stopPropagation();
-            const info = this.openChats.get(peerId);
-            if (!info) return;
+        setTimeout(() => input.focus(), 50);
+    }
 
-            info.minimized = !info.minimized;
-
-            if (info.minimized) {
-                // Minimize
-                info.box.classList.add('chat-minimized');
-                messagesEl.style.display = 'none';
-                inputRow.style.display = 'none';
-                minBtn.style.display = 'none';
-                unreadBadge.classList.remove('hidden');
-
-                // Update header appearance when minimized
-                header.style.cursor = 'pointer';
-                header.classList.add('hover:bg-white/10');
-            } else {
-                // Restore
-                info.box.classList.remove('chat-minimized');
-                messagesEl.style.display = '';
-                inputRow.style.display = '';
-                minBtn.style.display = '';
-                unreadBadge.classList.add('hidden');
-                unreadBadge.textContent = '';
-                this.unreadCounts.delete(peerId);
-
-                // Reset header appearance
-                header.style.cursor = 'default';
-                header.classList.remove('hover:bg-white/10');
-
-                // Focus input and scroll to bottom
-                setTimeout(() => {
-                    input.focus();
-                    messagesEl.scrollTop = messagesEl.scrollHeight;
-                }, 100);
-            }
-        };
-
-        closeBtn.onclick = (e: MouseEvent) => {
-            e.stopPropagation();
-            if (this.openChats.has(peerId)) {
-                const info = this.openChats.get(peerId)!;
-                if (this.chatContainer && this.chatContainer.contains(info.box)) {
-                    // Add fade-out animation
-                    info.box.style.opacity = '0';
-                    info.box.style.transform = 'scale(0.95)';
-                    setTimeout(() => {
-                        if (this.chatContainer && this.chatContainer.contains(info.box)) {
-                            this.chatContainer.removeChild(info.box);
-                        }
-                    }, 200);
-                }
-                this.openChats.delete(peerId);
-                this.unreadCounts.delete(peerId);
-            }
-        };
-
-        header.onclick = (e: MouseEvent) => {
-            const info = this.openChats.get(peerId);
-            if (!info || !info.minimized) return;
-
-            const target = e.target as HTMLElement;
-            if (target.closest('button')) return;
-
-            // Restore the chat
-            info.minimized = false;
-            info.box.classList.remove('chat-minimized');
-            messagesEl.style.display = '';
-            inputRow.style.display = '';
-            minBtn.style.display = '';
-            unreadBadge.classList.add('hidden');
-            unreadBadge.textContent = '';
-            this.unreadCounts.delete(peerId);
-
-            header.style.cursor = 'default';
-            header.classList.remove('hover:bg-white/10');
-
-            setTimeout(() => {
-                input.focus();
-                messagesEl.scrollTop = messagesEl.scrollHeight;
-            }, 100);
-        };
-
-        setTimeout(() => {
-            input.focus();
-            this.closePanel();
-        }, 50);
+    unmount(): void {
+        if (this.intervalId) {
+            clearInterval(this.intervalId);
+            this.intervalId = null;
+        }
+        if (this.directMessageHandler) {
+            window.removeEventListener('direct_message', this.directMessageHandler);
+            this.directMessageHandler = null;
+        }
+        if (this.clickOutsideHandler) {
+            document.removeEventListener('click', this.clickOutsideHandler);
+            this.clickOutsideHandler = null;
+        }
+        if (this.authChangeHandler) {
+            window.removeEventListener('auth:change', this.authChangeHandler);
+            this.authChangeHandler = null;
+        }
+        if (this.root && document.body.contains(this.root)) {
+            document.body.removeChild(this.root);
+        }
+        if (this.chatContainer && document.body.contains(this.chatContainer)) {
+            document.body.removeChild(this.chatContainer);
+        }
+        this.openChats.clear();
+        try {
+            if ((window as any)._friendWidget === this) delete (window as any)._friendWidget;
+        } catch (e) { }
+        this.root = null;
+        this.panel = null;
+        this.btn = null;
+        this.searchInput = null;
+        this.searchBtn = null;
     }
 }
