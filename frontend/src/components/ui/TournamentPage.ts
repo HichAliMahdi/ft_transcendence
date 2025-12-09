@@ -6,6 +6,7 @@ export class TournamentPage {
     private currentGame: PongGame | null = null;
     private container: HTMLElement | null = null;
     private gameCheckInterval: number | null = null;
+    private statusRestored: boolean = false;
     
     // State
     private tournament: Tournament | null = null;
@@ -383,6 +384,16 @@ export class TournamentPage {
 
     private renderMatch(): void {
         if (!this.container || !this.currentMatch) return;
+
+        // Set status to Busy when match starts (only once per tournament)
+        if (!this.statusRestored) {
+            try {
+                AuthService.savePreviousStatus();
+                AuthService.setStatus('Busy').catch(e => console.error('Failed to set Busy status:', e));
+            } catch (e) {
+                console.error('Failed to save/set status:', e);
+            }
+        }
 
         this.cleanupCurrentGame();
 
@@ -996,6 +1007,18 @@ export class TournamentPage {
 
     public cleanup(): void {
         this.cleanupCurrentGame();
+
+        // Restore previous status when leaving tournament (only once)
+        if (!this.statusRestored) {
+            this.statusRestored = true;
+            try {
+                const previousStatus = AuthService.getPreviousStatus();
+                AuthService.setStatus(previousStatus).catch(e => console.error('Failed to restore status:', e));
+            } catch (e) {
+                console.error('Failed to restore status:', e);
+            }
+        }
+
         if (this.tournament && this.tournament.status === 'pending' && this.participants.length === 0) {
             TournamentAPI.deleteTournament(this.tournament.id).catch(err => {
                 console.error('Error deleting tournament on cleanup:', err);

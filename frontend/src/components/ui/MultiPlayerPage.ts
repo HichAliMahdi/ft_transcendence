@@ -12,6 +12,7 @@ export class MultiplayerPage {
     private friendWidget: FriendWidget | null = null;
     private playerNumber: 1 | 2 | null = null;
     private opponentUser: { id?: number; username?: string; display_name?: string } | null = null;
+    private statusRestored: boolean = false;
 
     public render(): HTMLElement {
         this.container = document.createElement('div');
@@ -201,6 +202,16 @@ export class MultiplayerPage {
 
     private renderGameScreen(): void {
         if (!this.container) return;
+
+        // Set status to Busy when game starts (only once per session)
+        if (!this.statusRestored) {
+            try {
+                AuthService.savePreviousStatus();
+                AuthService.setStatus('Busy').catch(e => console.error('Failed to set Busy status:', e));
+            } catch (e) {
+                console.error('Failed to save/set status:', e);
+            }
+        }
 
         this.container.innerHTML = '';
 
@@ -530,10 +541,33 @@ export class MultiplayerPage {
         this.roomId = null;
         this.isHost = false;
         this.opponentUser = null;
+
+        // Restore previous status when disconnecting (only once)
+        if (!this.statusRestored) {
+            this.statusRestored = true;
+            try {
+                const previousStatus = AuthService.getPreviousStatus();
+                AuthService.setStatus(previousStatus).catch(e => console.error('Failed to restore status:', e));
+            } catch (e) {
+                console.error('Failed to restore status:', e);
+            }
+        }
+
         this.renderConnectionScreen();
     }
  
     public cleanup(): void {
+        // Ensure status is restored on cleanup
+        if (!this.statusRestored) {
+            this.statusRestored = true;
+            try {
+                const previousStatus = AuthService.getPreviousStatus();
+                AuthService.setStatus(previousStatus).catch(e => console.error('Failed to restore status:', e));
+            } catch (e) {
+                console.error('Failed to restore status:', e);
+            }
+        }
+
         this.disconnect();
         if (this.friendWidget) {
             this.friendWidget.unmount();
