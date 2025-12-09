@@ -627,6 +627,9 @@ export class FriendWidget {
                 const chat = this.openChats.get(fromId);
                 const isOpening = this.openingChats.has(fromId);
 
+                // Check if current user is in Busy mode
+                const iAmBusy = AuthService.isUserBusy();
+
                 if (chat) {
                     const formatTime = (dateString: string): string => {
                         if (!dateString) return 'Just now';
@@ -658,7 +661,8 @@ export class FriendWidget {
                     chat.messagesEl.appendChild(el);
                     chat.messagesEl.scrollTop = chat.messagesEl.scrollHeight;
 
-                    if (chat.minimized) {
+                    // Only auto-restore chat if user is NOT in Busy mode
+                    if (chat.minimized && !iAmBusy) {
                         chat.minimized = false;
                         chat.box.classList.remove('chat-minimized');
                         chat.messagesEl.classList.remove('hidden');
@@ -669,15 +673,20 @@ export class FriendWidget {
                         const minBtn = chat.box.querySelector('button[title="Minimize"]') as HTMLElement | null;
                         if (minBtn) minBtn.style.display = '';
                         this.unreadCounts.delete(fromId);
+                    } else if (chat.minimized && iAmBusy) {
+                        // User is busy - just update unread count
+                        const count = this.unreadCounts.get(fromId) || 0;
+                        this.unreadCounts.set(fromId, count + 1);
+                        const badge = chat.box.querySelector('.chat-unread') as HTMLElement | null;
+                        if (badge) {
+                            badge.textContent = String(this.unreadCounts.get(fromId));
+                            badge.classList.remove('hidden');
+                        }
                     }
                 } else if (!isOpening) {
-                    this.openingChats.add(fromId);
-
-                    const friendName = await this.getFriendName(fromId);
-                    if (friendName) {
-                        await this.openChatWindow(fromId, friendName);
-                    } else {
-                        this.openingChats.delete(fromId);
+                    // Don't auto-open new chat windows if user is in Busy mode
+                    if (iAmBusy) {
+                        // Just increment unread counter and show notification in friend list
                         const prev = this.unreadCounts.get(fromId) || 0;
                         this.unreadCounts.set(fromId, prev + 1);
                         const row = this.panel?.querySelector(`div[data-friend-id="${fromId}"]`) as HTMLElement | null;
@@ -689,6 +698,28 @@ export class FriendWidget {
                                 (row.querySelector('div.flex.flex-col') || row).appendChild(badge);
                             }
                             badge.textContent = String(this.unreadCounts.get(fromId));
+                        }
+                    } else {
+                        // Normal behavior - auto-open chat
+                        this.openingChats.add(fromId);
+
+                        const friendName = await this.getFriendName(fromId);
+                        if (friendName) {
+                            await this.openChatWindow(fromId, friendName);
+                        } else {
+                            this.openingChats.delete(fromId);
+                            const prev = this.unreadCounts.get(fromId) || 0;
+                            this.unreadCounts.set(fromId, prev + 1);
+                            const row = this.panel?.querySelector(`div[data-friend-id="${fromId}"]`) as HTMLElement | null;
+                            if (row) {
+                                let badge = row.querySelector('.friend-unread') as HTMLElement | null;
+                                if (!badge) {
+                                    badge = document.createElement('span');
+                                    badge.className = 'friend-unread bg-accent-pink text-white rounded-full text-xs px-2 py-0.5 ml-2';
+                                    (row.querySelector('div.flex.flex-col') || row).appendChild(badge);
+                                }
+                                badge.textContent = String(this.unreadCounts.get(fromId));
+                            }
                         }
                     }
                 }
