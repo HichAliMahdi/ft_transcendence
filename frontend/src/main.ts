@@ -374,7 +374,6 @@ class App {
             const container = document.createElement('div');
             container.className = 'relative';
 
-            // Gear button with user info
             const gearButton = document.createElement('button');
             gearButton.id = 'auth-menu-btn';
             gearButton.className = 'w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-white/5 hover:bg-white/10 transition-all duration-300 group';
@@ -383,8 +382,47 @@ class App {
             leftSection.className = 'flex items-center gap-3 flex-1 min-w-0';
             
             const avatar = document.createElement('div');
-            avatar.className = 'w-10 h-10 rounded-full bg-gradient-to-br from-accent-pink to-accent-purple flex items-center justify-center text-white font-bold text-sm ring-2 ring-white/20 flex-shrink-0';
-            avatar.textContent = (user?.display_name || user?.username || 'U').charAt(0).toUpperCase();
+            avatar.className = 'w-10 h-10 rounded-full bg-gradient-to-br from-accent-pink to-accent-purple flex items-center justify-center text-white font-bold text-sm ring-2 ring-white/20 flex-shrink-0 overflow-hidden cursor-pointer hover:ring-accent-pink transition-all duration-200';
+            avatar.title = 'Click to change avatar';
+            
+            // Display avatar if exists
+            const avatarUrl = AuthService.getAvatarUrl(user);
+            if (avatarUrl) {
+                const img = document.createElement('img');
+                img.src = avatarUrl;
+                img.className = 'w-full h-full object-cover';
+                img.alt = 'Avatar';
+                avatar.appendChild(img);
+            } else {
+                avatar.textContent = (user?.display_name || user?.username || 'U').charAt(0).toUpperCase();
+            }
+
+            // Add click handler for avatar upload
+            const fileInput = document.createElement('input');
+            fileInput.type = 'file';
+            fileInput.accept = 'image/jpeg,image/png,image/gif,image/webp';
+            fileInput.className = 'hidden';
+            fileInput.onchange = async (e) => {
+                const file = (e.target as HTMLInputElement).files?.[0];
+                if (!file) return;
+
+                if (file.size > 5 * 1024 * 1024) {
+                    await (window as any).app.showInfo('File Too Large', 'Maximum file size is 5MB');
+                    return;
+                }
+
+                try {
+                    await AuthService.uploadAvatar(file);
+                    this.updateAuthSection(); // Refresh UI
+                } catch (err: any) {
+                    await (window as any).app.showInfo('Upload Failed', AuthService.extractErrorMessage(err));
+                }
+            };
+            avatar.appendChild(fileInput);
+            avatar.onclick = (e) => {
+                e.stopPropagation();
+                fileInput.click();
+            };
             
             const userInfo = document.createElement('div');
             userInfo.className = 'flex flex-col items-start min-w-0 flex-1';

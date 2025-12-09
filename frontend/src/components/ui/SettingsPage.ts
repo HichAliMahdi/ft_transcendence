@@ -189,6 +189,92 @@ export class SettingsPage {
         profileSection.appendChild(displayNameContainer);
         profileSection.appendChild(accountInfoGrid);
 
+        // Avatar Section
+        const avatarSection = document.createElement('div');
+        avatarSection.className = 'glass-effect p-6 rounded-2xl mb-6';
+
+        const avatarTitle = document.createElement('h2');
+        avatarTitle.textContent = 'Profile Avatar';
+        avatarTitle.className = 'text-2xl font-bold text-white mb-4';
+
+        const avatarContainer = document.createElement('div');
+        avatarContainer.className = 'flex items-center gap-6';
+
+        const avatarPreview = document.createElement('div');
+        avatarPreview.className = 'relative group';
+
+        const avatarImg = document.createElement('div');
+        avatarImg.className = 'w-24 h-24 rounded-full bg-gradient-to-br from-accent-pink to-accent-purple flex items-center justify-center text-white font-bold text-3xl ring-4 ring-white/20 overflow-hidden';
+        const avatarUrl = AuthService.getAvatarUrl(user);
+        if (avatarUrl) {
+            const img = document.createElement('img');
+            img.src = avatarUrl;
+            img.className = 'w-full h-full object-cover';
+            img.alt = 'Avatar';
+            avatarImg.innerHTML = '';
+            avatarImg.appendChild(img);
+        } else {
+            avatarImg.textContent = (user.display_name || user.username).charAt(0).toUpperCase();
+        }
+
+        avatarPreview.appendChild(avatarImg);
+
+        const avatarControls = document.createElement('div');
+        avatarControls.className = 'flex-1 space-y-3';
+
+        const fileInput = document.createElement('input');
+        fileInput.type = 'file';
+        fileInput.accept = 'image/jpeg,image/png,image/gif,image/webp';
+        fileInput.className = 'hidden';
+        fileInput.id = 'avatar-upload-input';
+
+        const uploadBtn = document.createElement('button');
+        uploadBtn.textContent = '📤 Upload Avatar';
+        uploadBtn.className = 'btn-primary text-sm px-4 py-2';
+        uploadBtn.onclick = () => fileInput.click();
+
+        const deleteBtn = document.createElement('button');
+        deleteBtn.textContent = '🗑️ Remove Avatar';
+        deleteBtn.className = 'bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm transition-colors duration-200';
+        deleteBtn.onclick = async () => {
+            try {
+                await AuthService.deleteAvatar();
+                window.location.reload();
+            } catch (err: any) {
+                await (window as any).app.showInfo('Error', AuthService.extractErrorMessage(err));
+            }
+        };
+
+        const avatarInfo = document.createElement('p');
+        avatarInfo.textContent = 'Supported: JPEG, PNG, GIF, WebP (max 5MB)';
+        avatarInfo.className = 'text-xs text-gray-400';
+
+        fileInput.onchange = async (e) => {
+            const file = (e.target as HTMLInputElement).files?.[0];
+            if (!file) return;
+
+            if (file.size > 5 * 1024 * 1024) {
+                await (window as any).app.showInfo('File Too Large', 'Maximum file size is 5MB');
+                return;
+            }
+
+            try {
+                await AuthService.uploadAvatar(file);
+                window.location.reload();
+            } catch (err: any) {
+                await (window as any).app.showInfo('Upload Failed', AuthService.extractErrorMessage(err));
+            }
+        };
+
+        avatarControls.appendChild(uploadBtn);
+        avatarControls.appendChild(deleteBtn);
+        avatarControls.appendChild(avatarInfo);
+        avatarContainer.appendChild(avatarPreview);
+        avatarContainer.appendChild(fileInput);
+        avatarContainer.appendChild(avatarControls);
+        avatarSection.appendChild(avatarTitle);
+        avatarSection.appendChild(avatarContainer);
+
         // Placeholder sections for future settings
         const preferencesSection = document.createElement('div');
         preferencesSection.className = 'mb-8';
@@ -200,6 +286,7 @@ export class SettingsPage {
         `;
 
         settingsCard.appendChild(profileSection);
+        settingsCard.appendChild(avatarSection);
         settingsCard.appendChild(preferencesSection);
 
         this.container.appendChild(title);
