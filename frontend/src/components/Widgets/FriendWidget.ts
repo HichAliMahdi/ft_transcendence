@@ -168,43 +168,43 @@ export class FriendWidget {
 
             content.appendChild(label);
 
-            const icon = document.createElement('span');
-            icon.className = `text-lg ${isActive ? 'scale-125' : 'scale-0 group-hover:scale-100'} transition-transform duration-300`;
-            icon.textContent = isActive ? '✓' : s.icon;
-
             statusBtn.appendChild(dot);
             statusBtn.appendChild(content);
-            statusBtn.appendChild(icon);
 
             statusBtn.onclick = async () => {
                 try {
                     await AuthService.setStatus(s.value as any);
+                    
+                    // Remove active state from all buttons
                     statusSelector.querySelectorAll('button').forEach(btn => {
                         btn.className = 'group relative flex items-center gap-2 p-3 rounded-xl hover:bg-white/10 transition-all duration-300 text-left bg-white/5 hover:scale-105';
                         const lbl = btn.querySelector('span:nth-child(2) span');
                         if (lbl) lbl.className = 'text-white text-sm font-medium';
-                        const ic = btn.querySelector('span:last-child');
-                        if (ic) ic.className = 'text-lg scale-0 group-hover:scale-100 transition-transform duration-300';
+                        // Reset dot to non-glowing state
+                        const btnDot = btn.querySelector('span:first-child') as HTMLElement | null;
+                        if (btnDot) {
+                            btnDot.className = 'w-3 h-3 rounded-full inline-block transition-all duration-300';
+                        }
                     });
+                    
+                    // Add active state to clicked button
                     statusBtn.className = 'group relative flex items-center gap-2 p-3 rounded-xl hover:bg-white/10 transition-all duration-300 text-left bg-gradient-to-r from-accent-pink/20 to-accent-purple/20 ring-2 ring-accent-pink/50';
                     label.className = 'text-white text-sm font-medium text-accent-pink';
-                    icon.className = 'text-lg scale-125 transition-transform duration-300';
-                    icon.textContent = '✓';
-
-                    statusSelector.querySelectorAll('button span:first-child').forEach(d => {
-                        (d as HTMLElement).className = 'w-3 h-3 rounded-full inline-block transition-all duration-300';
-                    });
+                    
+                    // Apply glow effect only to active status if not Offline
                     if (s.value !== 'Offline') {
                         dot.className = 'w-3 h-3 rounded-full inline-block shadow-[0_0_12px_currentColor] animate-pulse transition-all duration-300';
+                    } else {
+                        dot.className = 'w-3 h-3 rounded-full inline-block transition-all duration-300';
                     }
 
                     const headerDot = document.getElementById('header-status-dot');
                     if (headerDot) {
                         headerDot.style.backgroundColor = s.color;
                         if (s.value !== 'Offline') {
-                            headerDot.className = 'w-2.5 h-2.5 rounded-full inline-block shadow-[0_0_8px_currentColor]';
+                            headerDot.className = 'w-2 h-2 rounded-full shadow-[0_0_8px_currentColor]';
                         } else {
-                            headerDot.className = 'w-2.5 h-2.5 rounded-full inline-block';
+                            headerDot.className = 'w-2 h-2 rounded-full';
                         }
                     }
                 } catch (err: any) {
