@@ -112,7 +112,6 @@ export function initializeDatabase(): void {
         )
     `);
 
-    // Simple messages table for direct friend-to-friend chats
     db.exec(`
         CREATE TABLE IF NOT EXISTS messages (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -124,6 +123,43 @@ export function initializeDatabase(): void {
             FOREIGN KEY (recipient_id) REFERENCES users(id) ON DELETE CASCADE
         )
     `);
+
+    // ========================================
+    // ADD THIS SECTION TO CREATE user_stats VIEW
+    // ========================================
     
-    console.log('Database initialized successfully');
+    // Drop existing view if it exists
+    db.exec(`DROP VIEW IF EXISTS user_stats`);
+
+    // Create user_stats view for statistics
+    db.exec(`
+        CREATE VIEW user_stats AS
+        SELECT 
+            u.id AS user_id,
+            COUNT(DISTINCT CASE 
+                WHEN m.player1_id = u.id OR m.player2_id = u.id 
+                THEN m.id 
+            END) AS games_played,
+            COUNT(DISTINCT CASE 
+                WHEN m.winner_id = u.id 
+                THEN m.id 
+            END) AS matches_won,
+            COUNT(DISTINCT CASE 
+                WHEN (m.player1_id = u.id OR m.player2_id = u.id) 
+                AND m.winner_id IS NOT NULL 
+                AND m.winner_id != u.id 
+                THEN m.id 
+            END) AS matches_lost,
+            COUNT(DISTINCT tp.tournament_id) AS tournaments_joined,
+            COUNT(DISTINCT CASE 
+                WHEN t.winner_id = u.id 
+                THEN t.id 
+            END) AS tournaments_won
+        FROM users u
+        LEFT JOIN matches m ON m.player1_id = u.id OR m.player2_id = u.id
+        LEFT JOIN tournament_participants tp ON tp.user_id = u.id
+        LEFT JOIN tournaments t ON t.id = tp.tournament_id
+        GROUP BY u.id
+    `);
+    
 }
