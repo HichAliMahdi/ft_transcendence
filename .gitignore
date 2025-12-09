@@ -1,2 +1,64 @@
+# Environment variables
 .env
-./data
+.env.local
+.env.development
+.env.test
+.env.production
+
+# Database files
+data/*.db
+data/*.db-shm
+data/*.db-wal
+data/*.db-journal
+data/*.sqlite
+data/*.sqlite3
+
+# Docker volumes data
+data/
+
+# Logs
+logs/
+*.log
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+*.sublime-*
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Backend specific
+backend/node_modules/
+backend/dist/
+backend/uploads/**/*
+!backend/uploads/**/.gitkeep
+backend/*.db*
+
+# Frontend specific
+frontend/node_modules/
+frontend/dist/
+
+# Docker
+.docker/
+
+# Coverage
+coverage/
+.nyc_output/

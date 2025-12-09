@@ -72,10 +72,10 @@ export class TournamentService {
 
         try {
             const userStmt = db.prepare(`
-                INSERT INTO users (username, display_name) VALUES (?, ?)
+                INSERT INTO users (username, display_name, avatar_url) VALUES (?, ?, ?)
             `);
             const uniqueUsername = `${alias}_${Date.now()}`;
-            const userResult = userStmt.run(uniqueUsername, alias);
+            const userResult = userStmt.run(uniqueUsername, alias, '/default-avatar.png');
             const userId = userResult.lastInsertRowid as number;
 
             const participantStmt = db.prepare(`

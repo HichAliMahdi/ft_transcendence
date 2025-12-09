@@ -1,0 +1,16 @@
+# SSL certificates (will be generated)
+ssl/*.crt
+ssl/*.key
+ssl/*.pem
+
+# Logs
+logs/
+*.log
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# OS files
+.DS_Store

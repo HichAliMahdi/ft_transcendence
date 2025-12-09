@@ -16,6 +16,11 @@ RUN npm install && npm install pino-pretty --save-dev
 COPY src ./src
 RUN npm run build
 
+# Create uploads directory with proper permissions
+RUN mkdir -p /app/uploads/avatars && \
+    chmod -R 755 /app/uploads && \
+    touch /app/uploads/avatars/.gitkeep
+
 EXPOSE 3000
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \

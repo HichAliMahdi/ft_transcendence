@@ -11,6 +11,7 @@ services:
       - FRONTEND_URL=http://frontend:5173
     volumes:
       - ./data:/data
+      - uploads:/app/uploads
     networks:
       - transcendence_network
     healthcheck:
@@ -42,6 +43,7 @@ services:
       - "80:80"
     volumes:
       - frontend_dist:/var/www/html:ro
+      - uploads:/var/uploads:ro
     networks:
       - transcendence_network
     depends_on:
@@ -50,6 +52,7 @@ services:
 
 volumes:
   frontend_dist:
+  uploads:
 
 networks:
   transcendence_network:

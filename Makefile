@@ -20,6 +20,8 @@ all: up
 
 up:
 	@echo "$(BLUE)🚀 Starting $(NAME)...$(RESET)"
+	@mkdir -p backend/uploads/avatars
+	@touch backend/uploads/avatars/.gitkeep
 	@docker compose -f $(COMPOSE) up -d --build
 	@echo "$(GREEN)✅ $(NAME) is running!$(RESET)"
 	@echo "$(YELLOW)📱 Access the application at: https://localhost$(RESET)"
@@ -51,11 +53,11 @@ clean:
 	@echo "$(GREEN)✅ Containers and volumes removed!$(RESET)"
 
 fclean: down
-	docker system prune -af --volumes
-	@if [ -f data/pong.db ]; then \
-		sudo rm -f data/pong.db || echo "Could not remove data/pong.db, skipping..."; \
-	fi
-	@echo "Cleaned everything!"
+	@echo "🧹 Performing deep clean..."
+	@docker system prune -af --volumes
+	@rm -rf backend/uploads
+	@rm -rf data/*.db*
+	@echo "✨ Deep clean complete!"
 
 re: fclean up
 

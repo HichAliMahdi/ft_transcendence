@@ -553,11 +553,11 @@ export default async function userRoutes(fastify: FastifyInstance) {
         return reply.status(400).send({ message: 'No file uploaded' });
       }
 
-      // Validate file type
-      const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+      // Validate file type - support jpg, jpeg, png, gif, webp
+      const allowedMimeTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
       if (!allowedMimeTypes.includes(data.mimetype)) {
         return reply.status(400).send({ 
-          message: 'Invalid file type. Only JPEG, PNG, GIF, and WebP are allowed' 
+          message: 'Invalid file type. Only JPEG, JPG, PNG, GIF, and WebP are allowed' 
         });
       }
 
@@ -580,24 +580,36 @@ export default async function userRoutes(fastify: FastifyInstance) {
         fs.mkdirSync(uploadsDir, { recursive: true });
       }
 
-      // Generate unique filename
-      const fileExt = data.mimetype.split('/')[1];
+      // Generate unique filename with proper extension
+      const mimeToExt: {[key: string]: string} = {
+        'image/jpeg': 'jpg',
+        'image/jpg': 'jpg',
+        'image/png': 'png',
+        'image/gif': 'gif',
+        'image/webp': 'webp'
+      };
+      const fileExt = mimeToExt[data.mimetype] || 'jpg';
       const filename = `${targetId}_${crypto.randomBytes(8).toString('hex')}.${fileExt}`;
       const filepath = path.join(uploadsDir, filename);
 
       // Delete old avatar if exists
       const oldUser = db.prepare('SELECT avatar_url FROM users WHERE id = ?').get(targetId) as { avatar_url?: string } | undefined;
-      if (oldUser?.avatar_url && oldUser.avatar_url !== '/default-avatar.png') {
-        const oldPath = path.join(process.cwd(), 'uploads', oldUser.avatar_url.replace('/uploads/', ''));
+      if (oldUser?.avatar_url && oldUser.avatar_url !== '/default-avatar.png' && !oldUser.avatar_url.startsWith('http')) {
+        const oldFilename = path.basename(oldUser.avatar_url);
+        const oldPath = path.join(uploadsDir, oldFilename);
         if (fs.existsSync(oldPath)) {
-          fs.unlinkSync(oldPath);
+          try {
+            fs.unlinkSync(oldPath);
+          } catch (e) {
+            request.log.warn({ err: e }, 'Failed to delete old avatar');
+          }
         }
       }
 
       // Save new avatar
       fs.writeFileSync(filepath, buffer);
 
-      // Update database
+      // Update database with relative path
       const avatarUrl = `/uploads/avatars/${filename}`;
       db.prepare('UPDATE users SET avatar_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
         .run(avatarUrl, targetId);
@@ -627,10 +639,16 @@ export default async function userRoutes(fastify: FastifyInstance) {
     try {
       const user = db.prepare('SELECT avatar_url FROM users WHERE id = ?').get(targetId) as { avatar_url?: string } | undefined;
       
-      if (user?.avatar_url && user.avatar_url !== '/default-avatar.png') {
-        const filepath = path.join(process.cwd(), 'uploads', user.avatar_url.replace('/uploads/', ''));
+      if (user?.avatar_url && user.avatar_url !== '/default-avatar.png' && !user.avatar_url.startsWith('http')) {
+        const uploadsDir = path.join(process.cwd(), 'uploads', 'avatars');
+        const filename = path.basename(user.avatar_url);
+        const filepath = path.join(uploadsDir, filename);
         if (fs.existsSync(filepath)) {
-          fs.unlinkSync(filepath);
+          try {
+            fs.unlinkSync(filepath);
+          } catch (e) {
+            request.log.warn({ err: e }, 'Failed to delete avatar file');
+          }
         }
       }
 

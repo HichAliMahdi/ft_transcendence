@@ -1,9 +1,10 @@
 node_modules
 npm-debug.log
-.git
-.gitignore
-README.md
-.env
 dist
-*.ts
-!src/**/*.ts
+.env
+.DS_Store
+*.db
+*.db-shm
+*.db-wal
+uploads/*
+!uploads/**/.gitkeep

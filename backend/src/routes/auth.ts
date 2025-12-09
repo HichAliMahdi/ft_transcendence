@@ -47,14 +47,14 @@ export default async function authRoutes(fastify: FastifyInstance) {
                 const password_hash = await bcrypt.hash(password, 10);
                 // mark new user as online immediately and set status = 'Online'
                 const result = db.prepare(
-                    'INSERT INTO users (username, email, password_hash, display_name, is_online, status) VALUES (?, ?, ?, ?, 1, ?)'
-                ).run(username, email, password_hash, display_name, 'Online');
+                    'INSERT INTO users (username, email, password_hash, display_name, is_online, status, avatar_url) VALUES (?, ?, ?, ?, 1, ?, ?)'
+                ).run(username, email, password_hash, display_name, 'Online', '/default-avatar.png');
 
                 const token = jwt.sign({ userId: result.lastInsertRowid }, config.jwt.secret, { expiresIn: '7d' });
                 reply.code(201).send({
                     message: 'User registered successfully',
                     token,
-                    user: { id: result.lastInsertRowid, username, email, display_name, status: 'Online', is_online: 1 }
+                    user: { id: result.lastInsertRowid, username, email, display_name, status: 'Online', is_online: 1, avatar_url: '/default-avatar.png' }
                 });
             } catch (error) {
                 fastify.log.error(error);

@@ -7,6 +7,7 @@ package-lock.json
 
 # Build output
 dist/
+dist-ssr/
 build/
 
 # Environment variables
@@ -16,26 +17,9 @@ build/
 .env.test
 .env.production
 
-# Database files
-*.db
-*.db-shm
-*.db-wal
-*.db-journal
-*.sqlite
-*.sqlite3
-
-# Uploads
-uploads/**/*
-!uploads/**/.gitkeep
-!uploads/avatars/.gitkeep
-
 # Logs
 logs/
 *.log
-pids/
-*.pid
-*.seed
-*.pid.lock
 
 # OS files
 .DS_Store
@@ -56,6 +40,9 @@ Thumbs.db
 .classpath
 .settings/
 *.sublime-*
+
+# Vite
+vite.config.ts.timestamp-*
 
 # Temporary files
 tmp/
