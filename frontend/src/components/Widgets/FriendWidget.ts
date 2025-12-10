@@ -620,10 +620,18 @@ export class FriendWidget {
                 const isOpening = this.openingChats.has(fromId);
                 
                 if (chat) {
+                    // Hide timestamp on previous message from same sender
+                    const lastMsg = chat.messagesEl.lastElementChild;
+                    if (lastMsg && lastMsg.classList.contains('text-left')) {
+                        const timestamp = lastMsg.querySelector('.timestamp');
+                        if (timestamp) timestamp.classList.add('hidden');
+                    }
+
                     const el = document.createElement('div');
                     el.className = `mb-2 text-left`;
                     el.setAttribute('data-message-id', String(msgId || ''));
                     el.setAttribute('data-timestamp', d.created_at || new Date().toISOString());
+                    el.setAttribute('data-sender-id', String(fromId));
                     el.innerHTML = `
                         <div class="inline-block px-3 py-1 rounded bg-gray-700">${d.content}</div>
                         <div class="text-xs text-gray-400 mt-1 timestamp">${this.formatTimestamp(d.created_at)}</div>
@@ -631,8 +639,11 @@ export class FriendWidget {
                     chat.messagesEl.appendChild(el);
                     chat.messagesEl.scrollTop = chat.messagesEl.scrollHeight;
 
-                    // Auto-restore if minimized
-                    if (chat.minimized) {
+                    // Auto-restore if minimized (only if not Busy)
+                    const user = AuthService.getUser();
+                    const userStatus = (user as any)?.status || 'Online';
+                    
+                    if (chat.minimized && userStatus !== 'Busy') {
                         chat.minimized = false;
                         chat.box.classList.remove('chat-minimized');
                         chat.messagesEl.style.display = '';
@@ -644,7 +655,16 @@ export class FriendWidget {
                         if (minBtn) minBtn.style.display = '';
                     }
                 } else if (!isOpening) {
-                    // Auto-open chat window for new message, passing the message to display it
+                    // Check if user is in Busy mode before auto-opening
+                    const user = AuthService.getUser();
+                    const userStatus = (user as any)?.status || 'Online';
+                    
+                    if (userStatus === 'Busy') {
+                        // Don't auto-open chat window if user is Busy
+                        return;
+                    }
+                    
+                    // Auto-open chat window for new message
                     this.openingChats.add(fromId);
                     
                     const friendName = await this.getFriendName(fromId);
@@ -823,16 +843,26 @@ export class FriendWidget {
             messagesEl.innerHTML = '';
 
             if (history && Array.isArray(history)) {
-                history.forEach((msg: any) => {
+                history.forEach((msg: any, index: number) => {
                     const isMe = msg.sender_id === AuthService.getUser()?.id;
+                    const currentSenderId = msg.sender_id;
+                    const isLastInSequence = index === history.length - 1 || history[index + 1]?.sender_id !== currentSenderId;
+                    
                     const el = document.createElement('div');
                     el.className = `mb-2 ${isMe ? 'text-right' : 'text-left'}`;
                     el.setAttribute('data-message-id', String(msg.id || ''));
                     el.setAttribute('data-timestamp', msg.created_at || '');
+                    el.setAttribute('data-sender-id', String(currentSenderId));
                     const bgClass = isMe ? 'bg-blue-600' : 'bg-gray-700';
+                    
+                    // Only show timestamp on last message in sequence
+                    const timestampHtml = isLastInSequence 
+                        ? `<div class="text-xs text-gray-400 mt-1 timestamp">${this.formatTimestamp(msg.created_at)}</div>`
+                        : `<div class="text-xs text-gray-400 mt-1 timestamp hidden">${this.formatTimestamp(msg.created_at)}</div>`;
+                    
                     el.innerHTML = `
                         <div class="inline-block px-3 py-1 rounded ${bgClass}">${msg.content}</div>
-                        <div class="text-xs text-gray-400 mt-1 timestamp">${this.formatTimestamp(msg.created_at)}</div>
+                        ${timestampHtml}
                     `;
                     messagesEl.appendChild(el);
                 });
@@ -844,6 +874,7 @@ export class FriendWidget {
                 el.className = 'mb-2 text-left';
                 el.setAttribute('data-message-id', String(incomingMessage.msgId || ''));
                 el.setAttribute('data-timestamp', incomingMessage.timestamp || new Date().toISOString());
+                el.setAttribute('data-sender-id', String(peerId));
                 el.innerHTML = `
                     <div class="inline-block px-3 py-1 rounded bg-gray-700">${incomingMessage.content}</div>
                     <div class="text-xs text-gray-400 mt-1 timestamp">${this.formatTimestamp(incomingMessage.timestamp || '')}</div>
@@ -864,9 +895,18 @@ export class FriendWidget {
             if (!txt) return;
             try {
                 await AuthService.sendMessage(peerId, txt);
+                
+                // Hide timestamp on previous message from me
+                const lastMsg = messagesEl.lastElementChild;
+                if (lastMsg && lastMsg.classList.contains('text-right')) {
+                    const timestamp = lastMsg.querySelector('.timestamp');
+                    if (timestamp) timestamp.classList.add('hidden');
+                }
+                
                 const el = document.createElement('div');
                 el.className = 'mb-2 text-right';
                 el.setAttribute('data-timestamp', new Date().toISOString());
+                el.setAttribute('data-sender-id', String(AuthService.getUser()?.id || ''));
                 el.innerHTML = `
                     <div class="inline-block px-3 py-1 rounded bg-blue-600">${txt}</div>
                     <div class="text-xs text-gray-400 mt-1 timestamp">Just now</div>
