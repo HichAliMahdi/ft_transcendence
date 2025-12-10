@@ -641,12 +641,12 @@ export class FriendWidget {
                         if (minBtn) minBtn.style.display = '';
                     }
                 } else if (!isOpening) {
-                    // Auto-open chat window for new message
+                    // Auto-open chat window for new message, passing the message to display it
                     this.openingChats.add(fromId);
                     
                     const friendName = await this.getFriendName(fromId);
                     if (friendName) {
-                        await this.openChatWindow(fromId, friendName);
+                        await this.openChatWindow(fromId, friendName, { content: d.content, msgId });
                     } else {
                         this.openingChats.delete(fromId);
                     }
@@ -679,7 +679,7 @@ export class FriendWidget {
         }, 15000) as unknown as number;
     }
 
-    private async openChatWindow(peerId: number, peerName: string): Promise<void> {
+    private async openChatWindow(peerId: number, peerName: string, incomingMessage?: { content: string; msgId: number | null }): Promise<void> {
         if (!this.chatContainer) {
             this.chatContainer = document.getElementById('chat-windows-root') as HTMLElement | null;
             if (!this.chatContainer) {
@@ -758,6 +758,40 @@ export class FriendWidget {
         // Register IMMEDIATELY to prevent race condition
         this.openChats.set(peerId, { box, messagesEl, inputEl: input, minimized: false });
         this.openingChats.delete(peerId);
+
+        // Load history and display incoming message if provided
+        try {
+            const history = await AuthService.getMessages(peerId);
+            messagesEl.innerHTML = '';
+
+            if (history && Array.isArray(history)) {
+                history.forEach((msg: any) => {
+                    const isMe = msg.sender_id === AuthService.getUser()?.id;
+                    const el = document.createElement('div');
+                    el.className = `mb-2 ${isMe ? 'text-right' : 'text-left'}`;
+                    el.setAttribute('data-message-id', String(msg.id || ''));
+                    const bgClass = isMe ? 'bg-blue-600' : 'bg-gray-700';
+                    el.innerHTML = `<div class="inline-block px-3 py-1 rounded ${bgClass}">${msg.content}</div>`;
+                    messagesEl.appendChild(el);
+                });
+            }
+
+            // Display the incoming message that triggered the window to open
+            if (incomingMessage && incomingMessage.msgId && !this.displayedMessageIds.has(incomingMessage.msgId)) {
+                const el = document.createElement('div');
+                el.className = 'mb-2 text-left';
+                el.setAttribute('data-message-id', String(incomingMessage.msgId || ''));
+                el.innerHTML = `<div class="inline-block px-3 py-1 rounded bg-gray-700">${incomingMessage.content}</div>`;
+                messagesEl.appendChild(el);
+                if (incomingMessage.msgId) {
+                    this.displayedMessageIds.add(incomingMessage.msgId);
+                }
+            }
+
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+        } catch (err) {
+            messagesEl.innerHTML = '<p class="text-gray-400 text-center py-4">Failed to load messages</p>';
+        }
 
         const sendMessage = async () => {
             const txt = input.value.trim();
