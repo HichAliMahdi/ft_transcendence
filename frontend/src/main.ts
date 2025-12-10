@@ -322,6 +322,14 @@ class App {
                 try {
                     const data = JSON.parse(event.data);
                     if (data.type === 'presence_update') {
+                        // Dispatch event with correct structure
+                        window.dispatchEvent(new CustomEvent('presence:update', {
+                            detail: {
+                                user_id: data.userId,
+                                status: data.status,
+                                is_online: data.isOnline
+                            }
+                        }));
                         this.handlePresenceUpdate(data.userId, data.status, data.isOnline);
                     } else if (data.type === 'direct_message') {
                         window.dispatchEvent(new CustomEvent('direct_message', { detail: data }));

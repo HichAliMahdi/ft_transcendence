@@ -2,6 +2,8 @@ import { AuthService } from '../game/AuthService';
 
 export class StatusWidget {
     private container: HTMLElement | null = null;
+    private statusSelector: HTMLElement | null = null;
+    private authChangeHandler: ((e?: Event) => void) | null = null;
 
     render(parentElement: HTMLElement): void {
         const statusSection = document.createElement('div');
@@ -20,6 +22,9 @@ export class StatusWidget {
 
         const statusSelector = document.createElement('div');
         statusSelector.className = 'grid grid-cols-2 gap-2';
+        
+        // Assign to this.statusSelector BEFORE using it
+        this.statusSelector = statusSelector;
 
         const statuses: Array<{value: string; label: string; color: string; icon: string}> = [
             { value: 'Online', label: 'Online', color: '#22c55e', icon: '✓' },
@@ -97,12 +102,55 @@ export class StatusWidget {
         statusSection.appendChild(statusSelector);
         parentElement.appendChild(statusSection);
         this.container = statusSection;
+
+        // Listen for auth changes to update status display
+        this.authChangeHandler = () => this.updateStatusDisplay();
+        window.addEventListener('auth:change', this.authChangeHandler);
+    }
+
+    private updateStatusDisplay(): void {
+        if (!this.statusSelector) return;
+
+        const user = AuthService.getUser();
+        const currentStatus = (user && (user as any).status) ? (user as any).status : 'Online';
+
+        // Update all button states
+        const buttons = this.statusSelector.querySelectorAll('button');
+        buttons.forEach((btn, index) => {
+            const statuses = ['Online', 'Busy', 'Away', 'Offline'];
+            const statusValue = statuses[index];
+            const isActive = currentStatus === statusValue;
+            
+            const dot = btn.querySelector('span:first-child') as HTMLElement | null;
+            const label = btn.querySelector('span:nth-child(2) span') as HTMLElement | null;
+
+            if (isActive) {
+                btn.className = 'group relative flex items-center gap-2 p-3 rounded-xl hover:bg-white/10 transition-all duration-300 text-left bg-gradient-to-r from-accent-pink/20 to-accent-purple/20 ring-2 ring-accent-pink/50';
+                if (label) label.className = 'text-white text-sm font-medium text-accent-pink';
+                if (dot && statusValue !== 'Offline') {
+                    dot.className = 'w-3 h-3 rounded-full inline-block shadow-[0_0_12px_currentColor] animate-pulse transition-all duration-300';
+                } else if (dot) {
+                    dot.className = 'w-3 h-3 rounded-full inline-block transition-all duration-300';
+                }
+            } else {
+                btn.className = 'group relative flex items-center gap-2 p-3 rounded-xl hover:bg-white/10 transition-all duration-300 text-left bg-white/5 hover:scale-105';
+                if (label) label.className = 'text-white text-sm font-medium';
+                if (dot) {
+                    dot.className = 'w-3 h-3 rounded-full inline-block transition-all duration-300';
+                }
+            }
+        });
     }
 
     destroy(): void {
+        if (this.authChangeHandler) {
+            window.removeEventListener('auth:change', this.authChangeHandler);
+            this.authChangeHandler = null;
+        }
         if (this.container && this.container.parentElement) {
             this.container.parentElement.removeChild(this.container);
         }
         this.container = null;
+        this.statusSelector = null;
     }
 }

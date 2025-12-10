@@ -14,6 +14,7 @@ export class ChatWidget {
     private displayedMessageIds: Set<number> = new Set();
     private timestampUpdateInterval: number | null = null;
     private directMessageHandler: ((ev: Event) => void) | null = null;
+    private presenceUpdateHandler: ((ev: Event) => void) | null = null;
 
     mount(): void {
         this.chatContainer = document.createElement('div');
@@ -36,6 +37,7 @@ export class ChatWidget {
         }
 
         this.registerGlobalMessageListener();
+        this.registerPresenceUpdateListener();
         this.startTimestampUpdates();
     }
 
@@ -123,6 +125,47 @@ export class ChatWidget {
             }
         };
         window.addEventListener('direct_message', this.directMessageHandler);
+    }
+
+    private registerPresenceUpdateListener(): void {
+        if (this.presenceUpdateHandler) return;
+
+        this.presenceUpdateHandler = (ev: Event) => {
+            try {
+                const detail = (ev as CustomEvent).detail;
+                if (!detail || !detail.user_id) return;
+
+                const userId = Number(detail.user_id);
+                const status = detail.status || 'Online';
+                const isOnline = detail.is_online !== false;
+
+                // Update status dot in chat window header if chat is open for this user
+                const chat = this.openChats.get(userId);
+                if (chat) {
+                    const statusDot = chat.box.querySelector('.w-2\\.5.h-2\\.5.rounded-full') as HTMLElement | null;
+                    if (statusDot) {
+                        let statusColor = '#94a3b8'; // Offline
+                        if (isOnline) {
+                            if (status === 'Busy') statusColor = '#ef4444';
+                            else if (status === 'Away') statusColor = '#f59e0b';
+                            else statusColor = '#22c55e'; // Online
+                        }
+                        statusDot.style.backgroundColor = statusColor;
+                        
+                        // Update glow effect
+                        if (isOnline && status !== 'Offline') {
+                            statusDot.className = 'w-2.5 h-2.5 rounded-full flex-shrink-0 shadow-[0_0_8px_currentColor]';
+                        } else {
+                            statusDot.className = 'w-2.5 h-2.5 rounded-full flex-shrink-0';
+                        }
+                    }
+                }
+            } catch (e) {
+                // ignore
+            }
+        };
+
+        window.addEventListener('presence:update', this.presenceUpdateHandler);
     }
 
     private formatTimestamp(dateString: string): string {
@@ -456,6 +499,10 @@ export class ChatWidget {
         if (this.directMessageHandler) {
             window.removeEventListener('direct_message', this.directMessageHandler);
             this.directMessageHandler = null;
+        }
+        if (this.presenceUpdateHandler) {
+            window.removeEventListener('presence:update', this.presenceUpdateHandler);
+            this.presenceUpdateHandler = null;
         }
         if (this.chatContainer && document.body.contains(this.chatContainer)) {
             document.body.removeChild(this.chatContainer);

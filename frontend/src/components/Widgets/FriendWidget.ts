@@ -14,6 +14,7 @@ export class FriendWidget {
     private clickOutsideHandler: ((e: MouseEvent) => void) | null = null;
     private statusWidget: StatusWidget | null = null;
     private chatWidget: ChatWidget | null = null;
+    private presenceUpdateHandler: ((ev: Event) => void) | null = null;
 
     mount(): void {
         if (!this.authChangeHandler) {
@@ -43,6 +44,21 @@ export class FriendWidget {
                 }
             };
             window.addEventListener('auth:change', this.authChangeHandler);
+        }
+
+        // Listen for presence updates from WebSocket
+        if (!this.presenceUpdateHandler) {
+            this.presenceUpdateHandler = (ev: Event) => {
+                const detail = (ev as CustomEvent).detail;
+                if (detail && detail.user_id) {
+                    this.updateFriendPresence(
+                        detail.user_id,
+                        detail.status || 'Online',
+                        detail.is_online !== false
+                    );
+                }
+            };
+            window.addEventListener('presence:update', this.presenceUpdateHandler);
         }
 
         const existing = document.getElementById('friend-widget-root');
@@ -406,25 +422,44 @@ export class FriendWidget {
         rows.forEach((row) => {
             const friendId = parseInt(row.getAttribute('data-friend-id') || '0');
             if (friendId === userId) {
+                // Update status badge
                 const statusBadge = row.querySelector('.status-text') as HTMLElement | null;
-
                 if (statusBadge && !statusBadge.textContent?.includes('Pending')) {
-                    statusBadge.className = 'status-text text-xs px-2 py-0.5 rounded-full inline-block mt-1 w-fit';
+                    statusBadge.className = 'status-text text-xs px-2.5 py-1 rounded-full inline-block mt-1 w-fit font-medium';
 
                     if (isOnline) {
                         if (status === 'Busy') {
-                            statusBadge.textContent = 'Busy';
-                            statusBadge.className += ' bg-red-500/20 text-red-400';
+                            statusBadge.textContent = '🚫 Busy';
+                            statusBadge.className += ' bg-red-500/20 text-red-300 border border-red-500/30';
                         } else if (status === 'Away') {
-                            statusBadge.textContent = 'Away';
-                            statusBadge.className += ' bg-amber-500/20 text-amber-400';
+                            statusBadge.textContent = '⏰ Away';
+                            statusBadge.className += ' bg-amber-500/20 text-amber-300 border border-amber-500/30';
                         } else {
-                            statusBadge.textContent = 'Online';
-                            statusBadge.className += ' bg-green-500/20 text-green-400';
+                            statusBadge.textContent = '✓ Online';
+                            statusBadge.className += ' bg-green-500/20 text-green-300 border border-green-500/30';
                         }
                     } else {
-                        statusBadge.textContent = 'Offline';
-                        statusBadge.className += ' bg-slate-500/20 text-slate-400';
+                        statusBadge.textContent = '○ Offline';
+                        statusBadge.className += ' bg-slate-500/20 text-slate-300 border border-slate-500/30';
+                    }
+                }
+
+                // Update status indicator dot
+                const statusIndicator = row.querySelector('.absolute.bottom-0.right-0') as HTMLElement | null;
+                if (statusIndicator) {
+                    let statusColor = '#94a3b8';
+                    if (isOnline) {
+                        if (status === 'Busy') statusColor = '#ef4444';
+                        else if (status === 'Away') statusColor = '#f59e0b';
+                        else statusColor = '#22c55e';
+                    }
+                    statusIndicator.style.backgroundColor = statusColor;
+                    
+                    // Update animation classes
+                    if (isOnline && status !== 'Away') {
+                        statusIndicator.className = 'absolute bottom-0 right-0 w-4 h-4 rounded-full border-2 border-game-dark animate-pulse shadow-[0_0_8px_currentColor]';
+                    } else {
+                        statusIndicator.className = 'absolute bottom-0 right-0 w-4 h-4 rounded-full border-2 border-game-dark';
                     }
                 }
             }
@@ -439,6 +474,12 @@ export class FriendWidget {
             const nw = (window as any)._notificationWidget;
             if (nw && nw !== this && typeof nw.closePanel === 'function') {
                 try { nw.closePanel(); } catch (e) { /* ignore */ }
+            }
+            
+            // Refresh status display when opening panel
+            if (this.statusWidget) {
+                // Trigger a manual status display update
+                window.dispatchEvent(new Event('auth:change'));
             }
         }
 
