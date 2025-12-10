@@ -236,7 +236,7 @@ export class NotificationWidget {
 
                 const time = document.createElement('p');
                 time.className = 'text-xs text-gray-500 mt-1';
-                time.textContent = this.formatTime(notif.created_at);
+                time.textContent = this.formatTimestamp(notif.created_at);
 
                 textContainer.appendChild(message);
                 textContainer.appendChild(time);
@@ -270,19 +270,38 @@ export class NotificationWidget {
         }
     }
 
-    private formatTime(dateString: string): string {
-        const date = new Date(dateString);
-        const now = new Date();
-        const diff = now.getTime() - date.getTime();
-        const minutes = Math.floor(diff / 60000);
-        const hours = Math.floor(minutes / 60);
-        const days = Math.floor(hours / 24);
+    private formatTimestamp(dateString: string): string {
+        if (!dateString) return 'Just now';
+        try {
+            // Parse the date string - if it doesn't end with 'Z', assume it's UTC
+            let date: Date;
+            if (dateString.endsWith('Z')) {
+                date = new Date(dateString);
+            } else {
+                // Append 'Z' to treat as UTC
+                date = new Date(dateString + 'Z');
+            }
+            
+            if (isNaN(date.getTime())) return 'Just now';
 
-        if (minutes < 1) return 'Just now';
-        if (minutes < 60) return `${minutes}m ago`;
-        if (hours < 24) return `${hours}h ago`;
-        if (days < 7) return `${days}d ago`;
-        return date.toLocaleDateString();
+            const now = new Date();
+            const diffMs = now.getTime() - date.getTime();
+            const diffSec = Math.floor(diffMs / 1000);
+            const diffMin = Math.floor(diffSec / 60);
+            const diffHour = Math.floor(diffMin / 60);
+            const diffDay = Math.floor(diffHour / 24);
+
+            if (diffSec < 10) return 'Just now';
+            if (diffSec < 60) return `${diffSec}s ago`;
+            if (diffMin < 60) return `${diffMin}m ago`;
+            if (diffHour < 24) return `${diffHour}h ago`;
+            if (diffDay === 1) return 'Yesterday';
+            if (diffDay < 7) return `${diffDay}d ago`;
+            
+            return date.toLocaleDateString();
+        } catch (e) {
+            return 'Just now';
+        }
     }
 
     private startPolling(): void {

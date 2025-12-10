@@ -171,7 +171,15 @@ export class ChatWidget {
     private formatTimestamp(dateString: string): string {
         if (!dateString) return 'Just now';
         try {
-            const date = new Date(dateString + 'Z');
+            // Parse the date string - if it doesn't end with 'Z', assume it's UTC
+            let date: Date;
+            if (dateString.endsWith('Z')) {
+                date = new Date(dateString);
+            } else {
+                // Append 'Z' to treat as UTC
+                date = new Date(dateString + 'Z');
+            }
+            
             if (isNaN(date.getTime())) return 'Just now';
 
             const now = new Date();
