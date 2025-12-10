@@ -324,3 +324,145 @@ export class ChatWidget {
                 });
             }
 
+            if (incomingMessage && incomingMessage.msgId && !this.displayedMessageIds.has(incomingMessage.msgId)) {
+                const el = document.createElement('div');
+                el.className = 'mb-2 text-left';
+                el.setAttribute('data-message-id', String(incomingMessage.msgId || ''));
+                el.setAttribute('data-timestamp', incomingMessage.timestamp || new Date().toISOString());
+                el.setAttribute('data-sender-id', String(peerId));
+                el.innerHTML = `
+                    <div class="inline-block px-3 py-1 rounded bg-gray-700">${incomingMessage.content}</div>
+                    <div class="text-xs text-gray-400 mt-1 timestamp">${this.formatTimestamp(incomingMessage.timestamp || '')}</div>
+                `;
+                messagesEl.appendChild(el);
+                if (incomingMessage.msgId) {
+                    this.displayedMessageIds.add(incomingMessage.msgId);
+                }
+            }
+
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+        } catch (err) {
+            messagesEl.innerHTML = '<p class="text-gray-400 text-center py-4">Failed to load messages</p>';
+        }
+
+        const sendMessage = async () => {
+            const txt = input.value.trim();
+            if (!txt) return;
+            try {
+                await AuthService.sendMessage(peerId, txt);
+                
+                const lastMsg = messagesEl.lastElementChild;
+                if (lastMsg && lastMsg.classList.contains('text-right')) {
+                    const timestamp = lastMsg.querySelector('.timestamp');
+                    if (timestamp) timestamp.classList.add('hidden');
+                }
+                
+                const el = document.createElement('div');
+                el.className = 'mb-2 text-right';
+                el.setAttribute('data-timestamp', new Date().toISOString());
+                el.setAttribute('data-sender-id', String(AuthService.getUser()?.id || ''));
+                el.innerHTML = `
+                    <div class="inline-block px-3 py-1 rounded bg-blue-600">${txt}</div>
+                    <div class="text-xs text-gray-400 mt-1 timestamp">Just now</div>
+                `;
+                messagesEl.appendChild(el);
+                messagesEl.scrollTop = messagesEl.scrollHeight;
+                input.value = '';
+            } catch (err: any) {
+                await (window as any).app.showInfo('Send failed', AuthService.extractErrorMessage(err));
+            }
+        };
+
+        send.onclick = sendMessage;
+        input.addEventListener('keydown', (e: KeyboardEvent) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+
+        minBtn.onclick = (e: MouseEvent) => {
+            e.stopPropagation();
+            const info = this.openChats.get(peerId);
+            if (!info) return;
+            info.minimized = !info.minimized;
+            info.box.classList.toggle('chat-minimized', info.minimized);
+            
+            if (info.minimized) {
+                messagesEl.style.display = 'none';
+                inputRow.style.display = 'none';
+                header.classList.add('cursor-pointer');
+                minBtn.style.display = 'none';
+            } else {
+                messagesEl.style.display = '';
+                inputRow.style.display = '';
+                header.classList.remove('cursor-pointer');
+                minBtn.style.display = '';
+                input.focus();
+            }
+        };
+
+        closeBtn.onclick = (e: MouseEvent) => {
+            e.stopPropagation();
+            if (this.chatContainer && this.chatContainer.contains(box)) {
+                this.chatContainer.removeChild(box);
+            }
+            this.openChats.delete(peerId);
+        };
+
+        header.onclick = (e: MouseEvent) => {
+            const info = this.openChats.get(peerId);
+            if (!info || !info.minimized) return;
+
+            const target = e.target as HTMLElement;
+            if (target.closest('button')) return;
+
+            info.minimized = false;
+            info.box.classList.remove('chat-minimized');
+            messagesEl.style.display = '';
+            inputRow.style.display = '';
+            header.classList.remove('cursor-pointer');
+            minBtn.style.display = '';
+            input.focus();
+        };
+
+        setTimeout(() => input.focus(), 50);
+    }
+
+    minimizeAll(): void {
+        this.openChats.forEach((chat) => {
+            if (!chat.minimized) {
+                chat.minimized = true;
+                chat.box.classList.add('chat-minimized');
+                chat.messagesEl.style.display = 'none';
+                chat.inputEl.parentElement!.style.display = 'none';
+
+                const minBtn = chat.box.querySelector('button[title="Minimize"]') as HTMLElement | null;
+                if (minBtn) minBtn.style.display = 'none';
+
+                const header = chat.box.querySelector('.flex.items-center.justify-between') as HTMLElement;
+                if (header) {
+                    header.classList.add('cursor-pointer');
+                }
+            }
+        });
+    }
+
+    unmount(): void {
+        if (this.timestampUpdateInterval) {
+            clearInterval(this.timestampUpdateInterval);
+            this.timestampUpdateInterval = null;
+        }
+        if (this.directMessageHandler) {
+            window.removeEventListener('direct_message', this.directMessageHandler);
+            this.directMessageHandler = null;
+        }
+        if (this.chatContainer && document.body.contains(this.chatContainer)) {
+            document.body.removeChild(this.chatContainer);
+        }
+        this.openChats.clear();
+        this.displayedMessageIds.clear();
+        this.openingChats.clear();
+        this.chatContainer = null;
+    }
+}
