@@ -18,6 +18,8 @@ export class FriendWidget {
     }> = new Map();
     private clickOutsideHandler: ((e: MouseEvent) => void) | null = null;
     private directMessageHandler: ((ev: Event) => void) | null = null;
+    private openingChats: Set<number> = new Set();
+    private displayedMessageIds: Set<number> = new Set();
 
     mount(): void {
         if (!this.authChangeHandler) {
@@ -597,17 +599,57 @@ export class FriendWidget {
                 if (!d) return;
                 const fromId = Number(d.from);
                 const meId = AuthService.getUser()?.id;
+                const msgId = d.id ? Number(d.id) : null;
 
                 if (fromId === meId) return;
 
+                // Prevent duplicate display
+                if (msgId && this.displayedMessageIds.has(msgId)) {
+                    return;
+                }
+                if (msgId) {
+                    this.displayedMessageIds.add(msgId);
+                    if (this.displayedMessageIds.size > 100) {
+                        const firstId = this.displayedMessageIds.values().next().value;
+                        if (firstId !== undefined) {
+                            this.displayedMessageIds.delete(firstId);
+                        }
+                    }
+                }
+                
                 const chat = this.openChats.get(fromId);
-
+                const isOpening = this.openingChats.has(fromId);
+                
                 if (chat) {
                     const el = document.createElement('div');
                     el.className = `mb-2 text-left`;
+                    el.setAttribute('data-message-id', String(msgId || ''));
                     el.innerHTML = `<div class="inline-block px-3 py-1 rounded bg-gray-700">${d.content}</div>`;
                     chat.messagesEl.appendChild(el);
                     chat.messagesEl.scrollTop = chat.messagesEl.scrollHeight;
+
+                    // Auto-restore if minimized
+                    if (chat.minimized) {
+                        chat.minimized = false;
+                        chat.box.classList.remove('chat-minimized');
+                        chat.messagesEl.style.display = '';
+                        const inputRow = chat.box.querySelector('.chat-input-row') as HTMLElement | null;
+                        if (inputRow) inputRow.style.display = '';
+                        const badge = chat.box.querySelector('.chat-unread') as HTMLElement | null;
+                        if (badge) { badge.classList.add('hidden'); badge.textContent = ''; }
+                        const minBtn = chat.box.querySelector('button[title="Minimize"]') as HTMLElement | null;
+                        if (minBtn) minBtn.style.display = '';
+                    }
+                } else if (!isOpening) {
+                    // Auto-open chat window for new message
+                    this.openingChats.add(fromId);
+                    
+                    const friendName = await this.getFriendName(fromId);
+                    if (friendName) {
+                        await this.openChatWindow(fromId, friendName);
+                    } else {
+                        this.openingChats.delete(fromId);
+                    }
                 }
                 await this.refreshNow();
             } catch (e) {
@@ -615,6 +657,19 @@ export class FriendWidget {
             }
         };
         window.addEventListener('direct_message', this.directMessageHandler);
+    }
+
+    private async getFriendName(userId: number): Promise<string | null> {
+        try {
+            const me = AuthService.getUser();
+            if (!me) return null;
+            
+            const friends = await AuthService.getFriends(me.id);
+            const friend = friends.find((f: any) => f.id === userId);
+            return friend ? (friend.display_name || friend.username) : null;
+        } catch (e) {
+            return null;
+        }
     }
 
     private startPolling(): void {
@@ -700,7 +755,9 @@ export class FriendWidget {
 
         if (this.chatContainer) this.chatContainer.insertBefore(box, this.chatContainer.firstChild);
 
+        // Register IMMEDIATELY to prevent race condition
         this.openChats.set(peerId, { box, messagesEl, inputEl: input, minimized: false });
+        this.openingChats.delete(peerId);
 
         const sendMessage = async () => {
             const txt = input.value.trim();
@@ -753,6 +810,8 @@ export class FriendWidget {
             document.body.removeChild(this.chatContainer);
         }
         this.openChats.clear();
+        this.displayedMessageIds.clear();
+        this.openingChats.clear();
         try {
             if ((window as any)._friendWidget === this) delete (window as any)._friendWidget;
         } catch (e) { }

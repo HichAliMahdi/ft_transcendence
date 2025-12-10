@@ -379,7 +379,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
       const info = db.prepare('INSERT INTO messages (sender_id, recipient_id, content) VALUES (?, ?, ?)').run(senderId, recipientId, content);
       const created = db.prepare('SELECT id, sender_id, recipient_id, content, created_at FROM messages WHERE id = ?').get(info.lastInsertRowid) as any;
  
-      // Send WebSocket notification ONLY to recipient (sender already displayed it in UI)
+      // FIXED: Only send to recipient, sender already displayed it in UI
       try {
         sendDirectMessage(recipientId, { 
           type: 'direct_message', 
