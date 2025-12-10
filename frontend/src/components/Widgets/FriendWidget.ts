@@ -20,6 +20,7 @@ export class FriendWidget {
     private directMessageHandler: ((ev: Event) => void) | null = null;
     private openingChats: Set<number> = new Set();
     private displayedMessageIds: Set<number> = new Set();
+    private timestampUpdateInterval: number | null = null;
 
     mount(): void {
         if (!this.authChangeHandler) {
@@ -561,27 +562,25 @@ export class FriendWidget {
             if (nw && nw !== this && typeof nw.closePanel === 'function') {
                 try { nw.closePanel(); } catch (e) { /* ignore */ }
             }
-
-            // Minimize all open chat windows when opening friend list
-            this.openChats.forEach((chat) => {
-                if (!chat.minimized) {
-                    chat.minimized = true;
-                    chat.box.classList.add('chat-minimized');
-                    chat.messagesEl.style.display = 'none';
-                    chat.inputEl.parentElement!.style.display = 'none';
-
-                    // Update header appearance
-                    const header = chat.box.querySelector('.flex.items-center.justify-between') as HTMLElement;
-                    if (header) {
-                        header.classList.add('opacity-50');
-                        const title = header.querySelector('span.text-lg') as HTMLElement;
-                        if (title) {
-                            title.classList.add('line-clamp-1');
-                        }
-                    }
-                }
-            });
         }
+
+        // Always minimize all open chat windows when toggling (both opening and closing)
+        this.openChats.forEach((chat) => {
+            if (!chat.minimized) {
+                chat.minimized = true;
+                chat.box.classList.add('chat-minimized');
+                chat.messagesEl.style.display = 'none';
+                chat.inputEl.parentElement!.style.display = 'none';
+
+                const minBtn = chat.box.querySelector('button[title="Minimize"]') as HTMLElement | null;
+                if (minBtn) minBtn.style.display = 'none';
+
+                const header = chat.box.querySelector('.flex.items-center.justify-between') as HTMLElement;
+                if (header) {
+                    header.classList.add('cursor-pointer');
+                }
+            }
+        });
 
         this.panel.classList.toggle('hidden', !this.visible);
         this.panel.classList.toggle('block', this.visible);
@@ -624,7 +623,11 @@ export class FriendWidget {
                     const el = document.createElement('div');
                     el.className = `mb-2 text-left`;
                     el.setAttribute('data-message-id', String(msgId || ''));
-                    el.innerHTML = `<div class="inline-block px-3 py-1 rounded bg-gray-700">${d.content}</div>`;
+                    el.setAttribute('data-timestamp', d.created_at || new Date().toISOString());
+                    el.innerHTML = `
+                        <div class="inline-block px-3 py-1 rounded bg-gray-700">${d.content}</div>
+                        <div class="text-xs text-gray-400 mt-1 timestamp">${this.formatTimestamp(d.created_at)}</div>
+                    `;
                     chat.messagesEl.appendChild(el);
                     chat.messagesEl.scrollTop = chat.messagesEl.scrollHeight;
 
@@ -646,7 +649,7 @@ export class FriendWidget {
                     
                     const friendName = await this.getFriendName(fromId);
                     if (friendName) {
-                        await this.openChatWindow(fromId, friendName, { content: d.content, msgId });
+                        await this.openChatWindow(fromId, friendName, { content: d.content, msgId, timestamp: d.created_at });
                     } else {
                         this.openingChats.delete(fromId);
                     }
@@ -657,6 +660,52 @@ export class FriendWidget {
             }
         };
         window.addEventListener('direct_message', this.directMessageHandler);
+    }
+
+    private formatTimestamp(dateString: string): string {
+        if (!dateString) return 'Just now';
+        try {
+            const date = new Date(dateString + 'Z');
+            if (isNaN(date.getTime())) return 'Just now';
+
+            const now = new Date();
+            const diffMs = now.getTime() - date.getTime();
+            const diffSec = Math.floor(diffMs / 1000);
+            const diffMin = Math.floor(diffSec / 60);
+            const diffHour = Math.floor(diffMin / 60);
+            const diffDay = Math.floor(diffHour / 24);
+
+            if (diffSec < 10) return 'Just now';
+            if (diffSec < 60) return `${diffSec}s ago`;
+            if (diffMin < 60) return `${diffMin}m ago`;
+            if (diffHour < 24) return `${diffHour}h ago`;
+            if (diffDay === 1) return 'Yesterday';
+            if (diffDay < 7) return `${diffDay}d ago`;
+            
+            return date.toLocaleDateString();
+        } catch (e) {
+            return 'Just now';
+        }
+    }
+
+    private updateAllTimestamps(): void {
+        this.openChats.forEach((chat) => {
+            const messages = chat.messagesEl.querySelectorAll('[data-timestamp]');
+            messages.forEach((msgEl) => {
+                const timestamp = msgEl.getAttribute('data-timestamp');
+                const timeEl = msgEl.querySelector('.timestamp') as HTMLElement | null;
+                if (timestamp && timeEl) {
+                    timeEl.textContent = this.formatTimestamp(timestamp);
+                }
+            });
+        });
+    }
+
+    private startTimestampUpdates(): void {
+        if (this.timestampUpdateInterval) return;
+        this.timestampUpdateInterval = window.setInterval(() => {
+            this.updateAllTimestamps();
+        }, 10000) as unknown as number; // Update every 10 seconds
     }
 
     private async getFriendName(userId: number): Promise<string | null> {
@@ -679,7 +728,7 @@ export class FriendWidget {
         }, 15000) as unknown as number;
     }
 
-    private async openChatWindow(peerId: number, peerName: string, incomingMessage?: { content: string; msgId: number | null }): Promise<void> {
+    private async openChatWindow(peerId: number, peerName: string, incomingMessage?: { content: string; msgId: number | null; timestamp?: string }): Promise<void> {
         if (!this.chatContainer) {
             this.chatContainer = document.getElementById('chat-windows-root') as HTMLElement | null;
             if (!this.chatContainer) {
@@ -718,18 +767,24 @@ export class FriendWidget {
         title.className = 'text-sm text-white font-bold truncate';
         title.textContent = peerName;
 
+        const controls = document.createElement('div');
+        controls.className = 'flex items-center gap-2';
+
+        const minBtn = document.createElement('button');
+        minBtn.textContent = '−';
+        minBtn.title = 'Minimize';
+        minBtn.className = 'text-gray-300 hover:text-accent-pink transition-colors';
+
         const closeBtn = document.createElement('button');
         closeBtn.textContent = '✕';
-        closeBtn.className = 'text-gray-300 hover:text-red-400';
-        closeBtn.onclick = () => {
-            if (this.chatContainer && this.chatContainer.contains(box)) {
-                this.chatContainer.removeChild(box);
-            }
-            this.openChats.delete(peerId);
-        };
+        closeBtn.title = 'Close';
+        closeBtn.className = 'text-gray-300 hover:text-red-400 transition-colors';
+
+        controls.appendChild(minBtn);
+        controls.appendChild(closeBtn);
 
         header.appendChild(title);
-        header.appendChild(closeBtn);
+        header.appendChild(controls);
 
         const messagesEl = document.createElement('div');
         messagesEl.className = 'px-4 py-3 flex-1 overflow-auto text-sm chat-messages';
@@ -759,6 +814,9 @@ export class FriendWidget {
         this.openChats.set(peerId, { box, messagesEl, inputEl: input, minimized: false });
         this.openingChats.delete(peerId);
 
+        // Start timestamp updates if not already running
+        this.startTimestampUpdates();
+
         // Load history and display incoming message if provided
         try {
             const history = await AuthService.getMessages(peerId);
@@ -770,8 +828,12 @@ export class FriendWidget {
                     const el = document.createElement('div');
                     el.className = `mb-2 ${isMe ? 'text-right' : 'text-left'}`;
                     el.setAttribute('data-message-id', String(msg.id || ''));
+                    el.setAttribute('data-timestamp', msg.created_at || '');
                     const bgClass = isMe ? 'bg-blue-600' : 'bg-gray-700';
-                    el.innerHTML = `<div class="inline-block px-3 py-1 rounded ${bgClass}">${msg.content}</div>`;
+                    el.innerHTML = `
+                        <div class="inline-block px-3 py-1 rounded ${bgClass}">${msg.content}</div>
+                        <div class="text-xs text-gray-400 mt-1 timestamp">${this.formatTimestamp(msg.created_at)}</div>
+                    `;
                     messagesEl.appendChild(el);
                 });
             }
@@ -781,7 +843,11 @@ export class FriendWidget {
                 const el = document.createElement('div');
                 el.className = 'mb-2 text-left';
                 el.setAttribute('data-message-id', String(incomingMessage.msgId || ''));
-                el.innerHTML = `<div class="inline-block px-3 py-1 rounded bg-gray-700">${incomingMessage.content}</div>`;
+                el.setAttribute('data-timestamp', incomingMessage.timestamp || new Date().toISOString());
+                el.innerHTML = `
+                    <div class="inline-block px-3 py-1 rounded bg-gray-700">${incomingMessage.content}</div>
+                    <div class="text-xs text-gray-400 mt-1 timestamp">${this.formatTimestamp(incomingMessage.timestamp || '')}</div>
+                `;
                 messagesEl.appendChild(el);
                 if (incomingMessage.msgId) {
                     this.displayedMessageIds.add(incomingMessage.msgId);
@@ -800,7 +866,11 @@ export class FriendWidget {
                 await AuthService.sendMessage(peerId, txt);
                 const el = document.createElement('div');
                 el.className = 'mb-2 text-right';
-                el.innerHTML = `<div class="inline-block px-3 py-1 rounded bg-blue-600">${txt}</div>`;
+                el.setAttribute('data-timestamp', new Date().toISOString());
+                el.innerHTML = `
+                    <div class="inline-block px-3 py-1 rounded bg-blue-600">${txt}</div>
+                    <div class="text-xs text-gray-400 mt-1 timestamp">Just now</div>
+                `;
                 messagesEl.appendChild(el);
                 messagesEl.scrollTop = messagesEl.scrollHeight;
                 input.value = '';
@@ -817,6 +887,53 @@ export class FriendWidget {
             }
         });
 
+        // Minimize / restore functionality
+        minBtn.onclick = (e: MouseEvent) => {
+            e.stopPropagation();
+            const info = this.openChats.get(peerId);
+            if (!info) return;
+            info.minimized = !info.minimized;
+            info.box.classList.toggle('chat-minimized', info.minimized);
+            
+            if (info.minimized) {
+                messagesEl.style.display = 'none';
+                inputRow.style.display = 'none';
+                header.classList.add('cursor-pointer');
+                minBtn.style.display = 'none';
+            } else {
+                messagesEl.style.display = '';
+                inputRow.style.display = '';
+                header.classList.remove('cursor-pointer');
+                minBtn.style.display = '';
+                input.focus();
+            }
+        };
+
+        closeBtn.onclick = (e: MouseEvent) => {
+            e.stopPropagation();
+            if (this.chatContainer && this.chatContainer.contains(box)) {
+                this.chatContainer.removeChild(box);
+            }
+            this.openChats.delete(peerId);
+        };
+
+        // Make header clickable to restore when minimized
+        header.onclick = (e: MouseEvent) => {
+            const info = this.openChats.get(peerId);
+            if (!info || !info.minimized) return;
+
+            const target = e.target as HTMLElement;
+            if (target.closest('button')) return;
+
+            info.minimized = false;
+            info.box.classList.remove('chat-minimized');
+            messagesEl.style.display = '';
+            inputRow.style.display = '';
+            header.classList.remove('cursor-pointer');
+            minBtn.style.display = '';
+            input.focus();
+        };
+
         setTimeout(() => input.focus(), 50);
     }
 
@@ -824,6 +941,10 @@ export class FriendWidget {
         if (this.intervalId) {
             clearInterval(this.intervalId);
             this.intervalId = null;
+        }
+        if (this.timestampUpdateInterval) {
+            clearInterval(this.timestampUpdateInterval);
+            this.timestampUpdateInterval = null;
         }
         if (this.directMessageHandler) {
             window.removeEventListener('direct_message', this.directMessageHandler);
