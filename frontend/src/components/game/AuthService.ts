@@ -547,4 +547,15 @@ export class AuthService {
         }
         return user.avatar_url;
     }
+
+    static async changePassword(currentPassword: string, newPassword: string): Promise<void> {
+        const token = this.getToken();
+        if (!token) throw new Error('Not authenticated');
+        const resp = await fetch(`${API_BASE}/auth/change-password`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ currentPassword, newPassword })
+        });
+        if (!resp.ok) await this.parseResponseError(resp);
+    }
 }

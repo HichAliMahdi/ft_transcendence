@@ -274,6 +274,83 @@ export class SettingsPage {
         avatarSection.appendChild(avatarTitle);
         avatarSection.appendChild(avatarContainer);
 
+        // Security Section
+        const securitySection = document.createElement('div');
+        securitySection.className = 'mb-8 pb-8 border-b border-white/10';
+        securitySection.innerHTML = `
+            <h2 class="text-2xl font-bold text-white mb-6">Security</h2>
+            <div class="mb-6">
+                <label class="block text-sm font-semibold text-gray-400 mb-2">Change Password</label>
+                <div id="password-toggle" class="flex items-center gap-3 px-4 py-3 rounded-lg bg-game-dark border-2 border-gray-600 cursor-pointer hover:border-accent-pink transition-colors">
+                    <span class="text-white font-semibold flex-1">••••••••</span>
+                    <span class="text-gray-400 hover:text-accent-pink transition-colors">✏️</span>
+                </div>
+            </div>
+            <form id="password-form" class="space-y-4 hidden">
+                <div><label class="block text-sm font-semibold text-gray-400 mb-2">Current Password</label>
+                <input type="password" id="current-pwd" class="w-full px-4 py-3 rounded-lg bg-game-dark text-white border-2 border-gray-600 focus:border-accent-pink focus:outline-none" required></div>
+                <div><label class="block text-sm font-semibold text-gray-400 mb-2">New Password</label>
+                <input type="password" id="new-pwd" class="w-full px-4 py-3 rounded-lg bg-game-dark text-white border-2 border-gray-600 focus:border-accent-pink focus:outline-none" minlength="8" required>
+                <div id="strength" class="mt-2 h-1 bg-gray-700 rounded"><div id="strength-bar" class="h-full rounded transition-all"></div></div></div>
+                <div><label class="block text-sm font-semibold text-gray-400 mb-2">Confirm New Password</label>
+                <input type="password" id="confirm-pwd" class="w-full px-4 py-3 rounded-lg bg-game-dark text-white border-2 border-gray-600 focus:border-accent-pink focus:outline-none" required></div>
+                <p id="pwd-msg" class="text-sm hidden"></p>
+                <div class="flex gap-3">
+                    <button type="submit" class="btn-primary flex-1 py-3">Save</button>
+                    <button type="button" id="cancel-pwd" class="px-6 py-3 rounded-lg bg-game-dark text-white hover:bg-gray-700 transition-colors">Cancel</button>
+                </div>
+            </form>
+        `;
+        const passwordToggle = securitySection.querySelector('#password-toggle') as HTMLElement;
+        const pwdForm = securitySection.querySelector('#password-form') as HTMLFormElement;
+        const cancelPwdBtn = securitySection.querySelector('#cancel-pwd') as HTMLButtonElement;
+        const newPwd = securitySection.querySelector('#new-pwd') as HTMLInputElement;
+        const strengthBar = securitySection.querySelector('#strength-bar') as HTMLElement;
+        const msg = securitySection.querySelector('#pwd-msg') as HTMLElement;
+        
+        passwordToggle.onclick = () => {
+            passwordToggle.classList.add('hidden');
+            pwdForm.classList.remove('hidden');
+            (securitySection.querySelector('#current-pwd') as HTMLInputElement).focus();
+        };
+        
+        cancelPwdBtn.onclick = () => {
+            pwdForm.classList.add('hidden');
+            passwordToggle.classList.remove('hidden');
+            pwdForm.reset();
+            strengthBar.style.width = '0';
+            msg.classList.add('hidden');
+        };
+        
+        newPwd.oninput = () => {
+            const strength = Math.min(4, [newPwd.value.length >= 8, /[A-Z]/.test(newPwd.value), /\d/.test(newPwd.value), /[^A-Za-z0-9]/.test(newPwd.value)].filter(Boolean).length);
+            strengthBar.style.width = `${strength * 25}%`;
+            strengthBar.className = `h-full rounded transition-all ${['', 'bg-red-500', 'bg-orange-500', 'bg-yellow-500', 'bg-green-500'][strength]}`;
+        };
+        
+        pwdForm.onsubmit = async (e) => {
+            e.preventDefault();
+            msg.classList.add('hidden');
+            const curr = (securitySection.querySelector('#current-pwd') as HTMLInputElement).value;
+            const newP = newPwd.value;
+            const conf = (securitySection.querySelector('#confirm-pwd') as HTMLInputElement).value;
+            if (newP !== conf) { msg.textContent = 'Passwords do not match'; msg.className = 'text-sm text-red-500'; msg.classList.remove('hidden'); return; }
+            try { 
+                await AuthService.changePassword(curr, newP); 
+                msg.textContent = 'Password changed!'; 
+                msg.className = 'text-sm text-green-500'; 
+                msg.classList.remove('hidden'); 
+                setTimeout(() => {
+                    pwdForm.classList.add('hidden');
+                    passwordToggle.classList.remove('hidden');
+                    pwdForm.reset();
+                    strengthBar.style.width = '0';
+                    msg.classList.add('hidden');
+                }, 1000);
+            }
+            catch (err: any) { msg.textContent = AuthService.extractErrorMessage(err); msg.className = 'text-sm text-red-500'; msg.classList.remove('hidden'); }
+        };
+
         // Placeholder sections for future settings
         const preferencesSection = document.createElement('div');
         preferencesSection.className = 'mb-8';
@@ -286,6 +363,7 @@ export class SettingsPage {
 
         settingsCard.appendChild(profileSection);
         settingsCard.appendChild(avatarSection);
+        settingsCard.appendChild(securitySection);
         settingsCard.appendChild(preferencesSection);
 
         this.container.appendChild(title);

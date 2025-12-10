@@ -160,4 +160,26 @@ export default async function authRoutes(fastify: FastifyInstance) {
             reply.code(500).send({ message: formatErr(error) });
         }
     });
+
+    fastify.post('/auth/change-password', async (request, reply) => {
+        try {
+            const authHeader = request.headers.authorization;
+            if (!authHeader) return reply.status(401).send({ message: 'Unauthorized' });
+            const token = authHeader.split(' ')[1];
+            const decoded = jwt.verify(token, config.jwt.secret) as { userId: number };
+            const { currentPassword, newPassword } = request.body as any;
+            if (!currentPassword || !newPassword) return reply.status(400).send({ message: 'All fields required' });
+            if (newPassword.length < 8) return reply.status(400).send({ message: 'Password must be 8+ characters' });
+            const user = db.prepare('SELECT * FROM users WHERE id = ?').get(decoded.userId) as any;
+            if (!user) return reply.status(404).send({ message: 'User not found' });
+            const valid = await bcrypt.compare(currentPassword, user.password_hash);
+            if (!valid) return reply.status(401).send({ message: 'Current password incorrect' });
+            const hash = await bcrypt.hash(newPassword, 10);
+            db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hash, decoded.userId);
+            reply.send({ message: 'Password changed successfully' });
+        } catch (error) {
+            fastify.log.error(error);
+            reply.code(500).send({ message: formatErr(error) });
+        }
+    });
 }
