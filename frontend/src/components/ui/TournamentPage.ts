@@ -246,6 +246,13 @@ export class TournamentPage {
         const isFull = currentPlayers >= maxPlayers;
         const isLocal = this.tournament.type === 'local';
 
+        const typeIndicator = document.createElement('div');
+        typeIndicator.className = 'text-center mb-6';
+        const typeSpan = document.createElement('span');
+        typeSpan.className = `px-6 py-3 rounded-full text-base font-bold ${this.getTournamentTypeClass()} text-white inline-block`;
+        typeSpan.textContent = this.getTournamentTypeLabel();
+        typeIndicator.appendChild(typeSpan);
+
         const title = document.createElement('h1');
         title.textContent = `${isLocal ? 'Local' : 'Online'} Tournament Registration`;
         title.className = 'text-4xl font-bold text-white mb-4 gradient-text';
@@ -412,6 +419,7 @@ export class TournamentPage {
         buttonContainer.appendChild(startButton);
         buttonContainer.appendChild(backButton);
         
+        this.container.appendChild(typeIndicator);
         this.container.appendChild(title);
         this.container.appendChild(subtitle);
         if (this.participants.length > 0) {
@@ -905,6 +913,13 @@ export class TournamentPage {
     }
 
     private async joinTournament(tournament: Tournament): Promise<void> {
+        const confirmed = await (window as any).app.confirm(
+            'Join Tournament',
+            `Do you want to join "${tournament.name}"? (${tournament.max_players} players)`
+        );
+        
+        if (!confirmed) return;
+
         this.showAliasModal(async (alias: string) => {
             try {
                 this.tournament = tournament;
@@ -1033,10 +1048,20 @@ export class TournamentPage {
         const bracket = document.createElement('div');
         bracket.className = 'bg-game-dark p-8 rounded-lg mt-8 overflow-x-auto';
 
+        const header = document.createElement('div');
+        header.className = 'flex justify-between items-center mb-6';
+
         const title = document.createElement('h3');
         title.textContent = 'Tournament Bracket';
-        title.className = 'text-2xl font-semibold text-white mb-6';
-        bracket.appendChild(title);
+        title.className = 'text-2xl font-semibold text-white';
+
+        const typeSpan = document.createElement('span');
+        typeSpan.className = `px-4 py-2 rounded-full text-sm font-bold ${this.getTournamentTypeClass()} text-white`;
+        typeSpan.textContent = this.getTournamentTypeLabel();
+
+        header.appendChild(title);
+        header.appendChild(typeSpan);
+        bracket.appendChild(header);
 
         // Group matches by round
         const rounds: { [round: number]: Match[] } = {};
@@ -1109,6 +1134,13 @@ export class TournamentPage {
     private renderWaitingScreen(): void {
         if (!this.container) return;
 
+        const typeIndicator = document.createElement('div');
+        typeIndicator.className = 'text-center mb-6';
+        const typeSpan = document.createElement('span');
+        typeSpan.className = `px-6 py-3 rounded-full text-base font-bold ${this.getTournamentTypeClass()} text-white inline-block`;
+        typeSpan.textContent = this.getTournamentTypeLabel();
+        typeIndicator.appendChild(typeSpan);
+
         const title = document.createElement('h1');
         title.textContent = 'Preparing Next Match...';
         title.className = 'text-3xl font-bold text-white text-center gradient-text';
@@ -1131,6 +1163,7 @@ export class TournamentPage {
             }
         };
         
+        this.container.appendChild(typeIndicator);
         this.container.appendChild(title);
         this.container.appendChild(message);
         this.container.appendChild(leaveButton);
@@ -1218,38 +1251,28 @@ export class TournamentPage {
     }
 
     public cleanup(): void {
-        this.cleanupCurrentGame();his.currentGame) {
-eActive()) {
-        // Restore previous status when leaving tournament (only once)glePause();
-        if (!this.statusRestored) {   }
+        this.cleanupCurrentGame();
+
+        // Restore previous status when leaving tournament (only once)
+        if (!this.statusRestored) {
             this.statusRestored = true;
             try {
                 const previousStatus = AuthService.getPreviousStatus();
-                AuthService.setStatus(previousStatus).catch(e => console.error('Failed to restore status:', e));f (this.gameCheckInterval !== null) {
-            } catch (e) {       clearInterval(this.gameCheckInterval);
-                console.error('Failed to restore status:', e);           this.gameCheckInterval = null;
-            }        }
+                AuthService.setStatus(previousStatus).catch(e => console.error('Failed to restore status:', e));
+            } catch (e) {
+                console.error('Failed to restore status:', e);
+            }
+        }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-}    }        }            this.gameCheckInterval = null;            clearInterval(this.gameCheckInterval);        if (this.gameCheckInterval !== null) {        }            this.currentGame = null;            this.currentGame.destroy();            }                this.currentGame.togglePause();            if (this.currentGame.isPauseActive()) {    }        }            this.clearTournamentId();            });                console.error('Error deleting tournament on cleanup:', err);            TournamentAPI.deleteTournament(this.tournament.id).catch(err => {        if (this.tournament && this.tournament.status === 'pending' && this.participants.length === 0) {        }    }
+        // Only auto-delete local tournaments with no players in pending state
+        if (this.tournament && 
+            this.tournament.type === 'local' && 
+            this.tournament.status === 'pending' && 
+            this.participants.length === 0) {
+            TournamentAPI.deleteTournament(this.tournament.id).catch(err => {
+                console.error('Error deleting tournament on cleanup:', err);
+            });
+            this.clearTournamentId();
+        }
+    }
 }

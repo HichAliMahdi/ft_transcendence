@@ -37,6 +37,11 @@ interface Tournament {
 export class TournamentService {
     
     static createTournament(name: string, maxPlayers: TournamentSize, type: TournamentType = 'local'): Tournament {
+        // Validate tournament type
+        if (!['local', 'online'].includes(type)) {
+            throw new Error('Invalid tournament type. Must be "local" or "online"');
+        }
+
         const stmt = db.prepare(`
             INSERT INTO tournaments (name, type, status, max_players, current_round)
             VALUES (?, ?, 'pending', ?, 1)

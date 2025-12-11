@@ -1,6 +1,15 @@
 const API_BASE = '/api';
 
+/**
+ * Valid tournament sizes: 4, 8, or 16 players
+ */
 export type TournamentSize = 4 | 8 | 16;
+
+/**
+ * Tournament types:
+ * - local: Players share the same keyboard on one computer
+ * - online: Players join remotely and compete online
+ */
 export type TournamentType = 'local' | 'online';
 
 export interface Player {
@@ -46,6 +55,13 @@ export interface TournamentDetails {
 
 export class TournamentAPI {
     
+    /**
+     * Create a new tournament
+     * @param name Tournament name
+     * @param maxPlayers Number of players (4, 8, or 16)
+     * @param type Tournament type (local or online), defaults to 'local'
+     * @returns Created tournament object
+     */
     static async createTournament(name: string, maxPlayers: TournamentSize, type: TournamentType = 'local'): Promise<Tournament> {
         const response = await fetch(`${API_BASE}/tournaments`, {
             method: 'POST',
@@ -62,6 +78,11 @@ export class TournamentAPI {
         return data.tournament;
     }
 
+    /**
+     * Get details of a specific tournament
+     * @param id Tournament ID
+     * @returns Tournament details including participants and matches
+     */
     static async getTournament(id: number): Promise<TournamentDetails> {
         const response = await fetch(`${API_BASE}/tournaments/${id}`);
 
@@ -73,8 +94,14 @@ export class TournamentAPI {
         return await response.json();
     }
 
-    static async getAllTournaments(): Promise<Tournament[]> {
-        const response = await fetch(`${API_BASE}/tournaments`);
+    /**
+     * Get all tournaments, optionally filtered by type
+     * @param type Optional filter for tournament type
+     * @returns Array of tournaments
+     */
+    static async getAllTournaments(type?: TournamentType): Promise<Tournament[]> {
+        const url = type ? `${API_BASE}/tournaments?type=${type}` : `${API_BASE}/tournaments`;
+        const response = await fetch(url);
 
         if (!response.ok) {
             const error = await response.json();
@@ -83,6 +110,22 @@ export class TournamentAPI {
 
         const data = await response.json();
         return data.tournaments;
+    }
+
+    /**
+     * Get only local tournaments
+     * @returns Array of local tournaments
+     */
+    static async getLocalTournaments(): Promise<Tournament[]> {
+        return this.getAllTournaments('local');
+    }
+
+    /**
+     * Get only online tournaments available to join
+     * @returns Array of joinable online tournaments
+     */
+    static async getOnlineTournaments(): Promise<Tournament[]> {
+        return this.getAllTournaments('online');
     }
 
     static async getJoinableTournaments(): Promise<JoinableTournament[]> {
@@ -97,6 +140,12 @@ export class TournamentAPI {
         return data.tournaments;
     }
 
+    /**
+     * Add a player to a tournament
+     * @param tournamentId Tournament ID
+     * @param alias Player alias
+     * @returns Updated list of participants
+     */
     static async addPlayer(tournamentId: number, alias: string): Promise<Player[]> {
         const response = await fetch(`${API_BASE}/tournaments/${tournamentId}/players`, {
             method: 'POST',
@@ -113,6 +162,12 @@ export class TournamentAPI {
         return data.participants;
     }
 
+    /**
+     * Remove a player from a tournament
+     * @param tournamentId Tournament ID
+     * @param playerId Player ID
+     * @returns Updated list of participants
+     */
     static async removePlayer(tournamentId: number, playerId: number): Promise<Player[]> {
         const response = await fetch(`${API_BASE}/tournaments/${tournamentId}/players/${playerId}`, {
             method: 'DELETE'
@@ -127,6 +182,11 @@ export class TournamentAPI {
         return data.participants;
     }
 
+    /**
+     * Start a tournament
+     * @param tournamentId Tournament ID
+     * @returns Object containing the started tournament and the current match (if any)
+     */
     static async startTournament(tournamentId: number): Promise<{ tournament: Tournament; currentMatch: Match | null }> {
         const response = await fetch(`${API_BASE}/tournaments/${tournamentId}/start`, {
             method: 'POST'
@@ -140,6 +200,11 @@ export class TournamentAPI {
         return await response.json();
     }
 
+    /**
+     * Get the current match of a tournament
+     * @param tournamentId Tournament ID
+     * @returns Current match object or null if there is no current match
+     */
     static async getCurrentMatch(tournamentId: number): Promise<Match | null> {
         const response = await fetch(`${API_BASE}/tournaments/${tournamentId}/current-match`);
 
@@ -156,6 +221,11 @@ export class TournamentAPI {
         return data.match;
     }
 
+    /**
+     * Get all matches of a tournament
+     * @param tournamentId Tournament ID
+     * @returns Array of match objects
+     */
     static async getAllMatches(tournamentId: number): Promise<Match[]> {
         const response = await fetch(`${API_BASE}/tournaments/${tournamentId}/matches`);
 
@@ -168,6 +238,13 @@ export class TournamentAPI {
         return data.matches;
     }
 
+    /**
+     * Record the result of a match
+     * @param matchId Match ID
+     * @param winnerId ID of the player who won
+     * @param score1 Score of player 1
+     * @param score2 Score of player 2
+     */
     static async recordMatchResult(
         matchId: number, 
         winnerId: number, 
@@ -197,6 +274,10 @@ export class TournamentAPI {
         return participants.find(p => p.id === match.winner_id) || null;
     }
 
+    /**
+     * Delete a tournament
+     * @param tournamentId Tournament ID
+     */
     static async deleteTournament(tournamentId: number): Promise<void> {
         const response = await fetch(`${API_BASE}/tournaments/${tournamentId}`, {
             method: 'DELETE'
@@ -208,6 +289,11 @@ export class TournamentAPI {
         }
     }
 
+    /**
+     * Reset a tournament to its initial state
+     * @param tournamentId Tournament ID
+     * @returns Reset tournament object
+     */
     static async resetTournament(tournamentId: number): Promise<Tournament> {
         const response = await fetch(`${API_BASE}/tournaments/${tournamentId}/reset`, {
             method: 'POST'
