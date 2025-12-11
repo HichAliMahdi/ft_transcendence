@@ -30,6 +30,10 @@ interface MatchParams {
   matchId: string;
 }
 
+interface TournamentQueryParams {
+  type?: 'local' | 'online';
+}
+
 export default async function tournamentRoutes(fastify: FastifyInstance) {
   // helper to extract a safe message from thrown errors
   const formatErr = (e: any) => (e instanceof Error ? e.message : String(e));
@@ -104,15 +108,24 @@ export default async function tournamentRoutes(fastify: FastifyInstance) {
     }
   );
 
-  fastify.get('/tournaments', async (request, reply) => {
-    try {
-      const tournaments = TournamentService.getAllTournaments();
-      return reply.send({ tournaments });
-    } catch (error) {
-      fastify.log.error(error);
-      return reply.code(500).send({ message: formatErr(error) });
+  fastify.get<{ Querystring: TournamentQueryParams }>(
+    '/tournaments',
+    async (request, reply) => {
+      try {
+        const { type } = request.query;
+        
+        if (type && !['local', 'online'].includes(type)) {
+          return reply.code(400).send({ message: 'Invalid tournament type' });
+        }
+        
+        const tournaments = TournamentService.getAllTournaments(type);
+        return reply.send({ tournaments });
+      } catch (error) {
+        fastify.log.error(error);
+        return reply.code(500).send({ message: formatErr(error) });
+      }
     }
-  });
+  );
 
   fastify.post<{ Params: TournamentParams; Body: AddPlayerBody }>(
     '/tournaments/:id/players',

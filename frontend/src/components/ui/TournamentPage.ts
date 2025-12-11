@@ -47,12 +47,15 @@ export class TournamentPage {
             this.tournament = data.tournament;
             this.participants = data.participants;
             this.matches = data.matches;
+            
+            // Set tournament type from restored data
+            this.tournamentType = this.tournament.type;
 
             if (this.tournament.status === 'active') {
                 this.currentMatch = await TournamentAPI.getCurrentMatch(this.tournament.id);
             }
 
-            console.log('Tournament state restored:', this.tournament.name);
+            console.log(`Tournament state restored: ${this.tournament.name} (${this.tournament.type})`);
         } catch (error) {
             console.error('Failed to restore tournament:', error);
             sessionStorage.removeItem(this.STORAGE_KEY);
@@ -333,7 +336,7 @@ export class TournamentPage {
             const ul = document.createElement('ul');
             ul.className = 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4';
             
-            this.participants.forEach(player => {
+            this.participants.forEach((player, index) => {
                 const li = document.createElement('li');
                 li.className = 'bg-game-dark px-4 py-3 rounded-lg flex justify-between items-center transition-colors duration-300 hover:bg-blue-700';
                 
@@ -341,20 +344,23 @@ export class TournamentPage {
                 span.textContent = player.alias;
                 span.className = 'text-white font-medium';
                 
-                const removeBtn = document.createElement('button');
-                removeBtn.textContent = '×';
-                removeBtn.className = 'bg-game-red hover:bg-red-600 text-white px-3 py-1 text-xl leading-none rounded-lg transition-colors duration-300';
-                removeBtn.onclick = async () => {
-                    try {
-                        this.participants = await TournamentAPI.removePlayer(this.tournament!.id, player.id);
-                        await this.updateUI();
-                    } catch (error: any) {
-                        alert(`Error: ${AuthService.extractErrorMessage(error)}`);
-                    }
-                };
+                // Only show remove button for online tournaments, or local if not first player
+                if (!isLocal || index > 0) {
+                    const removeBtn = document.createElement('button');
+                    removeBtn.textContent = '×';
+                    removeBtn.className = 'bg-game-red hover:bg-red-600 text-white px-3 py-1 text-xl leading-none rounded-lg transition-colors duration-300';
+                    removeBtn.onclick = async () => {
+                        try {
+                            this.participants = await TournamentAPI.removePlayer(this.tournament!.id, player.id);
+                            await this.updateUI();
+                        } catch (error: any) {
+                            alert(`Error: ${AuthService.extractErrorMessage(error)}`);
+                        }
+                    };
+                    li.appendChild(removeBtn);
+                }
                 
                 li.appendChild(span);
-                li.appendChild(removeBtn);
                 ul.appendChild(li);
             });
             
@@ -434,6 +440,13 @@ export class TournamentPage {
 
         const player1 = TournamentAPI.getPlayerFromMatch(this.currentMatch, this.participants, 1);
         const player2 = TournamentAPI.getPlayerFromMatch(this.currentMatch, this.participants, 2);
+
+        const typeIndicator = document.createElement('div');
+        typeIndicator.className = 'text-center mb-4';
+        const typeSpan = document.createElement('span');
+        typeSpan.className = `px-4 py-2 rounded-full text-sm font-bold ${this.getTournamentTypeClass()} text-white`;
+        typeSpan.textContent = this.getTournamentTypeLabel();
+        typeIndicator.appendChild(typeSpan);
 
         const title = document.createElement('h1');
         title.textContent = `Round ${this.currentMatch.round} - Match ${this.currentMatch.match_number}`;
@@ -882,8 +895,6 @@ export class TournamentPage {
             availableSection.appendChild(errorMsg);
         }
     }
-    // ...existing code...
-
     private getTimeAgo(date: Date): string {
         const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
 
@@ -1130,6 +1141,13 @@ export class TournamentPage {
 
         const winner = this.participants.find(p => p.id === this.tournament!.winner_id);
         
+        const typeIndicator = document.createElement('div');
+        typeIndicator.className = 'text-center mb-4';
+        const typeSpan = document.createElement('span');
+        typeSpan.className = `px-4 py-2 rounded-full text-sm font-bold ${this.getTournamentTypeClass()} text-white`;
+        typeSpan.textContent = `${this.getTournamentTypeLabel()} Tournament`;
+        typeIndicator.appendChild(typeSpan);
+
         const title = document.createElement('h1');
         title.textContent = 'Tournament Complete! 🏆';
         title.className = 'text-4xl font-bold text-white text-center mb-8 gradient-text';
@@ -1187,39 +1205,51 @@ export class TournamentPage {
         this.container.appendChild(buttonContainer);
     }
 
-    public cleanup(): void {
-        this.cleanupCurrentGame();
+    private getTournamentTypeLabel(includeEmoji: boolean = true): string {
+        if (!this.tournament) return '';
+        const emoji = includeEmoji ? (this.tournament.type === 'local' ? '🎮 ' : '🌐 ') : '';
+        const label = this.tournament.type === 'local' ? 'Local' : 'Online';
+        return `${emoji}${label}`;
+    }
 
-        // Restore previous status when leaving tournament (only once)
-        if (!this.statusRestored) {
+    private getTournamentTypeClass(): string {
+        if (!this.tournament) return 'bg-gray-600';
+        return this.tournament.type === 'local' ? 'bg-accent-purple' : 'bg-accent-pink';
+    }
+
+    public cleanup(): void {
+        this.cleanupCurrentGame();his.currentGame) {
+eActive()) {
+        // Restore previous status when leaving tournament (only once)glePause();
+        if (!this.statusRestored) {   }
             this.statusRestored = true;
             try {
                 const previousStatus = AuthService.getPreviousStatus();
-                AuthService.setStatus(previousStatus).catch(e => console.error('Failed to restore status:', e));
-            } catch (e) {
-                console.error('Failed to restore status:', e);
-            }
-        }
+                AuthService.setStatus(previousStatus).catch(e => console.error('Failed to restore status:', e));f (this.gameCheckInterval !== null) {
+            } catch (e) {       clearInterval(this.gameCheckInterval);
+                console.error('Failed to restore status:', e);           this.gameCheckInterval = null;
+            }        }
 
-        if (this.tournament && this.tournament.status === 'pending' && this.participants.length === 0) {
-            TournamentAPI.deleteTournament(this.tournament.id).catch(err => {
-                console.error('Error deleting tournament on cleanup:', err);
-            });
-            this.clearTournamentId();
-        }
-    }
 
-    private cleanupCurrentGame(): void {
-        if (this.currentGame) {
-            if (this.currentGame.isPauseActive()) {
-                this.currentGame.togglePause();
-            }
-            this.currentGame.destroy();
-            this.currentGame = null;
-        }
-        if (this.gameCheckInterval !== null) {
-            clearInterval(this.gameCheckInterval);
-            this.gameCheckInterval = null;
-        }
-    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+}    }        }            this.gameCheckInterval = null;            clearInterval(this.gameCheckInterval);        if (this.gameCheckInterval !== null) {        }            this.currentGame = null;            this.currentGame.destroy();            }                this.currentGame.togglePause();            if (this.currentGame.isPauseActive()) {    }        }            this.clearTournamentId();            });                console.error('Error deleting tournament on cleanup:', err);            TournamentAPI.deleteTournament(this.tournament.id).catch(err => {        if (this.tournament && this.tournament.status === 'pending' && this.participants.length === 0) {        }    }
 }

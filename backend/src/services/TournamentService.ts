@@ -50,9 +50,27 @@ export class TournamentService {
         return stmt.get(id) as Tournament;
     }
 
-    static getAllTournaments(): Tournament[] {
-        const stmt = db.prepare(`SELECT * FROM tournaments ORDER BY created_at DESC`);
-        return stmt.all() as Tournament[];
+    static getAllTournaments(type?: TournamentType): Tournament[] {
+        let query = 'SELECT * FROM tournaments';
+        const params: any[] = [];
+        
+        if (type) {
+            query += ' WHERE type = ?';
+            params.push(type);
+        }
+        
+        query += ' ORDER BY created_at DESC';
+        
+        const stmt = db.prepare(query);
+        return (params.length > 0 ? stmt.all(...params) : stmt.all()) as Tournament[];
+    }
+
+    static getLocalTournaments(): Tournament[] {
+        return this.getAllTournaments('local');
+    }
+
+    static getOnlineTournaments(): Tournament[] {
+        return this.getAllTournaments('online');
     }
 
     static addPlayer(tournamentId: number, alias: string): boolean {

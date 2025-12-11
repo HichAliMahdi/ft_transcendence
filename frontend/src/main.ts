@@ -10,7 +10,12 @@ class App {
 
     private sanitizeForUi(input: string | undefined | null): string {
         if (!input) return '';
-        return String(input).replace(/\b127(?:\.\d{1,3}){3}\b/g, '').replace(/\blocalhost\b/gi, '').trim();
+        const sanitized = String(input)
+            .replace(/\b127(?:\.\d{1,3}){3}\b/g, '')
+            .replace(/\blocalhost\b/gi, '')
+            .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+            .trim();
+        return sanitized;
     }
 
     private showFatalErrorOverlay(title: string, err: any): void {
