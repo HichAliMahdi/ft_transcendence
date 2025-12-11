@@ -4,6 +4,7 @@ import { TournamentService, TournamentSize } from '../services/TournamentService
 interface CreateTournamentBody {
   name: string;
   maxPlayers: TournamentSize;
+  type?: 'local' | 'online';
 }
 
 interface AddPlayerBody {
@@ -37,7 +38,7 @@ export default async function tournamentRoutes(fastify: FastifyInstance) {
     '/tournaments',
     async (request, reply) => {
       try {
-        const { name, maxPlayers } = request.body;
+        const { name, maxPlayers, type = 'local' } = request.body;
         
         if (!name || name.trim().length === 0) {
           return reply.code(400).send({ message: 'Tournament name is required' });
@@ -47,7 +48,11 @@ export default async function tournamentRoutes(fastify: FastifyInstance) {
           return reply.code(400).send({ message: 'Max players must be 4, 8, or 16' });
         }
 
-        const tournament = TournamentService.createTournament(name.trim(), maxPlayers);
+        if (!['local', 'online'].includes(type)) {
+          return reply.code(400).send({ message: 'Type must be local or online' });
+        }
+
+        const tournament = TournamentService.createTournament(name.trim(), maxPlayers, type);
         return reply.code(201).send({ tournament });
       } catch (error) {
         fastify.log.error(error);

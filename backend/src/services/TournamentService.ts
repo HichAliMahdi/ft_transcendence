@@ -2,6 +2,7 @@ import { db } from '../database/db';
 
 export type TournamentSize = 4 | 8 | 16;
 export type TournamentStatus = 'pending' | 'active' | 'completed';
+export type TournamentType = 'local' | 'online';
 
 interface Player {
     id: number;
@@ -26,6 +27,7 @@ interface Match {
 interface Tournament {
     id: number;
     name: string;
+    type: TournamentType;
     status: TournamentStatus;
     max_players: number;
     current_round: number;
@@ -34,12 +36,12 @@ interface Tournament {
 
 export class TournamentService {
     
-    static createTournament(name: string, maxPlayers: TournamentSize): Tournament {
+    static createTournament(name: string, maxPlayers: TournamentSize, type: TournamentType = 'local'): Tournament {
         const stmt = db.prepare(`
-            INSERT INTO tournaments (name, status, max_players, current_round)
-            VALUES (?, 'pending', ?, 1)
+            INSERT INTO tournaments (name, type, status, max_players, current_round)
+            VALUES (?, ?, 'pending', ?, 1)
         `);
-        const result = stmt.run(name, maxPlayers);
+        const result = stmt.run(name, type, maxPlayers);
         return this.getTournamentById(result.lastInsertRowid as number);
     }
 
@@ -338,7 +340,7 @@ export class TournamentService {
                 t.max_players - COUNT(tp.user_id) as available_slots
             FROM tournaments t
             LEFT JOIN tournament_participants tp ON t.id = tp.tournament_id
-            WHERE t.status = 'pending'
+            WHERE t.status = 'pending' AND t.type = 'online'
             GROUP BY t.id
             HAVING available_slots > 0
             ORDER BY t.created_at DESC

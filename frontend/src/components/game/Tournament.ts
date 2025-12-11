@@ -1,6 +1,7 @@
 const API_BASE = '/api';
 
 export type TournamentSize = 4 | 8 | 16;
+export type TournamentType = 'local' | 'online';
 
 export interface Player {
     id: number;
@@ -25,6 +26,7 @@ export interface Match {
 export interface Tournament {
     id: number;
     name: string;
+    type: TournamentType;
     status: 'pending' | 'active' | 'completed';
     max_players: number;
     current_round: number;
@@ -44,11 +46,11 @@ export interface TournamentDetails {
 
 export class TournamentAPI {
     
-    static async createTournament(name: string, maxPlayers: TournamentSize): Promise<Tournament> {
+    static async createTournament(name: string, maxPlayers: TournamentSize, type: TournamentType = 'local'): Promise<Tournament> {
         const response = await fetch(`${API_BASE}/tournaments`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name, maxPlayers })
+            body: JSON.stringify({ name, maxPlayers, type })
         });
 
         if (!response.ok) {

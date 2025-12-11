@@ -53,6 +53,7 @@ export function initializeDatabase(): void {
         CREATE TABLE IF NOT EXISTS tournaments (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
+            type TEXT DEFAULT 'local' CHECK(type IN ('local', 'online')),
             status TEXT DEFAULT 'pending',
             max_players INTEGER NOT NULL,
             current_round INTEGER DEFAULT 1,
