@@ -224,16 +224,21 @@ export class TournamentPage {
         this.container.appendChild(infoBox);
         
         const backButton = document.createElement('button');
-        backButton.textContent = '← Back';
+        backButton.textContent = '← Back to Lobby';
         backButton.className = 'bg-game-dark hover:bg-blue-800 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-300 mt-8 mx-auto block';
         backButton.onclick = () => {
-            if (this.tournamentType === 'online') {
+            this.tournamentType = 'local'; // Reset to default
+            if (this.tournament?.type === 'online') {
                 this.renderOnlineLobby();
             } else {
                 this.renderLobby();
             }
         };
         
+        this.container.appendChild(title);
+        this.container.appendChild(subtitle);
+        this.container.appendChild(sizeSection);
+        this.container.appendChild(infoBox);
         this.container.appendChild(backButton);
     }
 
@@ -529,6 +534,22 @@ export class TournamentPage {
         const leaveButton = document.createElement('button');
         leaveButton.textContent = 'Leave Tournament';
         leaveButton.className = 'bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-200';
+        leaveButton.onclick = async () => {
+            const isLocal = this.tournament?.type === 'local';
+            const message = isLocal 
+                ? 'Are you sure you want to leave? The local tournament will be cancelled.'
+                : 'Are you sure you want to leave the online tournament? This action cannot be undone.';
+                
+            const ok = await (window as any).app.confirm('Leave Tournament', message);
+            if (ok) {
+                this.cleanupCurrentGame();
+                this.tournament = null;
+                this.participants = [];
+                this.matches = [];
+                this.clearTournamentId();
+                window.location.href = '/';
+            }
+        };
         
         startButton.onclick = () => {
             this.currentGame = new PongGame(canvas);
@@ -552,13 +573,18 @@ export class TournamentPage {
         };
         
         leaveButton.onclick = async () => {
-            const ok = await (window as any).app.confirm('Leave Tournament', 'Are you sure you want to leave the tournament? This action cannot be undone.');
+            const isLocal = this.tournament?.type === 'local';
+            const message = isLocal 
+                ? 'Are you sure you want to leave? The local tournament will be cancelled.'
+                : 'Are you sure you want to leave the online tournament? This action cannot be undone.';
+                
+            const ok = await (window as any).app.confirm('Leave Tournament', message);
             if (ok) {
                 this.cleanupCurrentGame();
                 this.tournament = null;
                 this.participants = [];
                 this.matches = [];
-                this.clearTournamentId(); // Clear storage
+                this.clearTournamentId();
                 window.location.href = '/';
             }
         };
@@ -1153,12 +1179,17 @@ export class TournamentPage {
         leaveButton.textContent = 'Leave Tournament';
         leaveButton.className = 'bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-200 mt-8';
         leaveButton.onclick = async () => {
-            const ok = await (window as any).app.confirm('Leave Tournament', 'Are you sure you want to leave the tournament? This action cannot be undone.');
+            const isLocal = this.tournament?.type === 'local';
+            const message = isLocal 
+                ? 'Are you sure you want to leave? The local tournament will be cancelled.'
+                : 'Are you sure you want to leave the online tournament? This action cannot be undone.';
+                
+            const ok = await (window as any).app.confirm('Leave Tournament', message);
             if (ok) {
                 this.tournament = null;
                 this.participants = [];
                 this.matches = [];
-                this.clearTournamentId(); // Clear storage
+                this.clearTournamentId();
                 window.location.href = '/';
             }
         };
