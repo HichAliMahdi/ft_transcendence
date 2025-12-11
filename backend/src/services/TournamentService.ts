@@ -78,7 +78,7 @@ export class TournamentService {
         return this.getAllTournaments('online');
     }
 
-    static addPlayer(tournamentId: number, alias: string): boolean {
+    static addPlayer(tournamentId: number, alias: string, userId?: number): boolean {
         const tournament = this.getTournamentById(tournamentId);
         
         if (!tournament || tournament.status !== 'pending') {
@@ -96,18 +96,33 @@ export class TournamentService {
         }
 
         try {
-            const userStmt = db.prepare(`
-                INSERT INTO users (username, display_name, avatar_url) VALUES (?, ?, ?)
-            `);
-            const uniqueUsername = `${alias}_${Date.now()}`;
-            const userResult = userStmt.run(uniqueUsername, alias, '/default-avatar.png');
-            const userId = userResult.lastInsertRowid as number;
+            let actualUserId = userId;
+            
+            // For online tournaments with logged-in users, check for duplicate user participation
+            if (tournament.type === 'online' && userId) {
+                const existingParticipant = currentPlayers.find(p => p.id === userId);
+                if (existingParticipant) {
+                    // User already in tournament, update their alias instead
+                    db.prepare('UPDATE tournament_participants SET alias = ? WHERE tournament_id = ? AND user_id = ?')
+                        .run(alias, tournamentId, userId);
+                    return true;
+                }
+                actualUserId = userId;
+            } else {
+                // Create temporary user for local tournaments or anonymous participants
+                const userStmt = db.prepare(`
+                    INSERT INTO users (username, display_name, avatar_url) VALUES (?, ?, ?)
+                `);
+                const uniqueUsername = `${alias}_${Date.now()}`;
+                const userResult = userStmt.run(uniqueUsername, alias, '/default-avatar.png');
+                actualUserId = userResult.lastInsertRowid as number;
+            }
 
             const participantStmt = db.prepare(`
                 INSERT INTO tournament_participants (tournament_id, user_id, alias)
                 VALUES (?, ?, ?)
             `);
-            participantStmt.run(tournamentId, userId, alias);
+            participantStmt.run(tournamentId, actualUserId, alias);
 
             return true;
         } catch (error) {

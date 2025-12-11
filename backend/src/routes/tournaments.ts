@@ -1,5 +1,8 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { TournamentService, TournamentSize } from '../services/TournamentService';
+import { broadcastToTournament } from './websocket';
+import jwt from 'jsonwebtoken';
+import { config } from '../config';
 
 interface CreateTournamentBody {
   name: string;
@@ -153,7 +156,23 @@ export default async function tournamentRoutes(fastify: FastifyInstance) {
           });
         }
 
-        const success = TournamentService.addPlayer(tournamentId, alias.trim());
+        // Get user ID from token for online tournaments
+        let userId: number | undefined;
+        const authHeader = request.headers.authorization;
+        if (authHeader) {
+          try {
+            const token = authHeader.split(' ')[1];
+            if (token) {
+              // Fix: only call jwt.verify if token is defined
+              const decoded = jwt.verify(token, config.jwt.secret) as unknown as { userId: number };
+              userId = decoded.userId;
+            }
+          } catch (e) {
+            // Ignore auth errors for local tournaments
+          }
+        }
+
+        const success = TournamentService.addPlayer(tournamentId, alias.trim(), userId);
         
         if (!success) {
           return reply.code(400).send({ 
@@ -162,6 +181,18 @@ export default async function tournamentRoutes(fastify: FastifyInstance) {
         }
 
         const participants = TournamentService.getParticipants(tournamentId);
+        
+        // Broadcast tournament update
+        try {
+          broadcastToTournament(tournamentId, {
+            type: 'tournament_update',
+            tournamentId,
+            participants
+          });
+        } catch (e) {
+          fastify.log.debug({ err: e }, 'Failed to broadcast tournament update');
+        }
+        
         return reply.code(201).send({ participants });
       } catch (error) {
         fastify.log.error(error);
@@ -191,6 +222,18 @@ export default async function tournamentRoutes(fastify: FastifyInstance) {
         }
 
         const participants = TournamentService.getParticipants(tournamentId);
+        
+        // Broadcast tournament update
+        try {
+          broadcastToTournament(tournamentId, {
+            type: 'tournament_update',
+            tournamentId,
+            participants
+          });
+        } catch (e) {
+          fastify.log.debug({ err: e }, 'Failed to broadcast tournament update');
+        }
+        
         return reply.send({ participants });
       } catch (error) {
         fastify.log.error(error);

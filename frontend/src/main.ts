@@ -347,6 +347,8 @@ class App {
                         if (fw && typeof fw.refreshNow === 'function') {
                             fw.refreshNow();
                         }
+                    } else if (data.type === 'tournament_update') {
+                        window.dispatchEvent(new CustomEvent('tournament:update', { detail: data }));
                     }
                 } catch (e) {}
             };

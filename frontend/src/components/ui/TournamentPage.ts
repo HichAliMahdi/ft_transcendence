@@ -16,19 +16,82 @@ export class TournamentPage {
     // Add storage key
     private readonly STORAGE_KEY = 'active_tournament_id';
     private tournamentType: TournamentType = 'local';
+    private tournamentUpdateListener: ((e: Event) => void) | null = null;
 
     public render(): HTMLElement {
         this.container = document.createElement('div');
         this.container.className = 'container mx-auto p-8 tournament-container fade-in';
+        
+        // Set up tournament update listener
+        this.tournamentUpdateListener = (e: Event) => {
+            const customEvent = e as CustomEvent;
+            const data = customEvent.detail;
+            
+            if (this.tournament && data.tournamentId === this.tournament.id) {
+                this.participants = data.participants || [];
+                this.updateUI();
+            }
+        };
+        window.addEventListener('tournament:update', this.tournamentUpdateListener);
+        
         // Try to restore tournament state before rendering lobby
         this.restoreTournamentState().then(() => {
             if (!this.tournament) {
                 this.renderLobby();
             } else {
+                this.subscribeToTournament();
                 this.updateUI();
             }
         });
         return this.container;
+    }
+
+    private subscribeToTournament(): void {
+        if (!this.tournament) return;
+        
+        try {
+            const ws = (window as any).app?.presenceSocket;
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'subscribe_tournament',
+                    tournamentId: this.tournament.id
+                }));
+            }
+        } catch (e) {
+            console.error('Failed to subscribe to tournament:', e);
+        }
+    }
+
+    private unsubscribeFromTournament(): void {
+        if (!this.tournament) return;
+        
+        try {
+            const ws = (window as any).app?.presenceSocket;
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'unsubscribe_tournament',
+                    tournamentId: this.tournament.id
+                }));
+            }
+        } catch (e) {
+            console.error('Failed to unsubscribe from tournament:', e);
+        }
+    }
+
+    public cleanup(): void {
+        this.cleanupCurrentGame();
+        
+        // Unsubscribe from tournament updates
+        this.unsubscribeFromTournament();
+        
+        // Remove event listener
+        if (this.tournamentUpdateListener) {
+            window.removeEventListener('tournament:update', this.tournamentUpdateListener);
+            this.tournamentUpdateListener = null;
+        }
+
+        // Clear tournament ID on cleanup
+        this.clearTournamentId();
     }
 
     // Add method to restore tournament from sessionStorage
@@ -250,6 +313,7 @@ export class TournamentPage {
         const remaining = maxPlayers - currentPlayers;
         const isFull = currentPlayers >= maxPlayers;
         const isLocal = this.tournament.type === 'local';
+        const isCreator = !isLocal && this.participants.length > 0 && this.participants[0].id === AuthService.getUser()?.id;
 
         const typeIndicator = document.createElement('div');
         typeIndicator.className = 'text-center mb-6';
@@ -355,8 +419,11 @@ export class TournamentPage {
                 span.textContent = player.alias;
                 span.className = 'text-white font-medium';
                 
-                // Only show remove button for online tournaments, or local if not first player
-                if (!isLocal || index > 0) {
+                li.appendChild(span);
+                
+                // For local tournaments: show remove button except for first player
+                // For online tournaments: only creator can remove others, anyone can leave
+                if (isLocal && index > 0) {
                     const removeBtn = document.createElement('button');
                     removeBtn.textContent = '×';
                     removeBtn.className = 'bg-game-red hover:bg-red-600 text-white px-3 py-1 text-xl leading-none rounded-lg transition-colors duration-300';
@@ -369,9 +436,45 @@ export class TournamentPage {
                         }
                     };
                     li.appendChild(removeBtn);
+                } else if (!isLocal) {
+                    const currentUserId = AuthService.getUser()?.id;
+                    // Show remove button if creator and not removing self, OR show leave button if it's the current user
+                    if (isCreator && player.id !== currentUserId) {
+                        const removeBtn = document.createElement('button');
+                        removeBtn.textContent = '×';
+                        removeBtn.className = 'bg-game-red hover:bg-red-600 text-white px-3 py-1 text-xl leading-none rounded-lg transition-colors duration-300';
+                        removeBtn.onclick = async () => {
+                            try {
+                                this.participants = await TournamentAPI.removePlayer(this.tournament!.id, player.id);
+                                await this.updateUI();
+                            } catch (error: any) {
+                                alert(`Error: ${AuthService.extractErrorMessage(error)}`);
+                            }
+                        };
+                        li.appendChild(removeBtn);
+                    } else if (player.id === currentUserId) {
+                        const leaveBtn = document.createElement('button');
+                        leaveBtn.textContent = 'Leave';
+                        leaveBtn.className = 'bg-yellow-600 hover:bg-yellow-700 text-white px-3 py-1 text-sm leading-none rounded-lg transition-colors duration-300';
+                        leaveBtn.onclick = async () => {
+                            const ok = await (window as any).app.confirm('Leave Tournament', 'Are you sure you want to leave this tournament?');
+                            if (ok) {
+                                try {
+                                    await TournamentAPI.removePlayer(this.tournament!.id, player.id);
+                                    this.tournament = null;
+                                    this.participants = [];
+                                    this.matches = [];
+                                    this.clearTournamentId();
+                                    this.renderOnlineLobby();
+                                } catch (error: any) {
+                                    alert(`Error: ${AuthService.extractErrorMessage(error)}`);
+                                }
+                            }
+                        };
+                        li.appendChild(leaveBtn);
+                    }
                 }
                 
-                li.appendChild(span);
                 ul.appendChild(li);
             });
             
@@ -1133,7 +1236,7 @@ export class TournamentPage {
         if (!this.container || !this.tournament) return;
 
         const winner = this.participants.find(p => p.id === this.tournament!.winner_id);
-        
+
         const typeIndicator = document.createElement('div');
         typeIndicator.className = 'text-center mb-4';
         const typeSpan = document.createElement('span');
@@ -1144,31 +1247,31 @@ export class TournamentPage {
         const title = document.createElement('h1');
         title.textContent = 'Tournament Complete! 🏆';
         title.className = 'text-4xl font-bold text-white text-center mb-8 gradient-text';
-        
+
         const winnerCard = document.createElement('div');
         winnerCard.className = 'glass-effect p-12 rounded-2xl mx-auto text-center max-w-2xl border-4 border-game-red';
-        
+
         const winnerTitle = document.createElement('h2');
         winnerTitle.textContent = 'Champion';
         winnerTitle.className = 'text-game-red text-3xl mb-4 font-bold';
-        
+
         const winnerName = document.createElement('h3');
         winnerName.textContent = winner?.alias || 'Unknown';
         winnerName.className = 'text-5xl text-blue-400 mb-8 font-bold gradient-text';
-        
+
         const trophy = document.createElement('div');
         trophy.textContent = '🏆';
         trophy.className = 'text-8xl';
-        
+
         winnerCard.appendChild(winnerTitle);
         winnerCard.appendChild(winnerName);
         winnerCard.appendChild(trophy);
-        
+
         const bracket = this.renderBracket();
-        
+
         const buttonContainer = document.createElement('div');
         buttonContainer.className = 'text-center mt-8 flex flex-col sm:flex-row gap-4 justify-center';
-        
+
         const newTournamentBtn = document.createElement('button');
         newTournamentBtn.textContent = 'New Tournament';
         newTournamentBtn.className = 'btn-primary text-lg px-8 py-4';
@@ -1180,7 +1283,7 @@ export class TournamentPage {
             this.clearTournamentId();
             this.updateUI();
         };
-        
+
         const homeBtn = document.createElement('button');
         homeBtn.textContent = 'Back to Home';
         homeBtn.className = 'bg-game-dark hover:bg-blue-800 text-white font-bold text-lg py-4 px-8 rounded-lg transition-colors duration-300';
@@ -1188,10 +1291,11 @@ export class TournamentPage {
             this.clearTournamentId();
             window.location.href = '/';
         };
-        
+
         buttonContainer.appendChild(newTournamentBtn);
         buttonContainer.appendChild(homeBtn);
-        
+
+        this.container.appendChild(typeIndicator);
         this.container.appendChild(title);
         this.container.appendChild(winnerCard);
         this.container.appendChild(bracket);
@@ -1210,38 +1314,15 @@ export class TournamentPage {
         return this.tournament.type === 'local' ? 'bg-accent-purple' : 'bg-accent-pink';
     }
 
-    public cleanup(): void {
-        this.cleanupCurrentGame();
-
-        // Restore previous status when leaving tournament (only once)
-        if (!this.statusRestored) {
-            this.statusRestored = true;
-            try {
-                const previousStatus = AuthService.getPreviousStatus();
-                AuthService.setStatus(previousStatus).catch(e => console.error('Failed to restore status:', e));
-            } catch (e) {
-                console.error('Failed to restore status:', e);
-            }
-        }
-
-        // Only auto-delete local tournaments with no players in pending state
-        if (this.tournament && 
-            this.tournament.type === 'local' && 
-            this.tournament.status === 'pending' && 
-            this.participants.length === 0) {
-            TournamentAPI.deleteTournament(this.tournament.id).catch(err => {
-                console.error('Error deleting tournament on cleanup:', err);
-            });
-            this.clearTournamentId();
-        }
-    }
-
+    // Add the missing cleanupCurrentGame method
     private cleanupCurrentGame(): void {
         if (this.currentGame) {
-            if (this.currentGame.isPauseActive()) {
+            if (typeof this.currentGame.isPauseActive === 'function' && this.currentGame.isPauseActive()) {
                 this.currentGame.togglePause();
             }
-            this.currentGame.destroy();
+            if (typeof this.currentGame.destroy === 'function') {
+                this.currentGame.destroy();
+            }
             this.currentGame = null;
         }
         if (this.gameCheckInterval !== null) {

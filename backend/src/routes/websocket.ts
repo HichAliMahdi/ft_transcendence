@@ -15,6 +15,9 @@ interface UserRow {
 // Global registry of connected users for presence broadcasting
 const presenceConnections = new Map<number, Set<WS>>();
 
+// NEW: Registry for tournament subscriptions
+const tournamentConnections = new Map<number, Set<WebSocket>>();
+
 export function broadcastPresenceUpdate(userId: number, status: string, isOnline: boolean): void {
   const message = JSON.stringify({
     type: 'presence_update',
@@ -66,6 +69,40 @@ export function sendNotificationUpdate(targetUserId: number): void {
       // ignore
     }
   }
+}
+
+// NEW: Tournament subscription management
+export function subscribeToTournament(tournamentId: number, ws: WebSocket): void {
+  if (!tournamentConnections.has(tournamentId)) {
+    tournamentConnections.set(tournamentId, new Set());
+  }
+  tournamentConnections.get(tournamentId)!.add(ws);
+}
+
+export function unsubscribeFromTournament(tournamentId: number, ws: WebSocket): void {
+  const subs = tournamentConnections.get(tournamentId);
+  if (subs) {
+    subs.delete(ws);
+    if (subs.size === 0) {
+      tournamentConnections.delete(tournamentId);
+    }
+  }
+}
+
+export function broadcastToTournament(tournamentId: number, message: any): void {
+  const subs = tournamentConnections.get(tournamentId);
+  if (!subs) return;
+  
+  const payload = JSON.stringify(message);
+  subs.forEach(ws => {
+    if (ws.readyState === 1) {
+      try {
+        ws.send(payload);
+      } catch (e) {
+        console.error('Failed to send tournament update:', e);
+      }
+    }
+  });
 }
 
 export default async function websocketRoutes(fastify: FastifyInstance) {
