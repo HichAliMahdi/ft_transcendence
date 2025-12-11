@@ -1,4 +1,4 @@
-import { TournamentAPI, Tournament, Player, Match, TournamentSize } from '../game/Tournament';
+import { TournamentAPI, Tournament, Player, Match, TournamentSize, TournamentType } from '../game/Tournament';
 import { AuthService } from '../game/AuthService';
 import { PongGame } from '../game/PongGame';
 
@@ -15,6 +15,7 @@ export class TournamentPage {
     private currentMatch: Match | null = null;
     // Add storage key
     private readonly STORAGE_KEY = 'active_tournament_id';
+    private tournamentType: TournamentType = 'local';
 
     public render(): HTMLElement {
         this.container = document.createElement('div');
@@ -111,7 +112,7 @@ export class TournamentPage {
         title.className = 'text-4xl font-bold text-white text-center mb-4 gradient-text';
         
         const subtitle = document.createElement('p');
-        subtitle.textContent = 'Select tournament size';
+        subtitle.textContent = `Select ${this.tournamentType} tournament size`;
         subtitle.className = 'text-gray-300 text-lg mb-12 text-center';
         
         const sizeSection = document.createElement('div');
@@ -127,21 +128,39 @@ export class TournamentPage {
             const card = document.createElement('div');
             card.className = 'glass-effect p-8 rounded-2xl cursor-pointer transition-all duration-300 border-2 border-transparent hover:border-accent-pink hover:-translate-y-2 flex flex-col items-center';
             card.onclick = async () => {
-                // Show alias input modal
-                this.showAliasModal(async (alias: string) => {
+                if (this.tournamentType === 'local') {
+                    // For local tournaments, no alias needed, start immediately
                     try {
-                        this.tournament = await TournamentAPI.createTournament(`Tournament ${Date.now()}`, size);
+                        this.tournament = await TournamentAPI.createTournament(
+                            `Local Tournament ${Date.now()}`, 
+                            size, 
+                            'local'
+                        );
                         this.saveTournamentId(this.tournament.id);
-                        
-                        // Automatically register the creator
-                        this.participants = await TournamentAPI.addPlayer(this.tournament.id, alias.trim());
-                        
-                        await this.refreshTournamentData();
                         await this.updateUI();
                     } catch (error: any) {
                         alert(`Error: ${AuthService.extractErrorMessage(error)}`);
                     }
-                }, 'Enter your alias to create tournament');
+                } else {
+                    // For online tournaments, show alias modal
+                    this.showAliasModal(async (alias: string) => {
+                        try {
+                            this.tournament = await TournamentAPI.createTournament(
+                                `Tournament ${Date.now()}`, 
+                                size, 
+                                'online'
+                            );
+                            this.saveTournamentId(this.tournament.id);
+                            
+                            this.participants = await TournamentAPI.addPlayer(this.tournament.id, alias.trim());
+                            
+                            await this.refreshTournamentData();
+                            await this.updateUI();
+                        } catch (error: any) {
+                            alert(`Error: ${AuthService.extractErrorMessage(error)}`);
+                        }
+                    }, 'Enter your alias to create tournament');
+                }
             };
             
             const emojiDiv = document.createElement('div');
@@ -200,6 +219,19 @@ export class TournamentPage {
         this.container.appendChild(subtitle);
         this.container.appendChild(sizeSection);
         this.container.appendChild(infoBox);
+        
+        const backButton = document.createElement('button');
+        backButton.textContent = '← Back';
+        backButton.className = 'bg-game-dark hover:bg-blue-800 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-300 mt-8 mx-auto block';
+        backButton.onclick = () => {
+            if (this.tournamentType === 'online') {
+                this.renderOnlineLobby();
+            } else {
+                this.renderLobby();
+            }
+        };
+        
+        this.container.appendChild(backButton);
     }
 
     private renderRegistration(): void {
@@ -209,20 +241,22 @@ export class TournamentPage {
         const currentPlayers = this.participants.length;
         const remaining = maxPlayers - currentPlayers;
         const isFull = currentPlayers >= maxPlayers;
+        const isLocal = this.tournament.type === 'local';
 
         const title = document.createElement('h1');
-        title.textContent = 'Tournament Registration';
+        title.textContent = `${isLocal ? 'Local' : 'Online'} Tournament Registration`;
         title.className = 'text-4xl font-bold text-white mb-4 gradient-text';
         
         const subtitle = document.createElement('p');
         subtitle.textContent = `${maxPlayers}-Player Tournament`;
         subtitle.className = 'text-gray-300 text-lg mb-2 text-center';
         
-        // Add creator info
-        const creatorInfo = document.createElement('p');
-        if (this.participants.length > 0) {
+        // Only show creator info for online tournaments
+        if (!isLocal && this.participants.length > 0) {
+            const creatorInfo = document.createElement('p');
             creatorInfo.textContent = `Created by ${this.participants[0].alias}`;
             creatorInfo.className = 'text-blue-400 text-sm mb-4 text-center';
+            this.container.appendChild(creatorInfo);
         }
         
         const playerCount = document.createElement('p');
@@ -365,7 +399,8 @@ export class TournamentPage {
             this.tournament = null;
             this.participants = [];
             this.matches = [];
-            this.updateUI();
+            this.clearTournamentId();
+            this.renderSizeSelection();
         };
         
         buttonContainer.appendChild(startButton);
@@ -593,42 +628,65 @@ export class TournamentPage {
         title.className = 'text-4xl font-bold text-white text-center mb-8 gradient-text';
 
         const subtitle = document.createElement('p');
-        subtitle.textContent = 'Join or create tournaments to compete with others!';
+        subtitle.textContent = 'Choose your tournament mode!';
         subtitle.className = 'text-gray-300 text-lg mb-12 text-center';
 
-        const createSection = document.createElement('div');
-        createSection.className = 'text-gray-300 text-lg mb-12 text-center';
+        // Tournament Type Selection
+        const typeSection = document.createElement('div');
+        typeSection.className = 'grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto mb-12';
 
-        const createTitile = document.createElement('h2');
-        createTitile.textContent = 'Create a New Tournament';
-        createTitile.className = 'text-2xl font-semibold text-white mb-4 text-center';
+        const localCard = document.createElement('div');
+        localCard.className = 'glass-effect p-8 rounded-2xl cursor-pointer transition-all duration-300 border-2 border-accent-purple hover:-translate-y-2 text-center';
+        localCard.onclick = () => {
+            this.tournamentType = 'local';
+            this.renderSizeSelection();
+        };
 
-        const createButton = document.createElement('button');
-        createButton.textContent = '➕ Create Tournament';
-        createButton.className = 'btn-primary text-lg px-8 py-4 mx-auto block';
-        createButton.onclick = () => this.renderSizeSelection();
+        const localEmoji = document.createElement('div');
+        localEmoji.className = 'text-7xl mb-4';
+        localEmoji.textContent = '🎮';
 
-        createSection.appendChild(createTitile);
-        createSection.appendChild(createButton);
+        const localTitle = document.createElement('h3');
+        localTitle.className = 'text-3xl font-bold text-white mb-3';
+        localTitle.textContent = 'Local Tournament';
 
-        const availableSection = document.createElement('div');
-        availableSection.className = 'glass-effect p-8 rounded-2xl';
+        const localDesc = document.createElement('p');
+        localDesc.className = 'text-gray-300';
+        localDesc.textContent = 'Play with friends on the same computer';
 
-        const availableTitle = document.createElement('h2');
-        availableTitle.textContent = 'Available Tournaments to Join';
-        availableTitle.className = 'text-2xl font-semibold text-white mb-6 text-center';
+        localCard.appendChild(localEmoji);
+        localCard.appendChild(localTitle);
+        localCard.appendChild(localDesc);
 
-        availableSection.appendChild(availableTitle);
+        const onlineCard = document.createElement('div');
+        onlineCard.className = 'glass-effect p-8 rounded-2xl cursor-pointer transition-all duration-300 border-2 border-accent-pink hover:-translate-y-2 text-center';
+        onlineCard.onclick = () => {
+            this.tournamentType = 'online';
+            this.renderOnlineLobby();
+        };
 
-        const loading = document.createElement('p');
-        loading.textContent = 'Loading available tournaments...';
-        loading.className = 'text-gray-400 text-center';
-        availableSection.appendChild(loading);
+        const onlineEmoji = document.createElement('div');
+        onlineEmoji.className = 'text-7xl mb-4';
+        onlineEmoji.textContent = '🌐';
+
+        const onlineTitle = document.createElement('h3');
+        onlineTitle.className = 'text-3xl font-bold text-white mb-3';
+        onlineTitle.textContent = 'Online Tournament';
+
+        const onlineDesc = document.createElement('p');
+        onlineDesc.className = 'text-gray-300';
+        onlineDesc.textContent = 'Create or join tournaments with other players';
+
+        onlineCard.appendChild(onlineEmoji);
+        onlineCard.appendChild(onlineTitle);
+        onlineCard.appendChild(onlineDesc);
+
+        typeSection.appendChild(localCard);
+        typeSection.appendChild(onlineCard);
 
         this.container.appendChild(title);
         this.container.appendChild(subtitle);
-        this.container.appendChild(createSection);
-        this.container.appendChild(availableSection);
+        this.container.appendChild(typeSection);
 
         try {
             const tournaments = await TournamentAPI.getJoinableTournaments();
@@ -701,6 +759,130 @@ export class TournamentPage {
             availableSection.appendChild(errorMsg);
         }
     }
+
+    private async renderOnlineLobby(): Promise<void> {
+        if (!this.container) return;
+        this.container.innerHTML = '';
+        
+        const title = document.createElement('h1');
+        title.textContent = 'Online Tournament Lobby';
+        title.className = 'text-4xl font-bold text-white text-center mb-8 gradient-text';
+
+        const subtitle = document.createElement('p');
+        subtitle.textContent = 'Join or create tournaments to compete with others!';
+        subtitle.className = 'text-gray-300 text-lg mb-12 text-center';
+
+        const createSection = document.createElement('div');
+        createSection.className = 'text-center mb-12';
+
+        const createTitle = document.createElement('h2');
+        createTitle.textContent = 'Create a New Tournament';
+        createTitle.className = 'text-2xl font-semibold text-white mb-4';
+
+        const createButton = document.createElement('button');
+        createButton.textContent = '➕ Create Tournament';
+        createButton.className = 'btn-primary text-lg px-8 py-4';
+        createButton.onclick = () => this.renderSizeSelection();
+
+        createSection.appendChild(createTitle);
+        createSection.appendChild(createButton);
+
+        const availableSection = document.createElement('div');
+        availableSection.className = 'glass-effect p-8 rounded-2xl';
+
+        const availableTitle = document.createElement('h2');
+        availableTitle.textContent = 'Available Tournaments to Join';
+        availableTitle.className = 'text-2xl font-semibold text-white mb-6 text-center';
+
+        availableSection.appendChild(availableTitle);
+
+        const loading = document.createElement('p');
+        loading.textContent = 'Loading available tournaments...';
+        loading.className = 'text-gray-400 text-center';
+        availableSection.appendChild(loading);
+
+        const backButton = document.createElement('button');
+        backButton.textContent = '← Back to Mode Selection';
+        backButton.className = 'bg-game-dark hover:bg-blue-800 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-300 mt-8 mx-auto block';
+        backButton.onclick = () => this.renderLobby();
+
+        this.container.appendChild(title);
+        this.container.appendChild(subtitle);
+        this.container.appendChild(createSection);
+        this.container.appendChild(availableSection);
+        this.container.appendChild(backButton);
+
+        try {
+            const tournaments = await TournamentAPI.getJoinableTournaments();
+            availableSection.removeChild(loading);
+
+            if (tournaments.length === 0) {
+                const noTournaments = document.createElement('p');
+                noTournaments.textContent = 'No available tournaments at the moment.';
+                noTournaments.className = 'text-gray-400 text-center';
+                availableSection.appendChild(noTournaments);
+            } else {
+                const tournamentsGrid = document.createElement('div');
+                tournamentsGrid.className = 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6';
+
+                tournaments.forEach(tournament => {
+                    const card = document.createElement('div');
+                    card.className = 'bg-game-dark p-6 rounded-xl hover:bg-blue-700 transition-all duration-300 cursor-pointer border-2 border-transparent hover:border-accent-pink';
+                    
+                    const tournamentName = document.createElement('h3');
+                    tournamentName.textContent = tournament.name;
+                    tournamentName.className = 'text-xl font-bold text-white mb-3';
+                    
+                    const info = document.createElement('div');
+                    info.className = 'space-y-2 text-gray-300 mb-4';
+                    
+                    const size = document.createElement('p');
+                    size.innerHTML = `<span class="text-accent-pink">⚡</span> ${tournament.max_players}-Player Tournament`;
+                    
+                    const slots = document.createElement('p');
+                    slots.innerHTML = `<span class="text-accent-purple">👥</span> ${tournament.available_slots} slot${tournament.available_slots > 1 ? 's' : ''} available`;
+                    
+                    const created = document.createElement('p');
+                    const createdDate = new Date(tournament.created_at);
+                    created.innerHTML = `<span class="text-blue-400">🕒</span> Created ${this.getTimeAgo(createdDate)}`;
+                    
+                    info.appendChild(size);
+                    info.appendChild(slots);
+                    info.appendChild(created);
+
+                    const joinButton = document.createElement('button');
+                    joinButton.textContent = 'Join Tournament';
+                    joinButton.className = 'btn-primary w-full text-sm py-2';
+                    joinButton.onclick = async (e) => {
+                        e.stopPropagation();
+                        await this.joinTournament(tournament);
+                    };
+                    
+                    card.appendChild(tournamentName);
+                    card.appendChild(info);
+                    card.appendChild(joinButton);
+                    
+                    tournamentsGrid.appendChild(card);
+                });
+
+                availableSection.appendChild(tournamentsGrid);
+            }
+
+            const refreshButton = document.createElement('button');
+            refreshButton.textContent = '🔄 Refresh';
+            refreshButton.className = 'bg-game-dark hover:bg-blue-800 text-white font-bold py-2 px-6 rounded-lg transition-colors duration-300 mt-6 mx-auto block';
+            refreshButton.onclick = () => this.renderOnlineLobby();
+            availableSection.appendChild(refreshButton);
+
+        } catch (error: any) {
+            availableSection.removeChild(loading);
+            const errorMsg = document.createElement('p');
+            errorMsg.textContent = `Error: ${AuthService.extractErrorMessage(error)}`;
+            errorMsg.className = 'text-red-500 text-center';
+            availableSection.appendChild(errorMsg);
+        }
+    }
+    // ...existing code...
 
     private getTimeAgo(date: Date): string {
         const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
