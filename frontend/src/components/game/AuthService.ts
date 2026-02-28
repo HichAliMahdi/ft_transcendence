@@ -9,6 +9,8 @@ interface AuthResponse {
         email: string;
         display_name: string;
     };
+    requires2FA?: boolean;
+    tempToken?: string;
 }
 
 interface User {
@@ -557,5 +559,25 @@ export class AuthService {
             body: JSON.stringify({ currentPassword, newPassword })
         });
         if (!resp.ok) await this.parseResponseError(resp);
+    }
+    static async submit2FA(code: string, tempToken: string): Promise<AuthResponse> {
+        const res = await fetch(`${API_BASE}/auth/2fa/login`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${tempToken}`
+            },
+            body: JSON.stringify({ code })
+        });
+
+        const data: AuthResponse = await res.json();
+        if (!res.ok) throw data;
+
+        if (!data.requires2FA && data.token && data.user) this.storeAuthData(data.token, data.user);
+
+        return data;
+    }
+    static setCurrentUser(user: User) {
+        localStorage.setItem(this.USER_KEY, JSON.stringify(user));
     }
 }

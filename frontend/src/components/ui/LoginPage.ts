@@ -2,89 +2,127 @@ import { AuthService } from "../game/AuthService";
 
 export class LoginPage {
     private container: HTMLElement | null = null;
+    private tempToken: string | null = null; // For 2FA stage
 
     public render(): HTMLElement {
         this.container = document.createElement('div');
         this.container.className = 'container mx-auto p-8 max-w-md fade-in';
 
+        // Title
         const title = document.createElement('h1');
         title.textContent = 'Login';
         title.className = 'text-4xl font-bold text-white text-center mb-8 gradient-text';
 
+        // Form
         const form = document.createElement('form');
         form.className = 'glass-effect p-8 rounded-2xl';
 
+        // Username
         const usernameLabel = document.createElement('label');
         usernameLabel.textContent = 'Username';
         usernameLabel.className = 'block text-white mb-2 font-semibold';
-
         const usernameInput = document.createElement('input');
         usernameInput.type = 'text';
         usernameInput.required = true;
         usernameInput.placeholder = 'Enter your username';
         usernameInput.className = 'w-full px-4 py-3 rounded-lg bg-game-dark text-white border-2 border-gray-600 focus:border-accent-pink focus:outline-none mb-4';
 
+        // Password
         const passwordLabel = document.createElement('label');
         passwordLabel.textContent = 'Password';
         passwordLabel.className = 'block text-white mb-2 font-semibold';
-
         const passwordInput = document.createElement('input');
         passwordInput.type = 'password';
         passwordInput.required = true;
         passwordInput.placeholder = 'Enter your password';
         passwordInput.className = 'w-full px-4 py-3 rounded-lg bg-game-dark text-white border-2 border-gray-600 focus:border-accent-pink focus:outline-none mb-6';
 
+        // 2FA Input (hidden initially)
+        const twofaLabel = document.createElement('label');
+        twofaLabel.textContent = '2FA Code';
+        twofaLabel.className = 'block text-white mb-2 font-semibold hidden';
+        const twofaInput = document.createElement('input');
+        twofaInput.type = 'text';
+        twofaInput.placeholder = 'Enter your 2FA code';
+        twofaInput.className = 'w-full px-4 py-3 rounded-lg bg-game-dark text-white border-2 border-gray-600 focus:border-accent-pink focus:outline-none mb-4 hidden';
+
+        // Error message
         const errorMsg = document.createElement('p');
         errorMsg.className = 'text-red-500 text-sm mb-4 hidden';
 
+        // Submit Button
         const submitButton = document.createElement('button');
         submitButton.type = 'submit';
         submitButton.textContent = 'Login';
         submitButton.className = 'btn-primary w-full text-lg py-3';
 
+        // Register Link
         const registerLink = document.createElement('p');
         registerLink.className = 'text-center text-gray-300 mt-4';
-
         const registerText = document.createTextNode("Don't have an account? ");
         const registerAnchor = document.createElement('a');
         registerAnchor.href = '/register';
         registerAnchor.setAttribute('data-link', '');
         registerAnchor.className = 'text-accent-pink hover:text-accent-purple transition-colors duration-300';
         registerAnchor.textContent = 'Register here';
-        
         registerLink.appendChild(registerText);
         registerLink.appendChild(registerAnchor);
 
+        // Form Submission
         form.onsubmit = async (e) => {
             e.preventDefault();
             errorMsg.classList.add('hidden');
             submitButton.disabled = true;
-            submitButton.textContent = 'Logging in...';
 
             try {
-                await AuthService.login(usernameInput.value, passwordInput.value);
-                // Navigate via the router (push state + trigger popstate) so app reacts immediately
-                const redirectUrl = sessionStorage.getItem('redirectAfterLogin');
-                if (redirectUrl) {
-                    sessionStorage.removeItem('redirectAfterLogin');
-                    history.replaceState(null, '', redirectUrl);
+                if (!twofaInput.classList.contains('hidden')) {
+                    // Stage 2: submit 2FA code
+                    submitButton.textContent = 'Verifying 2FA...';
+                    const user = await AuthService.submit2FA(twofaInput.value, this.tempToken!);
+                    localStorage.setItem('token', AuthService.getToken());
+                    AuthService.setCurrentUser(user);
+
                 } else {
-                    history.replaceState(null, '', '/');
+                    // Stage 1: submit username + password
+                    submitButton.textContent = 'Logging in...';
+                    const res = await AuthService.login(usernameInput.value, passwordInput.value);
+
+                    if (res.requires2FA) {
+                        // Show 2FA input
+                        twofaLabel.classList.remove('hidden');
+                        twofaInput.classList.remove('hidden');
+                        this.tempToken = res.tempToken;
+                        submitButton.textContent = 'Verify 2FA';
+                        submitButton.disabled = false;
+                        return;
+                    }
+
+                    // Successful login
+                    localStorage.setItem('token', res.token);
+                    AuthService.setCurrentUser(res.user);
                 }
-                // Trigger router to handle the new route without full page reload
+
+                // Navigate
+                const redirectUrl = sessionStorage.getItem('redirectAfterLogin') || '/';
+                sessionStorage.removeItem('redirectAfterLogin');
+                history.replaceState(null, '', redirectUrl);
                 window.dispatchEvent(new PopStateEvent('popstate'));
+
             } catch (error: any) {
                 errorMsg.textContent = AuthService.extractErrorMessage(error);
                 errorMsg.classList.remove('hidden');
                 submitButton.disabled = false;
-                submitButton.textContent = 'Login';
+                submitButton.textContent = twofaInput.classList.contains('hidden') ? 'Login' : 'Verify 2FA';
             }
         };
 
+        // Append all elements
         form.appendChild(usernameLabel);
         form.appendChild(usernameInput);
         form.appendChild(passwordLabel);
         form.appendChild(passwordInput);
+        form.appendChild(twofaLabel);
+        form.appendChild(twofaInput);
         form.appendChild(errorMsg);
         form.appendChild(submitButton);
         form.appendChild(registerLink);
@@ -99,6 +137,7 @@ export class LoginPage {
         if (this.container) {
             this.container.remove();
             this.container = null;
+            this.tempToken = null;
         }
-    }       
+    }
 }
