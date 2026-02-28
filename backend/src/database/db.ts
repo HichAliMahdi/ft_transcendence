@@ -15,6 +15,11 @@ export function initializeDatabase(): void {
             is_online INTEGER DEFAULT 0,
             status TEXT NOT NULL DEFAULT 'Offline',
             last_seen DATETIME DEFAULT CURRENT_TIMESTAMP,
+            twofa_enabled INTEGER DEFAULT 0,
+            twofa_secret TEXT,
+            twofa_temp_secret TEXT,
+            twofa_attempts INTEGER DEFAULT 0,
+            twofa_locked_until DATETIME
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
