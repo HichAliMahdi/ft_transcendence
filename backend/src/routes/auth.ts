@@ -1,4 +1,6 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
+import { authenticator } from 'otplib';
+import QRCode from 'qrcode';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { db } from '../database/db';
@@ -62,7 +64,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
             }
         }
     );
-    
+
     fastify.post<{ Body: LoginBody }>(
         '/auth/login',
         async (request, reply) => {
@@ -73,7 +75,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
             }
 
             try {
-                const user = db.prepare('SELECT * FROM users WHERE username = ?').get(username) as any;
+                const user = db.prepare('SELECT id, username, email, display_name, password_hash, twofa_enabled FROM users WHERE username = ?').get(username) as any;
                 if (!user) {
                     return reply.status(401).send({ message: 'Invalid username or password' });
                 }
@@ -83,14 +85,24 @@ export default async function authRoutes(fastify: FastifyInstance) {
                     return reply.status(401).send({ message: 'Invalid username or password' });
                 }
 
+                if (user.twofa_enabled) {
+                    const tempToken = jwt.sign(
+                        { userId: user.id, stage: '2fa' },
+                        config.jwt.secret,
+                        { expiresIn: '5m', issuer: 'ft_transcendence_2fa' }
+                    );
+                    return reply.send({
+                        requires2FA: true,
+                        tempToken
+                    });
+                }
+                const token = jwt.sign(
+                    { userId: user.id },
+                    config.jwt.secret,
+                    { expiresIn: '7d', issuer: 'ft_transcendence' }
+                );
                 // mark user online and status Online
                 db.prepare('UPDATE users SET is_online = 1, last_seen = CURRENT_TIMESTAMP, status = ? WHERE id = ?').run('Online', user.id);
-                
-                const token = jwt.sign(
-                    { userId: user.id }, 
-                    config.jwt.secret,
-                    { expiresIn: '7d' }
-                );
                 reply.code(200).send({
                     message: 'Login successful',
                     token,
@@ -102,7 +114,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
             }
         }
     );
-    
+
     fastify.post('/auth/logout', async (request, reply) => {
         try {
             const authHeader = request.headers.authorization;
@@ -119,7 +131,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
             const userId = decoded.userId;
 
             db.prepare('UPDATE users SET is_online = 0, last_seen = CURRENT_TIMESTAMP, status = ? WHERE id = ?').run('Offline', userId);
-            
+
             // Broadcast offline status to all connected clients
             try {
                 broadcastPresenceUpdate(userId, 'Offline', false);
@@ -133,7 +145,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
             reply.code(500).send({ message: formatErr(error) });
         }
     });
-    
+
     fastify.get('/auth/me', async (request, reply) => {
         try {
             const authHeader = request.headers.authorization;
@@ -167,25 +179,163 @@ export default async function authRoutes(fastify: FastifyInstance) {
             if (!authHeader) return reply.status(401).send({ message: 'Unauthorized' });
             const token = authHeader.split(' ')[1];
             if (!token) return reply.status(401).send({ message: 'Token missing' });
-            
+
             const decoded = jwt.verify(token, config.jwt.secret) as { userId: number };
             const { currentPassword, newPassword } = request.body as any;
-            
+
             if (!currentPassword || !newPassword) return reply.status(400).send({ message: 'All fields required' });
             if (newPassword.length < 8) return reply.status(400).send({ message: 'Password must be 8+ characters' });
-            
+
             const user = db.prepare('SELECT * FROM users WHERE id = ?').get(decoded.userId) as any;
             if (!user) return reply.status(404).send({ message: 'User not found' });
-            
+
             const valid = await bcrypt.compare(currentPassword, user.password_hash);
             if (!valid) return reply.status(401).send({ message: 'Current password incorrect' });
-            
+
             const hash = await bcrypt.hash(newPassword, 10);
             db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hash, decoded.userId);
             reply.send({ message: 'Password changed successfully' });
         } catch (error) {
             fastify.log.error(error);
             reply.code(500).send({ message: formatErr(error) });
+        }
+    });
+    fastify.post('/auth/2fa/setup', async (request, reply) => {
+        try {
+            const authHeader = request.headers.authorization;
+            if (!authHeader) return reply.status(401).send({ message: 'Unauthorized' });
+
+            const token = authHeader.split(' ')[1];
+            const decoded = jwt.verify(token, config.jwt.secret) as { userId: number };
+
+            const user = db.prepare('SELECT twofa_enabled FROM users WHERE id = ?')
+                .get(decoded.userId) as any;
+
+            if (user.twofa_enabled)
+                return reply.status(400).send({ message: '2FA already enabled' });
+
+            const secret = authenticator.generateSecret();
+
+            db.prepare('UPDATE users SET twofa_temp_secret = ? WHERE id = ?')
+                .run(secret, decoded.userId);
+
+            const otpauth = authenticator.keyuri(
+                decoded.userId.toString(),
+                'FT_TRANSCENDENCE',
+                secret
+            );
+
+            const qrCode = await QRCode.toDataURL(otpauth);
+
+            reply.send({
+                message: 'Scan QR code with authenticator app',
+                qrCode
+            });
+
+        } catch (error) {
+            reply.status(500).send({ message: '2FA setup failed' });
+        }
+    });
+    fastify.post('/auth/2fa/verify', async (request, reply) => {
+        try {
+            const authHeader = request.headers.authorization;
+            if (!authHeader) return reply.status(401).send({ message: 'Unauthorized' });
+
+            const token = authHeader.split(' ')[1];
+            const decoded = jwt.verify(token, config.jwt.secret) as { userId: number };
+
+            const { code } = request.body as any;
+            if (!code) return reply.status(400).send({ message: 'Code required' });
+
+            const user = db.prepare('SELECT twofa_temp_secret FROM users WHERE id = ?')
+                .get(decoded.userId) as any;
+
+            if (!user?.twofa_temp_secret)
+                return reply.status(400).send({ message: '2FA not initialized' });
+
+            const isValid = authenticator.verify({
+                token: code,
+                secret: user.twofa_temp_secret
+            });
+
+            if (!isValid)
+                return reply.status(400).send({ message: 'Invalid code' });
+
+            // Move temp secret to permanent
+            db.prepare(`
+            UPDATE users 
+            SET twofa_secret = ?, 
+                twofa_temp_secret = NULL, 
+                twofa_enabled = 1
+            WHERE id = ?
+        `).run(user.twofa_temp_secret, decoded.userId);
+
+            reply.send({ message: '2FA enabled successfully' });
+
+        } catch (error) {
+            reply.status(500).send({ message: 'Verification failed' });
+        }
+    });
+    fastify.post('/auth/2fa/disable', async (request, reply) => {
+        const authHeader = request.headers.authorization;
+        if (!authHeader) return reply.status(401).send({ message: 'Unauthorized' });
+
+        const token = authHeader.split(' ')[1];
+        const decoded = jwt.verify(token, config.jwt.secret) as { userId: number };
+
+        db.prepare(`
+        UPDATE users 
+        SET twofa_enabled = 0, 
+            twofa_secret = NULL 
+        WHERE id = ?
+    `).run(decoded.userId);
+
+        reply.send({ message: '2FA disabled' });
+    });
+    fastify.post('/auth/2fa/login', async (request, reply) => {
+        try {
+            const authHeader = request.headers.authorization;
+            if (!authHeader) return reply.status(401).send({ message: 'Unauthorized' });
+            const tempToken = authHeader.split(' ')[1];
+            const decoded = jwt.verify(tempToken, config.jwt.secret) as any;
+
+            if (decoded.stage !== '2fa')
+                return reply.status(400).send({ message: 'Invalid 2FA stage token' });
+            const { code } = request.body as any;
+            const userId = decoded.userId;
+            if (!code) return reply.status(400).send({ message: 'Missing 2FA code' });
+            if (!userId || !code)
+                return reply.status(400).send({ message: 'Missing data' });
+
+            const user = db.prepare('SELECT * FROM users WHERE id = ?')
+                .get(userId) as any;
+
+            if (!user || !user.twofa_enabled)
+                return reply.status(400).send({ message: 'Invalid request' });
+
+            const valid = authenticator.verify({
+                token: code,
+                secret: user.twofa_secret
+            });
+
+            if (!valid)
+                return reply.status(401).send({ message: 'Invalid 2FA code' });
+
+                        // mark user online and status Online
+            db.prepare('UPDATE users SET is_online = 1, last_seen = CURRENT_TIMESTAMP, status = ? WHERE id = ?').run('Online', user.id);
+            const token = jwt.sign(
+                { userId: user.id },
+                config.jwt.secret,
+                { expiresIn: '7d', issuer: 'ft_transcendence' }
+            );
+            reply.code(200).send({
+                message: 'Login successful',
+                token,
+                user: { id: user.id, username: user.username, email: user.email, display_name: user.display_name, status: 'Online', is_online: 1 }
+            });
+
+        } catch (error) {
+            reply.status(500).send({ message: '2FA login failed' });
         }
     });
 }
