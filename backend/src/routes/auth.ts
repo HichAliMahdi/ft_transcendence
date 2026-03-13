@@ -1,5 +1,5 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import { authenticator } from 'otplib';
+import { authenticator } from '@otplib/preset-default';
 import QRCode from 'qrcode';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
@@ -203,28 +203,50 @@ export default async function authRoutes(fastify: FastifyInstance) {
     fastify.post('/auth/2fa/setup', async (request, reply) => {
         try {
             const authHeader = request.headers.authorization;
-            if (!authHeader) return reply.status(401).send({ message: 'Unauthorized' });
+            if (!authHeader) {
+                return reply.status(401).send({ message: 'Unauthorized' });
+            }
 
             const token = authHeader.split(' ')[1];
-            const decoded = jwt.verify(token, config.jwt.secret) as { userId: number };
+            if (!token) {
+                return reply.status(401).send({ message: 'Token missing' });
+            }
 
-            const user = db.prepare('SELECT twofa_enabled FROM users WHERE id = ?')
-                .get(decoded.userId) as any;
+            // Safe JWT decoding
+            interface JwtPayload {
+                userId: number;
+                stage?: string;
+                iat?: number;
+                exp?: number;
+            }
 
-            if (user.twofa_enabled)
+            const decodedRaw = jwt.verify(token, config.jwt.secret as string);
+
+            // Runtime check
+            if (typeof decodedRaw !== 'object' || decodedRaw === null || !('userId' in decodedRaw)) {
+                return reply.status(401).send({ message: 'Invalid token' });
+            }
+
+            const decoded = decodedRaw as JwtPayload;
+            const userId = decoded.userId;
+
+            // Fetch user from DB
+            const user = db.prepare('SELECT twofa_enabled FROM users WHERE id = ?').get(userId) as any;
+            if (!user) {
+                return reply.status(404).send({ message: 'User not found' });
+            }
+
+            if (user.twofa_enabled) {
                 return reply.status(400).send({ message: '2FA already enabled' });
+            }
 
+            // Generate temporary secret
             const secret = authenticator.generateSecret();
 
-            db.prepare('UPDATE users SET twofa_temp_secret = ? WHERE id = ?')
-                .run(secret, decoded.userId);
+            db.prepare('UPDATE users SET twofa_temp_secret = ? WHERE id = ?').run(secret, userId);
 
-            const otpauth = authenticator.keyuri(
-                decoded.userId.toString(),
-                'FT_TRANSCENDENCE',
-                secret
-            );
-
+            // Generate QR code for authenticator app
+            const otpauth = authenticator.keyuri(userId.toString(), 'FT_TRANSCENDENCE', secret);
             const qrCode = await QRCode.toDataURL(otpauth);
 
             reply.send({
@@ -242,24 +264,38 @@ export default async function authRoutes(fastify: FastifyInstance) {
             if (!authHeader) return reply.status(401).send({ message: 'Unauthorized' });
 
             const token = authHeader.split(' ')[1];
-            const decoded = jwt.verify(token, config.jwt.secret) as { userId: number };
+            if (!token) return reply.status(401).send({ message: 'Token missing' });
+
+            // Safe JWT decoding
+            interface JwtPayload {
+                userId: number;
+                stage?: string;
+                iat?: number;
+                exp?: number;
+            }
+
+            const decodedRaw = jwt.verify(token, config.jwt.secret as string);
+
+            // Runtime check
+            if (typeof decodedRaw !== 'object' || decodedRaw === null || !('userId' in decodedRaw)) {
+                return reply.status(401).send({ message: 'Invalid token' });
+            }
+
+            const decoded = decodedRaw as JwtPayload;
+            const userId = decoded.userId;
 
             const { code } = request.body as any;
             if (!code) return reply.status(400).send({ message: 'Code required' });
 
-            const user = db.prepare('SELECT twofa_temp_secret FROM users WHERE id = ?')
-                .get(decoded.userId) as any;
-
-            if (!user?.twofa_temp_secret)
-                return reply.status(400).send({ message: '2FA not initialized' });
+            const user = db.prepare('SELECT twofa_temp_secret FROM users WHERE id = ?').get(userId) as any;
+            if (!user?.twofa_temp_secret) return reply.status(400).send({ message: '2FA not initialized' });
 
             const isValid = authenticator.verify({
                 token: code,
                 secret: user.twofa_temp_secret
             });
 
-            if (!isValid)
-                return reply.status(400).send({ message: 'Invalid code' });
+            if (!isValid) return reply.status(400).send({ message: 'Invalid code' });
 
             // Move temp secret to permanent
             db.prepare(`
@@ -268,7 +304,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
                 twofa_temp_secret = NULL, 
                 twofa_enabled = 1
             WHERE id = ?
-        `).run(user.twofa_temp_secret, decoded.userId);
+        `).run(user.twofa_temp_secret, userId);
 
             reply.send({ message: '2FA enabled successfully' });
 
@@ -277,20 +313,44 @@ export default async function authRoutes(fastify: FastifyInstance) {
         }
     });
     fastify.post('/auth/2fa/disable', async (request, reply) => {
-        const authHeader = request.headers.authorization;
-        if (!authHeader) return reply.status(401).send({ message: 'Unauthorized' });
+        try {
+            const authHeader = request.headers.authorization;
+            if (!authHeader) return reply.status(401).send({ message: 'Unauthorized' });
 
-        const token = authHeader.split(' ')[1];
-        const decoded = jwt.verify(token, config.jwt.secret) as { userId: number };
+            const token = authHeader.split(' ')[1];
+            if (!token) return reply.status(401).send({ message: 'Token missing' });
 
-        db.prepare(`
-        UPDATE users 
-        SET twofa_enabled = 0, 
-            twofa_secret = NULL 
-        WHERE id = ?
-    `).run(decoded.userId);
+            // Safe JWT decoding
+            interface JwtPayload {
+                userId: number;
+                stage?: string;
+                iat?: number;
+                exp?: number;
+            }
 
-        reply.send({ message: '2FA disabled' });
+            const decodedRaw = jwt.verify(token, config.jwt.secret as string);
+
+            // Runtime check to ensure decoded payload has userId
+            if (typeof decodedRaw !== 'object' || decodedRaw === null || !('userId' in decodedRaw)) {
+                return reply.status(401).send({ message: 'Invalid token' });
+            }
+
+            const decoded = decodedRaw as JwtPayload;
+            const userId = decoded.userId;
+
+            // Disable 2FA
+            db.prepare(`
+            UPDATE users 
+            SET twofa_enabled = 0, 
+                twofa_secret = NULL 
+            WHERE id = ?
+        `).run(userId);
+
+            reply.send({ message: '2FA disabled' });
+
+        } catch (error) {
+            reply.status(500).send({ message: 'Failed to disable 2FA' });
+        }
     });
     fastify.post('/auth/2fa/login', async (request, reply) => {
         try {
@@ -329,7 +389,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
             if (!valid)
                 return reply.status(401).send({ message: 'Invalid 2FA code' });
 
-                        // mark user online and status Online
+            // mark user online and status Online
             db.prepare('UPDATE users SET is_online = 1, last_seen = CURRENT_TIMESTAMP, status = ? WHERE id = ?').run('Online', user.id);
             const token = jwt.sign(
                 { userId: user.id },
