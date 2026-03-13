@@ -71,7 +71,7 @@ export class Setup2FAPage {
                     try {
                         const code = codeInput.value.trim();
                         if (!code) throw { message: 'Code required' };
-                        const verifyRes = await fetch('/auth/2fa/verify', {
+                        const verifyRes = await fetch(`${API_BASE}/auth/2fa/verify`, {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
