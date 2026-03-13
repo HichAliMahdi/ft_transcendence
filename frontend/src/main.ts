@@ -496,6 +496,13 @@ class App {
             settingsLink.className = 'flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-white/10 transition-colors duration-200 text-white';
             settingsLink.innerHTML = '<span class="text-lg">⚙️</span><span>Settings</span>';
             
+
+            const settings2faLink = document.createElement('a');
+            settings2faLink.href = '/settings2fa';
+            settings2faLink.setAttribute('data-link', '');
+            settings2faLink.className = 'flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-white/10 transition-colors duration-200 text-white';
+            settings2faLink.innerHTML = '<span class="text-lg">⚙️</span><span>2FA Settings</span>';
+
             const divider = document.createElement('div');
             divider.className = 'h-px bg-white/10 my-2';
             
@@ -513,6 +520,8 @@ class App {
             };
             
             dropdownContent.appendChild(settingsLink);
+            dropdownContent.appendChild(divider);
+            dropdownContent.appendChild(settings2faLink);
             dropdownContent.appendChild(divider);
             dropdownContent.appendChild(logoutBtn);
             dropdown.appendChild(dropdownContent);
