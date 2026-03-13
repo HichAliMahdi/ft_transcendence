@@ -52,7 +52,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
                     'INSERT INTO users (username, email, password_hash, display_name, is_online, status, avatar_url) VALUES (?, ?, ?, ?, 1, ?, ?)'
                 ).run(username, email, password_hash, display_name, 'Online', '/default-avatar.png');
 
-                const token = jwt.sign({ userId: result.lastInsertRowid }, config.jwt.secret, { expiresIn: '7d' });
+                const token = jwt.sign({ userId: result.lastInsertRowid }, config.jwt.secret as string, { expiresIn: '7d' });
                 reply.code(201).send({
                     message: 'User registered successfully',
                     token,
@@ -88,7 +88,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
                 if (user.twofa_enabled) {
                     const tempToken = jwt.sign(
                         { userId: user.id, stage: '2fa' },
-                        config.jwt.secret,
+                        config.jwt.secret as string,
                         { expiresIn: '5m', issuer: 'ft_transcendence_2fa' }
                     );
                     return reply.send({
@@ -98,7 +98,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
                 }
                 const token = jwt.sign(
                     { userId: user.id },
-                    config.jwt.secret,
+                    config.jwt.secret as string,
                     { expiresIn: '7d', issuer: 'ft_transcendence' }
                 );
                 // mark user online and status Online
@@ -297,7 +297,15 @@ export default async function authRoutes(fastify: FastifyInstance) {
             const authHeader = request.headers.authorization;
             if (!authHeader) return reply.status(401).send({ message: 'Unauthorized' });
             const tempToken = authHeader.split(' ')[1];
-            const decoded = jwt.verify(tempToken, config.jwt.secret) as any;
+
+            if (!tempToken) {
+                return reply.status(401).send({ message: 'Unauthorized' });
+            }
+
+            const decoded = jwt.verify(
+                tempToken,
+                config.jwt.secret as string
+            ) as unknown as { userId: number; stage?: string };
 
             if (decoded.stage !== '2fa')
                 return reply.status(400).send({ message: 'Invalid 2FA stage token' });
@@ -325,7 +333,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
             db.prepare('UPDATE users SET is_online = 1, last_seen = CURRENT_TIMESTAMP, status = ? WHERE id = ?').run('Online', user.id);
             const token = jwt.sign(
                 { userId: user.id },
-                config.jwt.secret,
+                config.jwt.secret as string,
                 { expiresIn: '7d', issuer: 'ft_transcendence' }
             );
             reply.code(200).send({

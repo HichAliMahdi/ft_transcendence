@@ -78,9 +78,10 @@ export class LoginPage {
                 if (!twofaInput.classList.contains('hidden')) {
                     // Stage 2: submit 2FA code
                     submitButton.textContent = 'Verifying 2FA...';
-                    const user = await AuthService.submit2FA(twofaInput.value, this.tempToken!);
-                    localStorage.setItem('token', AuthService.getToken());
-                    AuthService.setCurrentUser(user);
+                    const res = await AuthService.submit2FA(twofaInput.value, this.tempToken!);
+                    const token = AuthService.getToken();
+                    if (token) localStorage.setItem('token', token);
+                    if (res.user) AuthService.setCurrentUser(res.user);
 
                 } else {
                     // Stage 1: submit username + password
@@ -91,14 +92,14 @@ export class LoginPage {
                         // Show 2FA input
                         twofaLabel.classList.remove('hidden');
                         twofaInput.classList.remove('hidden');
-                        this.tempToken = res.tempToken;
+                        this.tempToken = res.tempToken || null;
                         submitButton.textContent = 'Verify 2FA';
                         submitButton.disabled = false;
                         return;
                     }
 
                     // Successful login
-                    localStorage.setItem('token', res.token);
+                    if (res.token) localStorage.setItem('token', res.token);
                     AuthService.setCurrentUser(res.user);
                 }
 
