@@ -21,6 +21,7 @@ interface User {
     avatar_url?: string;
     is_online?: number;
     status?: string;
+    twofa_enabled?: number;
 }
 
 export class AuthService {

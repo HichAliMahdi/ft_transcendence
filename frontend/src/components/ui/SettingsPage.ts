@@ -300,6 +300,12 @@ export class SettingsPage {
                     <button type="button" id="cancel-pwd" class="px-6 py-3 rounded-lg bg-game-dark text-white hover:bg-gray-700 transition-colors">Cancel</button>
                 </div>
             </form>
+            <div class="mb-6 m2-4">
+                <hr class="mt-6">
+                <div id="2fa-toggle" class="flex items-center gap-3 px-4 py-3 rounded-lg bg-game-dark border-2 border-gray-600 cursor-pointer hover:border-accent-pink transition-colors">
+                    <a class="btn-primary w-full text-lg py-3 text-center">Enable/Disable 2 Factor Authentication</a>
+                </div>
+            </div>
         `;
         const passwordToggle = securitySection.querySelector('#password-toggle') as HTMLElement;
         const pwdForm = securitySection.querySelector('#password-form') as HTMLFormElement;

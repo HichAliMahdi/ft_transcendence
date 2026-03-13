@@ -1,21 +1,29 @@
 const API_BASE = '/api';
+import { AuthService } from '../game/AuthService';
 
 export class Setup2FAPage {
     private container: HTMLElement | null = null;
 
     public render(): HTMLElement {
+        let usr = AuthService.getUser();
+        let twofa_enabled = 0;
+        if (usr && usr.twofa_enabled == 1) twofa_enabled = 1;
+
         this.container = document.createElement('div');
         this.container.className = 'container mx-auto p-8 max-w-md fade-in';
 
         const title = document.createElement('h1');
         title.textContent = 'Enable 2FA';
+        if (twofa_enabled) title.textContent = 'Disable 2FA';
         title.className = 'text-4xl font-bold text-white text-center mb-8 gradient-text';
         this.container.appendChild(title);
 
-        const info = document.createElement('p');
-        info.textContent = 'Scan this QR code with your authenticator app, then enter the code to confirm.';
-        info.className = 'text-white mb-6';
-        this.container.appendChild(info);
+        if (!twofa_enabled) {
+            const info = document.createElement('p');
+            info.textContent = 'Scan this QR code with your authenticator app, then enter the code to confirm.';
+            info.className = 'text-white mb-6';
+            this.container.appendChild(info);
+        }
 
         // QR Code container
         const qrImg = document.createElement('img');
@@ -38,70 +46,107 @@ export class Setup2FAPage {
         const submitButton = document.createElement('button');
         submitButton.className = 'btn-primary w-full text-lg py-3';
         submitButton.textContent = 'Enable 2FA';
+        if (twofa_enabled) submitButton.textContent = 'Disable 2FA';
         this.container.appendChild(submitButton);
         // Step 1: Fetch QR code
-        submitButton.onclick = async () => {
-            errorMsg.classList.add('hidden');
-            submitButton.disabled = true;
-            submitButton.textContent = 'Generating QR code...';
+        if (twofa_enabled) {
+            submitButton.onclick = async () => {
+                errorMsg.classList.add('hidden');
+                submitButton.disabled = true;
+                submitButton.textContent = 'Disable 2FA...';
 
-            try {
-                const token = localStorage.getItem('auth_token');
-                const res = await fetch(`${API_BASE}/auth/2fa/setup`, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${token}`
+                try {
+                    const token = localStorage.getItem('auth_token');
+                    const res = await fetch(`${API_BASE}/auth/2fa/disable`, {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${token}`
+                        }
+                    });
+                    const data = await res.json();
+                    if (!res.ok) throw data;
+                    if (usr) {
+                        usr.twofa_enabled = 0;
+                        localStorage.setItem('user_data', JSON.stringify(usr));
                     }
-                });
-                const data = await res.json();
-                if (!res.ok) throw data;
+                    alert('2FA disabled successfully!');
+                    history.replaceState(null, '', '/profile');
+                    window.dispatchEvent(new PopStateEvent('popstate'));
 
-                qrImg.src = data.qrCode;
-                qrImg.classList.remove('hidden');
-                codeInput.classList.remove('hidden');
-                submitButton.textContent = 'Verify 2FA';
-                submitButton.disabled = false;
+                } catch (err: any) {
+                    errorMsg.textContent = err.message || 'Failed to generate QR code';
+                    errorMsg.classList.remove('hidden');
+                    submitButton.disabled = false;
+                    submitButton.textContent = 'Enable 2FA';
+                }
+            };
+        } else {
+            submitButton.onclick = async () => {
+                errorMsg.classList.add('hidden');
+                submitButton.disabled = true;
+                submitButton.textContent = 'Generating QR code...';
 
-                // Change button to verification step
-                submitButton.onclick = async () => {
-                    errorMsg.classList.add('hidden');
-                    submitButton.disabled = true;
-                    submitButton.textContent = 'Verifying...';
+                try {
+                    const token = localStorage.getItem('auth_token');
+                    const res = await fetch(`${API_BASE}/auth/2fa/setup`, {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${token}`
+                        }
+                    });
+                    const data = await res.json();
+                    if (!res.ok) throw data;
 
-                    try {
-                        const code = codeInput.value.trim();
-                        if (!code) throw { message: 'Code required' };
-                        const verifyRes = await fetch(`${API_BASE}/auth/2fa/verify`, {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'Authorization': `Bearer ${token}`
-                            },
-                            body: JSON.stringify({ code })
-                        });
-                        const verifyData = await verifyRes.json();
-                        if (!verifyRes.ok) throw verifyData;
+                    qrImg.src = data.qrCode;
+                    qrImg.classList.remove('hidden');
+                    codeInput.classList.remove('hidden');
+                    submitButton.textContent = 'Verify 2FA';
+                    submitButton.disabled = false;
 
-                        alert('2FA enabled successfully!');
-                        // Optionally redirect to profile or dashboard
-                        history.replaceState(null, '', '/profile');
-                        window.dispatchEvent(new PopStateEvent('popstate'));
+                    // Change button to verification step
+                    submitButton.onclick = async () => {
+                        errorMsg.classList.add('hidden');
+                        submitButton.disabled = true;
+                        submitButton.textContent = 'Verifying...';
 
-                    } catch (err: any) {
-                        errorMsg.textContent = err.message || '2FA verification failed';
-                        errorMsg.classList.remove('hidden');
-                        submitButton.disabled = false;
-                        submitButton.textContent = 'Verify 2FA';
-                    }
-                };
+                        try {
+                            const code = codeInput.value.trim();
+                            if (!code) throw { message: 'Code required' };
+                            const verifyRes = await fetch(`${API_BASE}/auth/2fa/verify`, {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'Authorization': `Bearer ${token}`
+                                },
+                                body: JSON.stringify({ code })
+                            });
+                            const verifyData = await verifyRes.json();
+                            if (!verifyRes.ok) throw verifyData;
+                            if (usr) {
+                                usr.twofa_enabled = 1;
+                                localStorage.setItem('user_data', JSON.stringify(usr));
+                            }
+                            alert('2FA enabled successfully!');
+                            // Optionally redirect to profile or dashboard
+                            history.replaceState(null, '', '/profile');
+                            window.dispatchEvent(new PopStateEvent('popstate'));
 
-            } catch (err: any) {
-                errorMsg.textContent = err.message || 'Failed to generate QR code';
-                errorMsg.classList.remove('hidden');
-                submitButton.disabled = false;
-                submitButton.textContent = 'Enable 2FA';
-            }
-        };
+                        } catch (err: any) {
+                            errorMsg.textContent = err.message || '2FA verification failed';
+                            errorMsg.classList.remove('hidden');
+                            submitButton.disabled = false;
+                            submitButton.textContent = 'Verify 2FA';
+                        }
+                    };
+
+                } catch (err: any) {
+                    errorMsg.textContent = err.message || 'Failed to generate QR code';
+                    errorMsg.classList.remove('hidden');
+                    submitButton.disabled = false;
+                    submitButton.textContent = 'Enable 2FA';
+                }
+            };
+        }
 
         return this.container;
     }
