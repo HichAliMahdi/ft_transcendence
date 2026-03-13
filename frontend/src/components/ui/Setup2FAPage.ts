@@ -46,7 +46,7 @@ export class Setup2FAPage {
             submitButton.textContent = 'Generating QR code...';
 
             try {
-                const token = localStorage.getItem('token');
+                const token = localStorage.getItem('auth_token');
                 const res = await fetch(`${API_BASE}/auth/2fa/setup`, {
                     method: 'POST',
                     headers: {

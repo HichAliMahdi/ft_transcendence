@@ -56,7 +56,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
                 reply.code(201).send({
                     message: 'User registered successfully',
                     token,
-                    user: { id: result.lastInsertRowid, username, email, display_name, status: 'Online', is_online: 1, avatar_url: '/default-avatar.png' }
+                    user: { id: result.lastInsertRowid, username, email, display_name, status: 'Online', is_online: 1, avatar_url: '/default-avatar.png', twofa_enabled: 0 }
                 });
             } catch (error) {
                 fastify.log.error(error);
@@ -106,7 +106,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
                 reply.code(200).send({
                     message: 'Login successful',
                     token,
-                    user: { id: user.id, username: user.username, email: user.email, display_name: user.display_name, status: 'Online', is_online: 1 }
+                    user: { id: user.id, username: user.username, email: user.email, display_name: user.display_name, status: 'Online', is_online: 1, twofa_enabled: user.twofa_enabled }
                 });
             } catch (error) {
                 fastify.log.error(error);
@@ -280,26 +280,10 @@ export default async function authRoutes(fastify: FastifyInstance) {
         try {
             const authHeader = request.headers.authorization;
             if (!authHeader) return reply.status(401).send({ message: 'Unauthorized' });
-
             const token = authHeader.split(' ')[1];
             if (!token) return reply.status(401).send({ message: 'Token missing' });
 
-            // Safe JWT decoding
-            interface JwtPayload {
-                userId: number;
-                stage?: string;
-                iat?: number;
-                exp?: number;
-            }
-
-            const decodedRaw = jwt.verify(token, config.jwt.secret as string);
-
-            // Runtime check to ensure decoded payload has userId
-            if (typeof decodedRaw !== 'object' || decodedRaw === null || !('userId' in decodedRaw)) {
-                return reply.status(401).send({ message: 'Invalid token' });
-            }
-
-            const decoded = decodedRaw as JwtPayload;
+            const decoded = jwt.verify(token, config.jwt.secret) as { userId: number };
             const userId = decoded.userId;
 
             // Disable 2FA
@@ -363,7 +347,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
             reply.code(200).send({
                 message: 'Login successful',
                 token,
-                user: { id: user.id, username: user.username, email: user.email, display_name: user.display_name, status: 'Online', is_online: 1 }
+                user: { id: user.id, username: user.username, email: user.email, display_name: user.display_name, status: 'Online', is_online: 1, twofa_enabled: user.twofa_enabled }
             });
 
         } catch (error) {

@@ -79,8 +79,8 @@ export class LoginPage {
                     // Stage 2: submit 2FA code
                     submitButton.textContent = 'Verifying 2FA...';
                     const res = await AuthService.submit2FA(twofaInput.value, this.tempToken!);
-                    const token = AuthService.getToken();
-                    if (token) localStorage.setItem('token', token);
+                    // const token = AuthService.getToken();
+                    // if (token) localStorage.setItem('token', token);
                     if (res.user) AuthService.setCurrentUser(res.user);
 
                 } else {
@@ -99,7 +99,7 @@ export class LoginPage {
                     }
 
                     // Successful login
-                    if (res.token) localStorage.setItem('token', res.token);
+                    // if (res.token) localStorage.setItem('token', res.token);
                     AuthService.setCurrentUser(res.user);
                 }
 

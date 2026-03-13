@@ -144,7 +144,9 @@ export class AuthService {
         }
 
         const data: AuthResponse = await response.json();
-        this.storeAuthData(data.token, data.user);
+        if (data?.token && data?.user) {
+            this.storeAuthData(data.token, data.user);
+        }
         return data;
     }
 
