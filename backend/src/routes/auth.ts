@@ -203,31 +203,11 @@ export default async function authRoutes(fastify: FastifyInstance) {
     fastify.post('/auth/2fa/setup', async (request, reply) => {
         try {
             const authHeader = request.headers.authorization;
-            if (!authHeader) {
-                return reply.status(401).send({ message: 'Unauthorized' });
-            }
-
+            if (!authHeader) return reply.status(401).send({ message: 'Unauthorized' });
             const token = authHeader.split(' ')[1];
-            if (!token) {
-                return reply.status(401).send({ message: 'Token missing' });
-            }
+            if (!token) return reply.status(401).send({ message: 'Token missing' });
 
-            // Safe JWT decoding
-            interface JwtPayload {
-                userId: number;
-                stage?: string;
-                iat?: number;
-                exp?: number;
-            }
-
-            const decodedRaw = jwt.verify(token, config.jwt.secret as string);
-
-            // Runtime check
-            if (typeof decodedRaw !== 'object' || decodedRaw === null || !('userId' in decodedRaw)) {
-                return reply.status(401).send({ message: 'Invalid token' });
-            }
-
-            const decoded = decodedRaw as JwtPayload;
+            const decoded = jwt.verify(token, config.jwt.secret) as { userId: number };
             const userId = decoded.userId;
 
             // Fetch user from DB
@@ -246,7 +226,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
             db.prepare('UPDATE users SET twofa_temp_secret = ? WHERE id = ?').run(secret, userId);
 
             // Generate QR code for authenticator app
-            const otpauth = authenticator.keyuri(userId.toString(), 'FT_TRANSCENDENCE', secret);
+            const otpauth = authenticator.keyuri(decoded.userId.toString(), 'FT_TRANSCENDENCE', secret);
             const qrCode = await QRCode.toDataURL(otpauth);
 
             reply.send({
@@ -255,33 +235,17 @@ export default async function authRoutes(fastify: FastifyInstance) {
             });
 
         } catch (error) {
-            reply.status(500).send({ message: '2FA setup failed' });
+            reply.status(500).send({ message: '2FA setup failed', details:  String(error)});
         }
     });
     fastify.post('/auth/2fa/verify', async (request, reply) => {
         try {
             const authHeader = request.headers.authorization;
             if (!authHeader) return reply.status(401).send({ message: 'Unauthorized' });
-
             const token = authHeader.split(' ')[1];
             if (!token) return reply.status(401).send({ message: 'Token missing' });
 
-            // Safe JWT decoding
-            interface JwtPayload {
-                userId: number;
-                stage?: string;
-                iat?: number;
-                exp?: number;
-            }
-
-            const decodedRaw = jwt.verify(token, config.jwt.secret as string);
-
-            // Runtime check
-            if (typeof decodedRaw !== 'object' || decodedRaw === null || !('userId' in decodedRaw)) {
-                return reply.status(401).send({ message: 'Invalid token' });
-            }
-
-            const decoded = decodedRaw as JwtPayload;
+            const decoded = jwt.verify(token, config.jwt.secret) as { userId: number };
             const userId = decoded.userId;
 
             const { code } = request.body as any;
