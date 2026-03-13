@@ -1,3 +1,5 @@
+const API_BASE = '/api';
+
 export class Setup2FAPage {
     private container: HTMLElement | null = null;
 
@@ -45,7 +47,7 @@ export class Setup2FAPage {
 
             try {
                 const token = localStorage.getItem('token');
-                const res = await fetch('/auth/2fa/setup', {
+                const res = await fetch(`${API_BASE}/auth/2fa/setup`, {
                     method: 'POST',
                     headers: {
                         'Authorization': `Bearer ${token}`
