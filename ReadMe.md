@@ -1,40 +1,60 @@
-ACTION PLAN TO REACH 100%
-Week 1: Critical Fixes
+Critical Requirements
 
-Complete 2FA implementation (TOTP + backup codes)
-Fix tournament to work without registration
-Add XSS/CSRF protection
-Remove any security vulnerabilities
+Privacy Policy & Terms of Service: Two pages with real content, accessible from the app footer. Missing pages may lead to project rejection during peer review.
 
-Week 2: Add 7th Major Module
-Choose one:
+README.md must include:
+Italicized first line with test logins, Description, Setup Instructions, Resources (including AI usage), and the following sections:
+Team Information (roles), Project Management, Technical Stack, Database Schema, Features, Modules with point calculation, Individual Contributions.
 
-OAuth 2.0 (easiest, recommended)
-Blockchain score storage (impressive)
-WAF/ModSecurity (production-grade)
+High Priority
 
-Week 3: Polish & Testing
+2FA Completion
 
-Test all features thoroughly
-Fix any bugs discovered
-Ensure browser compatibility
-Prepare defense materials
+Add backup codes
 
+Implement rate limiting / account lockout after failed attempts
 
-🚨 BLOCKING ISSUES FOR EVALUATION
-These MUST be fixed before submission:
+Use existing DB fields twofa_attempts and twofa_locked_until.
 
-❌ 2FA incomplete - Major module not fully implemented
-❌ Tournament requires auth - Subject says it should work without
-⚠️ Security concerns - SQL injection, XSS, CSRF risks
-⚠️ Only 6/7 major modules - Need one more for 100%
+Tournament Anonymous Mode
 
+Local tournaments must work without authentication.
 
-💡 QUICK WINS
-These are easy improvements:
+Game Statistics
 
-✅ Add input sanitization library (DOMPurify)
-✅ Implement rate limiting (already have package)
-✅ Add CSP headers via Helmet
-✅ Create anonymous tournament mode
-✅ Add OAuth 2.0 (Google) - ~1 day work
+Stats currently use the matches table only.
+
+Results from the games table (tournaments) must also be included for correct win/loss tracking.
+
+Security
+
+XSS Protection: Sanitize user content (e.g., DOMPurify) and avoid unsafe innerHTML.
+
+Security Headers: Add Helmet.js (CSP, X-Frame-Options, etc.).
+
+CSRF Protection: Add CSRF middleware for state-changing requests.
+
+Rate Limiting: Protect login, register, and 2FA endpoints.
+
+Optional Module Choice (1 point)
+
+Advanced Chat Features (block users, game invites, notifications, profile access, typing indicators, read receipts)
+or
+
+OAuth 2.0 login (Google/GitHub) – simpler and recommended.
+
+Code Quality
+
+No browser console errors or warnings (latest Chrome).
+
+Clean TypeScript build (make check-frontend).
+
+Add .env.example and remove .env secrets from the repository.
+
+Additional Checks
+
+Add footer links to legal pages.
+
+Verify multi-user simultaneous support (WebSockets, sessions).
+
+Ensure compatibility with latest stable Chrome.
