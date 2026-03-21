@@ -61,4 +61,4 @@ frontend/dist/
 
 # Coverage
 coverage/
-.nyc_output/
+.nyc_output/.env
