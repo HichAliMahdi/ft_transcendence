@@ -51,7 +51,7 @@ export class Setup2FAPage {
         // Step 1: Fetch QR code
         if (twofa_enabled) {
             const regenerateButton = document.createElement('button');
-            regenerateButton.className = 'btn-primary w-full text-lg py-3';
+            regenerateButton.className = 'btn-primary w-full text-lg py-3 mt-4';
             regenerateButton.textContent = 'Regenerate backup codes';
             this.container.appendChild(regenerateButton);
             regenerateButton.onclick = async () => {
@@ -120,13 +120,14 @@ export class Setup2FAPage {
                             URL.revokeObjectURL(url);
                         };
                         codesContainer.appendChild(downloadBtn);
+                        regenerateButton.remove();
                     }
 
                 } catch (err: any) {
                     errorMsg.textContent = err.message || 'Failed to regenerate backup codes';
                     errorMsg.classList.remove('hidden');
+                    regenerateButton.disabled = false;
                 }
-                regenerateButton.disabled = false;
                 submitButton.disabled = false;
             };
             submitButton.onclick = async () => {

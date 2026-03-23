@@ -323,7 +323,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
                 db.prepare(`INSERT INTO backup_codes (user_id, code_hash) VALUES (?, ?)`).run(userId, hashCode(code));
             }
 
-            return { backupCodes: codes };
+            reply.send({ message: '2FA regenerate backup codes successfully', backupCodes: codes });
 
         } catch (error) {
             fastify.log.error(error);
