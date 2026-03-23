@@ -34,6 +34,13 @@ interface LoginBody {
     password: string;
 }
 
+interface BackupCode {
+    id: number;
+    user_id: number;
+    code_hash: string;
+    used: number;
+}
+
 export default async function authRoutes(fastify: FastifyInstance) {
     const formatErr = (e: any) => (e instanceof Error ? e.message : String(e));
 
@@ -362,7 +369,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
                 const backup = db.prepare(`
                     SELECT * FROM backup_codes
                     WHERE user_id = ? AND code_hash = ? AND used = 0
-                `).get(userId, hashed);
+                `).get(userId, hashed) as BackupCode | undefined;
                 if (!backup)
                     return reply.status(401).send({ message: 'Invalid 2FA code' });
                 db.prepare(`
