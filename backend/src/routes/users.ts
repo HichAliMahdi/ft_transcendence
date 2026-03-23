@@ -308,7 +308,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
 
       const target = db.prepare('SELECT id FROM users WHERE username = ?').get(username) as { id?: number } | undefined;
       if (!target || !target.id) {
-        return reply.status(401).send({ message: 'User not found' });
+        return reply.status(404).send({ message: 'User not found' });
       }
       const targetId = Number(target.id);
       const senderId = auth.userId;

@@ -8,9 +8,9 @@ Team Information (roles), Project Management, Technical Stack, Database Schema, 
 
 High Priority
 
-2FA Completion
+2FA Completion --> Done
 
-Add backup codes
+Add backup codes --> Done
 
 Implement rate limiting / account lockout after failed attempts
 

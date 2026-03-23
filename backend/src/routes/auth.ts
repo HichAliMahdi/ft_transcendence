@@ -107,12 +107,12 @@ export default async function authRoutes(fastify: FastifyInstance) {
             try {
                 const user = db.prepare('SELECT id, username, email, display_name, password_hash, twofa_enabled FROM users WHERE username = ?').get(username) as any;
                 if (!user) {
-                    return reply.status(401).send({ message: 'Invalid username or password' });
+                    return reply.status(404).send({ message: 'Invalid username or password' });
                 }
 
                 const passwordMatch = await bcrypt.compare(password, user.password_hash);
                 if (!passwordMatch) {
-                    return reply.status(401).send({ message: 'Invalid username or password' });
+                    return reply.status(404).send({ message: 'Invalid username or password' });
                 }
 
                 if (user.twofa_enabled) {
@@ -223,7 +223,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
             const decoded = jwt.verify(token, config.jwt.secret) as { userId: number };
             const userId = decoded.userId;
 
-            const user = db.prepare('SELECT id, username, email, display_name, avatar_url, is_online, status, last_seen, created_at, updated_at FROM users WHERE id = ?').get(userId);
+            const user = db.prepare('SELECT id, username, email, display_name, avatar_url, is_online, status, last_seen, twofa_enabled, created_at, updated_at FROM users WHERE id = ?').get(userId);
             if (!user) {
                 return reply.status(401).send({ message: 'User not found' });
             }
