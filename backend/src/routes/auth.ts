@@ -304,6 +304,32 @@ export default async function authRoutes(fastify: FastifyInstance) {
             reply.status(500).send({ message: 'Verification failed' });
         }
     });
+    fastify.post('/auth/2fa/backup/regenerate', async (request, reply) => {
+        try {
+            const authHeader = request.headers.authorization;
+            if (!authHeader) return reply.status(401).send({ message: 'Unauthorized' });
+            const token = authHeader.split(' ')[1];
+            if (!token) return reply.status(401).send({ message: 'Token missing' });
+
+            const decoded = jwt.verify(token, config.jwt.secret) as { userId: number };
+            const userId = decoded.userId;
+
+            // delete old codes
+            db.prepare('DELETE FROM backup_codes WHERE user_id = ?').run(userId);
+
+            const codes = generateBackupCodes();
+
+            for (const code of codes) {
+                db.prepare(`INSERT INTO backup_codes (user_id, code_hash) VALUES (?, ?)`).run(userId, hashCode(code));
+            }
+
+            return { backupCodes: codes };
+
+        } catch (error) {
+            fastify.log.error(error);
+            reply.code(500).send({ message: formatErr(error) });
+        }
+    });
     fastify.post('/auth/2fa/disable', async (request, reply) => {
         try {
             const authHeader = request.headers.authorization;
