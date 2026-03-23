@@ -25,9 +25,32 @@ interface User {
 }
 
 export class AuthService {
-    private static TOKEN_KEY = 'auth_token';
     private static USER_KEY = 'user_data';
     private static PREVIOUS_STATUS_KEY = 'previous_status';
+
+    private static memoryToken: string | null = null;
+    private static memoryUser: User | null = null;
+
+    static async initializeAuth(): Promise<void> {
+        if (this.memoryToken && this.memoryUser) return; // already set
+
+        try {
+            const res = await fetch(`${API_BASE}/auth/me`, {
+                credentials: 'include' // send HttpOnly cookie
+            });
+
+            if (!res.ok) return;
+
+            const data = await res.json();
+
+            // Set in-memory token if backend returns one (optional)
+            if (data.token) this.memoryToken = data.token;
+            this.memoryUser = data.user;
+        } catch {
+            this.memoryToken = null;
+            this.memoryUser = null;
+        }
+    }
 
     // Normalize various error shapes into a user-friendly single-line message
     static extractErrorMessage(err: any): string {
@@ -88,9 +111,9 @@ export class AuthService {
 
     private static async parseResponseError(response: Response): Promise<never> {
         const status = response.status as number ?? 0;
-        if (status == 404)
+        if (status == 401)
         {
-            this.clearAuth();
+            await this.logout();
             window.location.href = '/login';
         }
         // Try to read the body as text and parse JSON if possible.
@@ -158,53 +181,40 @@ export class AuthService {
     }
 
     static async logout(): Promise<void> {
-        const token = this.getToken();
-        if (token) {
-            try {
-                const response = await fetch(`${API_BASE}/auth/logout`, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${token}`
-                    }
-                });
-                if (!response.ok) {
-                    try { await response.json(); } catch (_) {}
-                }
-            } catch (error) {
+        try {
+            const response = await fetch(`${API_BASE}/auth/logout`, {
+                method: 'POST',
+                credentials: 'include'
+            });
+            if (!response.ok) {
+                try { await response.json(); } catch (_) { }
             }
+        } catch (error) {
         }
         this.clearAuth();
     }
 
     static async delete(): Promise<void> {
-        const token = this.getToken();
-        if (token) {
-            try {
-                const response = await fetch(`${API_BASE}/auth/delete`, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${token}`
-                    }
-                });
-                if (!response.ok) {
-                    try { await response.json(); } catch (_) {}
-                }
-            } catch (error) {
+        try {
+            const response = await fetch(`${API_BASE}/auth/delete`, {
+                method: 'POST',
+                credentials: 'include'
+            });
+            if (!response.ok) {
+                try { await response.json(); } catch (_) { }
             }
+        } catch (error) {
         }
         this.clearAuth();
     }
 
     static async getCurrentUser(): Promise<User | null> {
-        const token = this.getToken();
-        if (!token) {
+        if (!this.isAuthenticated()) {
             return null;
         }
         try {
             const response = await fetch(`${API_BASE}/auth/me`, {
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
+                 credentials: 'include'
             });
 
             if (!response.ok) {
@@ -221,12 +231,12 @@ export class AuthService {
 
     // Set user's presence/status (Online | Busy | Away | Offline)
     static async setStatus(status: 'Online'|'Busy'|'Away'|'Offline'): Promise<User> {
-        const token = this.getToken();
         const user = this.getUser();
-        if (!token || !user) throw new Error('Not authenticated');
+        if (!this.isAuthenticated() || !user) throw new Error('Not authenticated');
         const resp = await fetch(`${API_BASE}/users/${user.id}/status`, {
             method: 'POST',
-            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+            headers: {'Content-Type': 'application/json' },
+            credentials: 'include',
             body: JSON.stringify({ status })
         });
         if (!resp.ok) {
@@ -236,6 +246,7 @@ export class AuthService {
         const updated = data.user;
         // update local cache
         try {
+            this.memoryUser = updated;
             localStorage.setItem(this.USER_KEY, JSON.stringify(updated));
             try { window.dispatchEvent(new Event('auth:change')); } catch (e) {}
         } catch (e) {}
@@ -286,35 +297,29 @@ export class AuthService {
     }
 
     static isAuthenticated(): boolean {
-        const token = this.getToken();
-        if (!token) return false;
-
-        try {
-            const payload = JSON.parse(atob(token.split('.')[1]));
-            return payload.exp * 1000 > Date.now();
-        } catch {
-            return false;
-        }
-    }
-
-    static getToken(): string | null {
-        return localStorage.getItem(this.TOKEN_KEY);
+        return !!this.memoryToken || !!this.memoryUser;
     }
 
     static getUser(): User | null {
+        // return this.memoryUser; // in-memory user object
+        if (this.memoryUser != null) return this.memoryUser;
         const userData = localStorage.getItem(this.USER_KEY);
         return userData ? JSON.parse(userData) : null;
     }
 
     private static storeAuthData(token: string, user: User): void {
-        localStorage.setItem(this.TOKEN_KEY, token);
+        // localStorage.setItem(this.TOKEN_KEY, token);
+        this.memoryToken = token;
+        this.memoryUser = user;
         localStorage.setItem(this.USER_KEY, JSON.stringify(user));
         // notify app that authentication state changed (login)
         try { window.dispatchEvent(new Event('auth:change')); } catch (e) {}
     }
 
     private static clearAuth(): void {
-        localStorage.removeItem(this.TOKEN_KEY);
+        this.memoryUser = null;
+        this.memoryToken = null;
+        // localStorage.removeItem(this.TOKEN_KEY);
         localStorage.removeItem(this.USER_KEY);
         // notify app that authentication state changed (logout)
         try { window.dispatchEvent(new Event('auth:change')); } catch (e) {}
@@ -323,10 +328,9 @@ export class AuthService {
     // --- added friend API helpers ---
 
     static async getFriends(userId: number): Promise<Array<{ id: number; username: string; display_name?: string; avatar_url?: string | null; is_online?: boolean; user_status?: string; status?: string; relation?: string }>> {
-        const token = this.getToken();
-        if (!token) throw new Error('Not authenticated');
+        if (!this.isAuthenticated()) throw new Error('Not authenticated');
         const resp = await fetch(`${API_BASE}/users/${userId}/friends`, {
-            headers: { 'Authorization': `Bearer ${token}` }
+            credentials: 'include'
         });
         if (!resp.ok) {
             await this.parseResponseError(resp);
@@ -346,11 +350,11 @@ export class AuthService {
     }
 
     static async sendFriendRequest(targetUserId: number): Promise<void> {
-        const token = this.getToken();
-        if (!token) throw new Error('Not authenticated');
+        if (!this.isAuthenticated()) throw new Error('Not authenticated');
         const resp = await fetch(`${API_BASE}/users/${targetUserId}/friends`, {
             method: 'POST',
-            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
+            headers: {'Content-Type': 'application/json' },
+            credentials: 'include'
         });
         if (!resp.ok) {
             await this.parseResponseError(resp);
@@ -358,11 +362,11 @@ export class AuthService {
     }
 
     static async sendFriendRequestByUsername(username: string): Promise<void> {
-        const token = this.getToken();
-        if (!token) throw new Error('Not authenticated');
+        if (!this.isAuthenticated()) throw new Error('Not authenticated');
         const resp = await fetch(`${API_BASE}/users/friends`, {
             method: 'POST',
-            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+            headers: {'Content-Type': 'application/json' },
+            credentials: 'include',
             body: JSON.stringify({ username })
         });
         if (!resp.ok) {
@@ -371,11 +375,10 @@ export class AuthService {
     }
 
     static async removeFriend(userId: number, friendId: number): Promise<void> {
-        const token = this.getToken();
-        if (!token) throw new Error('Not authenticated');
+        if (!this.isAuthenticated()) throw new Error('Not authenticated');
         const resp = await fetch(`${API_BASE}/users/${userId}/friends/${friendId}`, {
             method: 'DELETE',
-            headers: { 'Authorization': `Bearer ${token}` }
+            credentials: 'include'
         });
         if (!resp.ok) {
             await this.parseResponseError(resp);
@@ -384,11 +387,10 @@ export class AuthService {
 
     // Accept an incoming friend request (userId is the accepter/recipient, friendId is the original requester)
     static async acceptFriend(userId: number, friendId: number): Promise<void> {
-        const token = this.getToken();
-        if (!token) throw new Error('Not authenticated');
+        if (!this.isAuthenticated()) throw new Error('Not authenticated');
         const resp = await fetch(`${API_BASE}/users/${userId}/friends/${friendId}/accept`, {
             method: 'POST',
-            headers: { 'Authorization': `Bearer ${token}` }
+            credentials: 'include'
         });
         if (!resp.ok) {
             await this.parseResponseError(resp);
@@ -398,10 +400,9 @@ export class AuthService {
     // --- added notification API helpers ---
 
     static async getNotifications(): Promise<Array<{ id: number; user_id: number; actor_id?: number; type: string; payload?: any; is_read: number; created_at: string }>> {
-        const token = this.getToken();
-        if (!token) throw new Error('Not authenticated');
+        if (!this.isAuthenticated()) throw new Error('Not authenticated');
         const resp = await fetch(`${API_BASE}/notifications`, {
-            headers: { 'Authorization': `Bearer ${token}` }
+            credentials: 'include'
         });
         if (!resp.ok) {
             await this.parseResponseError(resp);
@@ -411,11 +412,10 @@ export class AuthService {
     }
 
     static async markNotificationRead(notificationId: number): Promise<void> {
-        const token = this.getToken();
-        if (!token) throw new Error('Not authenticated');
+        if (!this.isAuthenticated()) throw new Error('Not authenticated');
         const resp = await fetch(`${API_BASE}/notifications/${notificationId}/read`, {
             method: 'POST',
-            headers: { 'Authorization': `Bearer ${token}` }
+            credentials: 'include'
         });
         if (!resp.ok) {
             await this.parseResponseError(resp);
@@ -424,11 +424,10 @@ export class AuthService {
 
     // Delete a single notification
     static async deleteNotification(notificationId: number): Promise<void> {
-        const token = this.getToken();
-        if (!token) throw new Error('Not authenticated');
+        if (!this.isAuthenticated()) throw new Error('Not authenticated');
         const resp = await fetch(`${API_BASE}/notifications/${notificationId}`, {
             method: 'DELETE',
-            headers: { 'Authorization': `Bearer ${token}` }
+            credentials: 'include'
         });
         if (!resp.ok) {
             await this.parseResponseError(resp);
@@ -437,11 +436,10 @@ export class AuthService {
 
     // Clear all notifications for current user
     static async clearNotifications(): Promise<void> {
-        const token = this.getToken();
-        if (!token) throw new Error('Not authenticated');
+        if (!this.isAuthenticated()) throw new Error('Not authenticated');
         const resp = await fetch(`${API_BASE}/notifications`, {
             method: 'DELETE',
-            headers: { 'Authorization': `Bearer ${token}` }
+            credentials: 'include'
         });
         if (!resp.ok) {
             await this.parseResponseError(resp);
@@ -450,11 +448,10 @@ export class AuthService {
 
     // Mark all notifications as read
     static async markAllNotificationsRead(): Promise<void> {
-        const token = this.getToken();
-        if (!token) throw new Error('Not authenticated');
+        if (!this.isAuthenticated()) throw new Error('Not authenticated');
         const resp = await fetch(`${API_BASE}/notifications/read-all`, {
             method: 'POST',
-            headers: { 'Authorization': `Bearer ${token}` }
+            credentials: 'include',
         });
         if (!resp.ok) {
             await this.parseResponseError(resp);
@@ -463,16 +460,15 @@ export class AuthService {
 
     // Update display name
     static async updateDisplayName(newDisplayName: string): Promise<User> {
-        const token = this.getToken();
         const user = this.getUser();
-        if (!token || !user) throw new Error('Not authenticated');
+        if (!this.isAuthenticated() || !user) throw new Error('Not authenticated');
         
         const resp = await fetch(`${API_BASE}/users/${user.id}/display-name`, {
             method: 'PUT',
             headers: { 
-                'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json'
             },
+            credentials: 'include',
             body: JSON.stringify({ display_name: newDisplayName })
         });
         
@@ -485,6 +481,7 @@ export class AuthService {
         
         // Update local cache
         try {
+            this.memoryUser = updatedUser;
             localStorage.setItem(this.USER_KEY, JSON.stringify(updatedUser));
             window.dispatchEvent(new Event('auth:change'));
         } catch (e) {}
@@ -494,12 +491,11 @@ export class AuthService {
 
     // Fetch conversation between current user and peer
     static async getMessages(peerId: number): Promise<Array<{ id: number; sender_id: number; recipient_id: number; content: string; created_at: string }>> {
-        const token = this.getToken();
-        if (!token) throw new Error('Not authenticated');
+        if (!this.isAuthenticated()) throw new Error('Not authenticated');
         const me = this.getUser();
         if (!me) throw new Error('Not authenticated');
         const resp = await fetch(`${API_BASE}/users/${me.id}/messages?peer_id=${encodeURIComponent(String(peerId))}`, {
-            headers: { 'Authorization': `Bearer ${token}` }
+            credentials: 'include'
         });
         if (!resp.ok) await this.parseResponseError(resp);
         const data = await resp.json();
@@ -508,11 +504,11 @@ export class AuthService {
 
     // Send a direct message to peerId
     static async sendMessage(peerId: number, message: string): Promise<any> {
-        const token = this.getToken();
-        if (!token) throw new Error('Not authenticated');
+        if (!this.isAuthenticated()) throw new Error('Not authenticated');
         const resp = await fetch(`${API_BASE}/users/${peerId}/messages`, {
             method: 'POST',
-            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+            headers: {'Content-Type': 'application/json' },
+            credentials: 'include',
             body: JSON.stringify({ message })
         });
         if (!resp.ok) await this.parseResponseError(resp);
@@ -521,16 +517,15 @@ export class AuthService {
 
     // Upload avatar
     static async uploadAvatar(file: File): Promise<User> {
-        const token = this.getToken();
         const user = this.getUser();
-        if (!token || !user) throw new Error('Not authenticated');
+        if (!this.isAuthenticated() || !user) throw new Error('Not authenticated');
 
         const formData = new FormData();
         formData.append('file', file);
 
         const resp = await fetch(`${API_BASE}/users/${user.id}/avatar`, {
             method: 'POST',
-            headers: { 'Authorization': `Bearer ${token}` },
+            credentials: 'include',
             body: formData
         });
 
@@ -541,6 +536,7 @@ export class AuthService {
 
         // Update local cache
         try {
+            this.memoryUser = updatedUser;
             localStorage.setItem(this.USER_KEY, JSON.stringify(updatedUser));
             window.dispatchEvent(new Event('auth:change'));
         } catch (e) {}
@@ -550,13 +546,12 @@ export class AuthService {
 
     // Delete avatar
     static async deleteAvatar(): Promise<User> {
-        const token = this.getToken();
         const user = this.getUser();
-        if (!token || !user) throw new Error('Not authenticated');
+        if (!this.isAuthenticated() || !user) throw new Error('Not authenticated');
 
         const resp = await fetch(`${API_BASE}/users/${user.id}/avatar`, {
             method: 'DELETE',
-            headers: { 'Authorization': `Bearer ${token}` }
+            credentials: 'include'
         });
 
         if (!resp.ok) await this.parseResponseError(resp);
@@ -566,6 +561,7 @@ export class AuthService {
 
         // Update local cache
         try {
+            this.memoryUser = updatedUser;
             localStorage.setItem(this.USER_KEY, JSON.stringify(updatedUser));
             window.dispatchEvent(new Event('auth:change'));
         } catch (e) {}
@@ -587,11 +583,11 @@ export class AuthService {
     }
 
     static async changePassword(currentPassword: string, newPassword: string): Promise<void> {
-        const token = this.getToken();
-        if (!token) throw new Error('Not authenticated');
+        if (!this.isAuthenticated()) throw new Error('Not authenticated');
         const resp = await fetch(`${API_BASE}/auth/change-password`, {
             method: 'POST',
-            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+            headers: {'Content-Type': 'application/json' },
+            credentials: 'include',
             body: JSON.stringify({ currentPassword, newPassword })
         });
         if (!resp.ok) await this.parseResponseError(resp);
@@ -614,6 +610,7 @@ export class AuthService {
         return data;
     }
     static setCurrentUser(user: User) {
+        this.memoryUser = user;
         localStorage.setItem(this.USER_KEY, JSON.stringify(user));
     }
 }

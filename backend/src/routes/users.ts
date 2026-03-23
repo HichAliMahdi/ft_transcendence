@@ -11,8 +11,7 @@ import crypto from 'crypto';
 export default async function userRoutes(fastify: FastifyInstance) {
   fastify.get('/users/:id/stats', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
-      const authHeader = (request.headers.authorization || '') as string;
-      const token = authHeader.startsWith('Bearer ') ? authHeader.split(' ')[1] : null;
+      const token = request.cookies?.auth_token;
       if (!token) {
         return reply.status(401).send({ message: 'Token missing' });
       }
@@ -62,8 +61,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
   });
 
   function verifyAuth(request: FastifyRequest, reply: FastifyReply): { userId: number } | null {
-    const authHeader = (request.headers.authorization || '') as string;
-    const token = authHeader.startsWith('Bearer ') ? authHeader.split(' ')[1] : null;
+    const token = request.cookies?.auth_token;
     if (!token) {
       reply.status(401).send({ message: 'Token missing' });
       return null;
@@ -310,7 +308,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
 
       const target = db.prepare('SELECT id FROM users WHERE username = ?').get(username) as { id?: number } | undefined;
       if (!target || !target.id) {
-        return reply.status(404).send({ message: 'User not found' });
+        return reply.status(401).send({ message: 'User not found' });
       }
       const targetId = Number(target.id);
       const senderId = auth.userId;

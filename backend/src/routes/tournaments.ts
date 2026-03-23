@@ -158,10 +158,8 @@ export default async function tournamentRoutes(fastify: FastifyInstance) {
 
         // Get user ID from token for online tournaments
         let userId: number | undefined;
-        const authHeader = request.headers.authorization;
-        if (authHeader) {
           try {
-            const token = authHeader.split(' ')[1];
+            const token = request.cookies?.auth_token;
             if (token) {
               // Fix: only call jwt.verify if token is defined
               const decoded = jwt.verify(token, config.jwt.secret) as unknown as { userId: number };
@@ -170,7 +168,6 @@ export default async function tournamentRoutes(fastify: FastifyInstance) {
           } catch (e) {
             // Ignore auth errors for local tournaments
           }
-        }
 
         const success = TournamentService.addPlayer(tournamentId, alias.trim(), userId);
         

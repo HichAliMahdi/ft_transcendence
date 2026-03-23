@@ -9,6 +9,7 @@
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts"
   },
   "dependencies": {
+    "@fastify/cookie": "^8.2.0",
     "fastify": "^4.24.3",
     "@fastify/websocket": "^8.3.0",
     "@fastify/cors": "^8.4.1",

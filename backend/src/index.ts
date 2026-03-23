@@ -1,4 +1,5 @@
 import Fastify from 'fastify';
+import fastifyCookie from '@fastify/cookie';
 import cors from '@fastify/cors';
 import websocketPlugin from '@fastify/websocket';
 import multipart from '@fastify/multipart';
@@ -22,6 +23,13 @@ const fastify = Fastify({
     } : undefined,
   }
 });
+
+// Register cookie plugin
+fastify.register(fastifyCookie, {
+    secret: 'your-secret-key', // optional, used for signed cookies
+    parseOptions: {}           // optional
+});
+
 
 // Initialize database
 initializeDatabase();

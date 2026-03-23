@@ -75,6 +75,14 @@ export default async function authRoutes(fastify: FastifyInstance) {
                 ).run(username, email, password_hash, display_name, 'Online', '/default-avatar.png');
 
                 const token = jwt.sign({ userId: result.lastInsertRowid }, config.jwt.secret as string, { expiresIn: '7d' });
+                reply.setCookie('auth_token', token, {
+                    httpOnly: true,      // JS cannot read it
+                    // secure: false,       // true in production HTTPS
+                    sameSite: 'lax',     // CSRF protection
+                    path: '/',           // must match frontend requests
+                    maxAge: 7 * 24 * 60 * 60 // 7 days
+                });
+
                 reply.code(201).send({
                     message: 'User registered successfully',
                     token,
@@ -113,6 +121,13 @@ export default async function authRoutes(fastify: FastifyInstance) {
                         config.jwt.secret as string,
                         { expiresIn: '5m', issuer: 'ft_transcendence_2fa' }
                     );
+                    reply.setCookie('auth_token', tempToken, {
+                        httpOnly: true,      // JS cannot read it
+                        // secure: false,       // true in production HTTPS
+                        sameSite: 'lax',     // CSRF protection
+                        path: '/',           // must match frontend requests
+                        maxAge: 7 * 24 * 60 * 60 // 7 days
+                    });
                     return reply.send({
                         requires2FA: true,
                         tempToken
@@ -125,6 +140,13 @@ export default async function authRoutes(fastify: FastifyInstance) {
                 );
                 // mark user online and status Online
                 db.prepare('UPDATE users SET is_online = 1, last_seen = CURRENT_TIMESTAMP, status = ? WHERE id = ?').run('Online', user.id);
+                reply.setCookie('auth_token', token, {
+                    httpOnly: true,      // JS cannot read it
+                    // secure: false,       // true in production HTTPS
+                    sameSite: 'lax',     // CSRF protection
+                    path: '/',           // must match frontend requests
+                    maxAge: 7 * 24 * 60 * 60 // 7 days
+                });
                 reply.code(200).send({
                     message: 'Login successful',
                     token,
@@ -139,12 +161,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
 
     fastify.post('/auth/logout', async (request, reply) => {
         try {
-            const authHeader = request.headers.authorization;
-            if (!authHeader) {
-                return reply.status(401).send({ message: 'Authorization header missing' });
-            }
-
-            const token = authHeader.split(' ')[1];
+            const token = request.cookies?.auth_token;
             if (!token) {
                 return reply.status(401).send({ message: 'Token missing' });
             }
@@ -153,7 +170,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
             const userId = decoded.userId;
 
             db.prepare('UPDATE users SET is_online = 0, last_seen = CURRENT_TIMESTAMP, status = ? WHERE id = ?').run('Offline', userId);
-
+            reply.clearCookie('auth_token', { path: '/' });
             // Broadcast offline status to all connected clients
             try {
                 broadcastPresenceUpdate(userId, 'Offline', false);
@@ -170,19 +187,14 @@ export default async function authRoutes(fastify: FastifyInstance) {
 
     fastify.post('/auth/delete', async (request, reply) => {
         try {
-            const authHeader = request.headers.authorization;
-            if (!authHeader) {
-                return reply.status(401).send({ message: 'Authorization header missing' });
-            }
-
-            const token = authHeader.split(' ')[1];
+            const token = request.cookies?.auth_token;
             if (!token) {
                 return reply.status(401).send({ message: 'Token missing' });
             }
 
             const decoded = jwt.verify(token, config.jwt.secret) as { userId: number };
             const userId = decoded.userId;
-
+            reply.clearCookie('auth_token', { path: '/' });
             db.prepare('DELETE FROM backup_codes WHERE user_id = ?').run(userId);
             db.prepare('DELETE FROM users WHERE id = ?').run(userId);
 
@@ -203,12 +215,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
 
     fastify.get('/auth/me', async (request, reply) => {
         try {
-            const authHeader = request.headers.authorization;
-            if (!authHeader) {
-                return reply.status(401).send({ message: 'Authorization header missing' });
-            }
-
-            const token = authHeader.split(' ')[1];
+            const token = request.cookies?.auth_token;
             if (!token) {
                 return reply.status(401).send({ message: 'Token missing' });
             }
@@ -218,7 +225,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
 
             const user = db.prepare('SELECT id, username, email, display_name, avatar_url, is_online, status, last_seen, created_at, updated_at FROM users WHERE id = ?').get(userId);
             if (!user) {
-                return reply.status(404).send({ message: 'User not found' });
+                return reply.status(401).send({ message: 'User not found' });
             }
 
             reply.code(200).send({ user });
@@ -230,9 +237,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
 
     fastify.post('/auth/change-password', async (request, reply) => {
         try {
-            const authHeader = request.headers.authorization;
-            if (!authHeader) return reply.status(401).send({ message: 'Unauthorized' });
-            const token = authHeader.split(' ')[1];
+            const token = request.cookies?.auth_token;
             if (!token) return reply.status(401).send({ message: 'Token missing' });
 
             const decoded = jwt.verify(token, config.jwt.secret) as { userId: number };
@@ -242,7 +247,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
             if (newPassword.length < 8) return reply.status(400).send({ message: 'Password must be 8+ characters' });
 
             const user = db.prepare('SELECT * FROM users WHERE id = ?').get(decoded.userId) as any;
-            if (!user) return reply.status(404).send({ message: 'User not found' });
+            if (!user) return reply.status(401).send({ message: 'User not found' });
 
             const valid = await bcrypt.compare(currentPassword, user.password_hash);
             if (!valid) return reply.status(401).send({ message: 'Current password incorrect' });
@@ -257,9 +262,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
     });
     fastify.post('/auth/2fa/setup', async (request, reply) => {
         try {
-            const authHeader = request.headers.authorization;
-            if (!authHeader) return reply.status(401).send({ message: 'Unauthorized' });
-            const token = authHeader.split(' ')[1];
+            const token = request.cookies?.auth_token;
             if (!token) return reply.status(401).send({ message: 'Token missing' });
 
             const decoded = jwt.verify(token, config.jwt.secret) as { userId: number };
@@ -268,7 +271,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
             // Fetch user from DB
             const user = db.prepare('SELECT twofa_enabled FROM users WHERE id = ?').get(userId) as any;
             if (!user) {
-                return reply.status(404).send({ message: 'User not found' });
+                return reply.status(401).send({ message: 'User not found' });
             }
 
             if (user.twofa_enabled) {
@@ -295,9 +298,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
     });
     fastify.post('/auth/2fa/verify', async (request, reply) => {
         try {
-            const authHeader = request.headers.authorization;
-            if (!authHeader) return reply.status(401).send({ message: 'Unauthorized' });
-            const token = authHeader.split(' ')[1];
+            const token = request.cookies?.auth_token;
             if (!token) return reply.status(401).send({ message: 'Token missing' });
 
             const decoded = jwt.verify(token, config.jwt.secret) as { userId: number };
@@ -339,9 +340,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
     });
     fastify.post('/auth/2fa/backup/regenerate', async (request, reply) => {
         try {
-            const authHeader = request.headers.authorization;
-            if (!authHeader) return reply.status(401).send({ message: 'Unauthorized' });
-            const token = authHeader.split(' ')[1];
+            const token = request.cookies?.auth_token;
             if (!token) return reply.status(401).send({ message: 'Token missing' });
 
             const decoded = jwt.verify(token, config.jwt.secret) as { userId: number };
@@ -365,9 +364,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
     });
     fastify.post('/auth/2fa/disable', async (request, reply) => {
         try {
-            const authHeader = request.headers.authorization;
-            if (!authHeader) return reply.status(401).send({ message: 'Unauthorized' });
-            const token = authHeader.split(' ')[1];
+            const token = request.cookies?.auth_token;
             if (!token) return reply.status(401).send({ message: 'Token missing' });
 
             const decoded = jwt.verify(token, config.jwt.secret) as { userId: number };
@@ -391,9 +388,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
     });
     fastify.post('/auth/2fa/login', async (request, reply) => {
         try {
-            const authHeader = request.headers.authorization;
-            if (!authHeader) return reply.status(401).send({ message: 'Unauthorized' });
-            const tempToken = authHeader.split(' ')[1];
+            const tempToken = request.cookies?.auth_token;
 
             if (!tempToken) {
                 return reply.status(401).send({ message: 'Unauthorized' });
@@ -443,6 +438,13 @@ export default async function authRoutes(fastify: FastifyInstance) {
                 config.jwt.secret as string,
                 { expiresIn: '7d', issuer: 'ft_transcendence' }
             );
+            reply.setCookie('auth_token', token, {
+                    httpOnly: true,      // JS cannot read it
+                    // secure: false,       // true in production HTTPS
+                    sameSite: 'lax',     // CSRF protection
+                    path: '/',           // must match frontend requests
+                    maxAge: 7 * 24 * 60 * 60 // 7 days
+            });
             reply.code(200).send({
                 message: 'Login successful',
                 token,

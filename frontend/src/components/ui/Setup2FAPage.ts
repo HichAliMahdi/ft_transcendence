@@ -59,12 +59,9 @@ export class Setup2FAPage {
                 regenerateButton.textContent = 'Regenerate backup codes...';
 
                 try {
-                    const token = localStorage.getItem('auth_token');
                     const res = await fetch(`${API_BASE}/auth/2fa/backup/regenerate`, {
                         method: 'POST',
-                        headers: {
-                            'Authorization': `Bearer ${token}`
-                        }
+                        credentials: 'include'
                     });
                     const data = await res.json();
                     if (!res.ok) throw data;
@@ -134,12 +131,9 @@ export class Setup2FAPage {
                 submitButton.textContent = 'Disable 2FA...';
 
                 try {
-                    const token = localStorage.getItem('auth_token');
                     const res = await fetch(`${API_BASE}/auth/2fa/disable`, {
                         method: 'POST',
-                        headers: {
-                            'Authorization': `Bearer ${token}`
-                        }
+                        credentials: 'include'
                     });
                     const data = await res.json();
                     if (!res.ok) throw data;
@@ -164,12 +158,9 @@ export class Setup2FAPage {
                 submitButton.textContent = 'Generating QR code...';
 
                 try {
-                    const token = localStorage.getItem('auth_token');
                     const res = await fetch(`${API_BASE}/auth/2fa/setup`, {
                         method: 'POST',
-                        headers: {
-                            'Authorization': `Bearer ${token}`
-                        }
+                        credentials: 'include'
                     });
                     const data = await res.json();
                     if (!res.ok) throw data;
@@ -194,8 +185,8 @@ export class Setup2FAPage {
                                 method: 'POST',
                                 headers: {
                                     'Content-Type': 'application/json',
-                                    'Authorization': `Bearer ${token}`
                                 },
+                                credentials: 'include',
                                 body: JSON.stringify({ code })
                             });
                             const verifyData = await verifyRes.json();

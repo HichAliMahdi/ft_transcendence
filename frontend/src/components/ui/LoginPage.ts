@@ -79,8 +79,6 @@ export class LoginPage {
                     // Stage 2: submit 2FA code
                     submitButton.textContent = 'Verifying 2FA...';
                     const res = await AuthService.submit2FA(twofaInput.value, this.tempToken!);
-                    // const token = AuthService.getToken();
-                    // if (token) localStorage.setItem('token', token);
                     if (res.user) AuthService.setCurrentUser(res.user);
 
                 } else {
