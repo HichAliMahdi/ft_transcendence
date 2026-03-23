@@ -167,5 +167,14 @@ export function initializeDatabase(): void {
         LEFT JOIN tournaments t ON t.id = tp.tournament_id
         GROUP BY u.id
     `);
-    
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS backup_codes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            code_hash TEXT NOT NULL,
+            used INTEGER DEFAULT 0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        )
+    `);
 }

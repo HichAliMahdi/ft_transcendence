@@ -6,6 +6,21 @@ import jwt from 'jsonwebtoken';
 import { db } from '../database/db';
 import { config } from '../config';
 import { broadcastPresenceUpdate } from './websocket';
+import crypto from 'crypto';
+
+function generateBackupCodes(count = 8): string[] {
+    const codes: string[] = [];
+
+    for (let i = 0; i < count; i++) {
+        const code = crypto.randomBytes(4).toString('hex').toUpperCase();
+        codes.push(code);
+    }
+    return codes;
+}
+
+function hashCode(code: string): string {
+    return crypto.createHash('sha256').update(code).digest('hex');
+}
 
 interface RegisterBody {
     username: string;
@@ -235,7 +250,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
             });
 
         } catch (error) {
-            reply.status(500).send({ message: '2FA setup failed', details:  String(error)});
+            reply.status(500).send({ message: '2FA setup failed', details: String(error) });
         }
     });
     fastify.post('/auth/2fa/verify', async (request, reply) => {
@@ -269,9 +284,15 @@ export default async function authRoutes(fastify: FastifyInstance) {
                 twofa_enabled = 1
             WHERE id = ?
         `).run(user.twofa_temp_secret, userId);
-
-            reply.send({ message: '2FA enabled successfully' });
-
+            const codes = generateBackupCodes();
+            const insert = db.prepare(`
+                INSERT INTO backup_codes (user_id, code_hash)
+                VALUES (?, ?)
+            `);
+            for (const code of codes) {
+                insert.run(userId, hashCode(code));
+            }
+            reply.send({ message: '2FA enabled successfully', backupCodes: codes });
         } catch (error) {
             reply.status(500).send({ message: 'Verification failed' });
         }
@@ -293,9 +314,11 @@ export default async function authRoutes(fastify: FastifyInstance) {
                 twofa_secret = NULL 
             WHERE id = ?
         `).run(userId);
-
+            const removeCode = db.prepare(`
+                DELETE FROM backup_codes WHERE user_id = ?
+            `);
+            removeCode.run(userId);
             reply.send({ message: '2FA disabled' });
-
         } catch (error) {
             reply.status(500).send({ message: 'Failed to disable 2FA' });
         }
@@ -334,8 +357,18 @@ export default async function authRoutes(fastify: FastifyInstance) {
                 secret: user.twofa_secret
             });
 
-            if (!valid)
-                return reply.status(401).send({ message: 'Invalid 2FA code' });
+            if (!valid) {
+                const hashed = hashCode(code);
+                const backup = db.prepare(`
+                    SELECT * FROM backup_codes
+                    WHERE user_id = ? AND code_hash = ? AND used = 0
+                `).get(userId, hashed);
+                if (!backup)
+                    return reply.status(401).send({ message: 'Invalid 2FA code' });
+                db.prepare(`
+                    UPDATE backup_codes SET used = 1 WHERE id = ?
+                `).run(backup.id);
+            }
 
             // mark user online and status Online
             db.prepare('UPDATE users SET is_online = 1, last_seen = CURRENT_TIMESTAMP, status = ? WHERE id = ?').run('Online', user.id);
