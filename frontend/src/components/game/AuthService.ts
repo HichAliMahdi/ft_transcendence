@@ -176,6 +176,25 @@ export class AuthService {
         this.clearAuth();
     }
 
+    static async delete(): Promise<void> {
+        const token = this.getToken();
+        if (token) {
+            try {
+                const response = await fetch(`${API_BASE}/auth/delete`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                if (!response.ok) {
+                    try { await response.json(); } catch (_) {}
+                }
+            } catch (error) {
+            }
+        }
+        this.clearAuth();
+    }
+
     static async getCurrentUser(): Promise<User | null> {
         const token = this.getToken();
         if (!token) {
@@ -267,7 +286,15 @@ export class AuthService {
     }
 
     static isAuthenticated(): boolean {
-        return this.getToken() !== null;
+        const token = this.getToken();
+        if (!token) return false;
+
+        try {
+            const payload = JSON.parse(atob(token.split('.')[1]));
+            return payload.exp * 1000 > Date.now();
+        } catch {
+            return false;
+        }
     }
 
     static getToken(): string | null {

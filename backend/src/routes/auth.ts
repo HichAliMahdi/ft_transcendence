@@ -168,6 +168,39 @@ export default async function authRoutes(fastify: FastifyInstance) {
         }
     });
 
+    fastify.post('/auth/delete', async (request, reply) => {
+        try {
+            const authHeader = request.headers.authorization;
+            if (!authHeader) {
+                return reply.status(401).send({ message: 'Authorization header missing' });
+            }
+
+            const token = authHeader.split(' ')[1];
+            if (!token) {
+                return reply.status(401).send({ message: 'Token missing' });
+            }
+
+            const decoded = jwt.verify(token, config.jwt.secret) as { userId: number };
+            const userId = decoded.userId;
+
+            db.prepare('DELETE FROM backup_codes WHERE user_id = ?').run(userId);
+            db.prepare('DELETE FROM users WHERE id = ?').run(userId);
+
+            // Broadcast offline status to all connected clients
+            try {
+                broadcastPresenceUpdate(userId, 'Offline', false);
+            } catch (e) {
+                fastify.log.debug({ err: e }, 'Failed to broadcast Offline presence');
+            }
+
+            reply.code(200).send({ message: 'Deleted successful' });
+        } catch (error) {
+            fastify.log.error(error);
+            reply.code(500).send({ message: formatErr(error) });
+        }
+    });
+
+
     fastify.get('/auth/me', async (request, reply) => {
         try {
             const authHeader = request.headers.authorization;
