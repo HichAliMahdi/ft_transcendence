@@ -87,6 +87,12 @@ export class AuthService {
     }
 
     private static async parseResponseError(response: Response): Promise<never> {
+        const status = response.status as number ?? 0;
+        if (status == 404)
+        {
+            this.clearAuth();
+            window.location.href = '/login';
+        }
         // Try to read the body as text and parse JSON if possible.
         let bodyText = '';
         try {
