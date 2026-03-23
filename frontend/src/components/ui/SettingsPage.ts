@@ -303,7 +303,7 @@ export class SettingsPage {
             <div class="mb-6 m2-4">
                 <hr class="mt-6">
                 <div id="2fa-toggle" class="flex items-center gap-3 px-4 py-3 rounded-lg bg-game-dark border-2 border-gray-600 cursor-pointer hover:border-accent-pink transition-colors">
-                    <a class="btn-primary w-full text-lg py-3 text-center">Enable/Disable 2 Factor Authentication</a>
+                    <a href="/settings2fa" class="btn-primary w-full text-lg py-3 text-center">Enable/Disable 2 Factor Authentication</a>
                 </div>
             </div>
         `;

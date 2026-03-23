@@ -18,12 +18,10 @@ export class Setup2FAPage {
         title.className = 'text-4xl font-bold text-white text-center mb-8 gradient-text';
         this.container.appendChild(title);
 
-        if (!twofa_enabled) {
-            const info = document.createElement('p');
-            info.textContent = 'Scan this QR code with your authenticator app, then enter the code to confirm.';
-            info.className = 'text-white mb-6';
-            this.container.appendChild(info);
-        }
+        const info = document.createElement('p');
+        info.textContent = 'Scan this QR code with your authenticator app, then enter the code to confirm.';
+        info.className = 'text-white mb-6 hidden';
+        this.container.appendChild(info);
 
         // QR Code container
         const qrImg = document.createElement('img');
@@ -176,6 +174,7 @@ export class Setup2FAPage {
                     const data = await res.json();
                     if (!res.ok) throw data;
 
+                    info.classList.remove('hidden');
                     qrImg.src = data.qrCode;
                     qrImg.classList.remove('hidden');
                     codeInput.classList.remove('hidden');
@@ -207,8 +206,8 @@ export class Setup2FAPage {
                             }
                             qrImg.remove();
                             codeInput.remove();
-                            submitButton.className = 'btn-info w-full text-lg py-3';
-                            submitButton.textContent = verifyData.message as string;
+                            submitButton.remove();
+                            info.textContent = verifyData.message as string;
                             const codes = verifyData.backupCodes as string[] ?? [];
                             if (codes.length > 0) {
                                 // Container
