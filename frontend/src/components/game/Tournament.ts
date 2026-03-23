@@ -147,9 +147,15 @@ export class TournamentAPI {
      * @returns Updated list of participants
      */
     static async addPlayer(tournamentId: number, alias: string): Promise<Player[]> {
+        const token = localStorage.getItem('auth_token');
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (token) {
+            headers.Authorization = `Bearer ${token}`;
+        }
+
         const response = await fetch(`${API_BASE}/tournaments/${tournamentId}/players`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers,
             body: JSON.stringify({ alias })
         });
 

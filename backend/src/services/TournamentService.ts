@@ -96,20 +96,32 @@ export class TournamentService {
         }
 
         try {
-            let actualUserId = userId;
-            
-            // For online tournaments with logged-in users, check for duplicate user participation
-            if (tournament.type === 'online' && userId) {
-                const existingParticipant = currentPlayers.find(p => p.id === userId);
-                if (existingParticipant) {
-                    // User already in tournament, update their alias instead
-                    db.prepare('UPDATE tournament_participants SET alias = ? WHERE tournament_id = ? AND user_id = ?')
-                        .run(alias, tournamentId, userId);
-                    return true;
+            let actualUserId: number;
+
+            if (userId) {
+                if (tournament.type === 'online') {
+                    const existingParticipant = currentPlayers.find(p => p.id === userId);
+                    if (existingParticipant) {
+                        // For online tournaments one account can only occupy one slot.
+                        db.prepare('UPDATE tournament_participants SET alias = ? WHERE tournament_id = ? AND user_id = ?')
+                            .run(alias, tournamentId, userId);
+                        return true;
+                    }
+                    actualUserId = userId;
+                } else if (currentPlayers.length === 0) {
+                    // In local tournaments, bind only the first registered slot to logged-in user.
+                    actualUserId = userId;
+                } else {
+                    // Remaining local slots stay anonymous so multiple players can be added.
+                    const userStmt = db.prepare(`
+                        INSERT INTO users (username, display_name, avatar_url) VALUES (?, ?, ?)
+                    `);
+                    const uniqueUsername = `${alias}_${Date.now()}`;
+                    const userResult = userStmt.run(uniqueUsername, alias, '/default-avatar.png');
+                    actualUserId = userResult.lastInsertRowid as number;
                 }
-                actualUserId = userId;
             } else {
-                // Create temporary user for local tournaments or anonymous participants
+                // Create temporary user for anonymous participants.
                 const userStmt = db.prepare(`
                     INSERT INTO users (username, display_name, avatar_url) VALUES (?, ?, ?)
                 `);

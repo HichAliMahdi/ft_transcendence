@@ -140,32 +140,62 @@ export function initializeDatabase(): void {
     // Create user_stats view for statistics
     db.exec(`
         CREATE VIEW user_stats AS
-        SELECT 
+        SELECT
             u.id AS user_id,
-            COUNT(DISTINCT CASE 
-                WHEN m.player1_id = u.id OR m.player2_id = u.id 
-                THEN m.id 
-            END) AS games_played,
-            COUNT(DISTINCT CASE 
-                WHEN m.winner_id = u.id 
-                THEN m.id 
-            END) AS matches_won,
-            COUNT(DISTINCT CASE 
-                WHEN (m.player1_id = u.id OR m.player2_id = u.id) 
-                AND m.winner_id IS NOT NULL 
-                AND m.winner_id != u.id 
-                THEN m.id 
-            END) AS matches_lost,
-            COUNT(DISTINCT tp.tournament_id) AS tournaments_joined,
-            COUNT(DISTINCT CASE 
-                WHEN t.winner_id = u.id 
-                THEN t.id 
-            END) AS tournaments_won
+            (
+                SELECT COUNT(*)
+                FROM (
+                    SELECT 'm-' || m.id AS game_key
+                    FROM matches m
+                    WHERE m.player1_id = u.id OR m.player2_id = u.id
+                    UNION
+                    SELECT 'g-' || g.id AS game_key
+                    FROM games g
+                    WHERE (g.player1_id = u.id OR g.player2_id = u.id)
+                      AND g.status = 'completed'
+                ) all_games
+            ) AS games_played,
+            (
+                SELECT COUNT(*)
+                FROM (
+                    SELECT 'm-' || m.id AS win_key
+                    FROM matches m
+                    WHERE m.winner_id = u.id
+                    UNION
+                    SELECT 'g-' || g.id AS win_key
+                    FROM games g
+                    WHERE g.winner_id = u.id
+                      AND g.status = 'completed'
+                ) all_wins
+            ) AS matches_won,
+            (
+                SELECT COUNT(*)
+                FROM (
+                    SELECT 'm-' || m.id AS loss_key
+                    FROM matches m
+                    WHERE (m.player1_id = u.id OR m.player2_id = u.id)
+                      AND m.winner_id IS NOT NULL
+                      AND m.winner_id != u.id
+                    UNION
+                    SELECT 'g-' || g.id AS loss_key
+                    FROM games g
+                    WHERE (g.player1_id = u.id OR g.player2_id = u.id)
+                      AND g.winner_id IS NOT NULL
+                      AND g.winner_id != u.id
+                      AND g.status = 'completed'
+                ) all_losses
+            ) AS matches_lost,
+            (
+                SELECT COUNT(DISTINCT tp.tournament_id)
+                FROM tournament_participants tp
+                WHERE tp.user_id = u.id
+            ) AS tournaments_joined,
+            (
+                SELECT COUNT(*)
+                FROM tournaments t
+                WHERE t.winner_id = u.id
+            ) AS tournaments_won
         FROM users u
-        LEFT JOIN matches m ON m.player1_id = u.id OR m.player2_id = u.id
-        LEFT JOIN tournament_participants tp ON tp.user_id = u.id
-        LEFT JOIN tournaments t ON t.id = tp.tournament_id
-        GROUP BY u.id
     `);
     
 }
