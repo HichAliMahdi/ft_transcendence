@@ -307,6 +307,12 @@ export class AuthService {
         return userData ? JSON.parse(userData) : null;
     }
 
+    public static storeUsrData(user: User): void {
+        this.memoryUser = user;
+        localStorage.setItem(this.USER_KEY, JSON.stringify(user));
+        try { window.dispatchEvent(new Event('auth:change')); } catch (e) {}
+    }
+
     private static storeAuthData(token: string, user: User): void {
         // localStorage.setItem(this.TOKEN_KEY, token);
         this.memoryToken = token;

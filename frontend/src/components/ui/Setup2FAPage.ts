@@ -139,7 +139,7 @@ export class Setup2FAPage {
                     if (!res.ok) throw data;
                     if (usr) {
                         usr.twofa_enabled = 0;
-                        localStorage.setItem('user_data', JSON.stringify(usr));
+                        AuthService.storeUsrData(usr);
                     }
                     alert('2FA disabled successfully!');
                     history.replaceState(null, '', '/profile');
@@ -193,7 +193,7 @@ export class Setup2FAPage {
                             if (!verifyRes.ok) throw verifyData;
                             if (usr) {
                                 usr.twofa_enabled = 1;
-                                localStorage.setItem('user_data', JSON.stringify(usr));
+                                AuthService.storeUsrData(usr);
                             }
                             qrImg.remove();
                             codeInput.remove();
