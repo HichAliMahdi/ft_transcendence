@@ -105,14 +105,31 @@ export default async function authRoutes(fastify: FastifyInstance) {
             }
 
             try {
-                const user = db.prepare('SELECT id, username, email, display_name, password_hash, twofa_enabled FROM users WHERE username = ?').get(username) as any;
+                const user = db.prepare('SELECT id, username, email, display_name, password_hash, twofa_enabled, login_attempts, login_locked_until FROM users WHERE username = ?').get(username) as any;
                 if (!user) {
                     return reply.status(404).send({ message: 'Invalid username or password' });
                 }
-
+                const now = new Date();
+                if (user.login_locked_until && new Date(user.login_locked_until) > now) {
+                    return reply.status(403).send({message: 'Account temporarily locked. Try again later.'});
+                }
                 const passwordMatch = await bcrypt.compare(password, user.password_hash);
+
+                const MAX_ATTEMPTS = 5;
+                const LOCK_TIME_MINUTES = 15;
+
                 if (!passwordMatch) {
-                    return reply.status(404).send({ message: 'Invalid username or password' });
+                    const attempts = (user.login_attempts || 0) + 1;
+
+                    if (attempts >= MAX_ATTEMPTS) {
+                        const lockUntil = new Date(Date.now() + LOCK_TIME_MINUTES * 60 * 1000);
+
+                        db.prepare(`UPDATE users SET login_attempts = ?, login_locked_until = ? WHERE id = ?`).run(attempts, lockUntil.toISOString(), user.id);
+                        return reply.status(403).send({message: `Too many attempts. Account Locked for ${LOCK_TIME_MINUTES} minutes.`});
+                    } else {
+                        db.prepare(`UPDATE users SET login_attempts = ? WHERE id = ?`).run(attempts, user.id);
+                        return reply.status(404).send({ message: 'Invalid username or password'});
+                    }
                 }
 
                 if (user.twofa_enabled) {
@@ -121,12 +138,12 @@ export default async function authRoutes(fastify: FastifyInstance) {
                         config.jwt.secret as string,
                         { expiresIn: '5m', issuer: 'ft_transcendence_2fa' }
                     );
-                    reply.setCookie('auth_token', tempToken, {
+                    reply.setCookie('tmp_token', tempToken, {
                         httpOnly: true,      // JS cannot read it
                         // secure: false,       // true in production HTTPS
                         sameSite: 'lax',     // CSRF protection
                         path: '/',           // must match frontend requests
-                        maxAge: 7 * 24 * 60 * 60 // 7 days
+                        maxAge:300 // 5 minutes
                     });
                     return reply.send({
                         requires2FA: true,
@@ -139,7 +156,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
                     { expiresIn: '7d', issuer: 'ft_transcendence' }
                 );
                 // mark user online and status Online
-                db.prepare('UPDATE users SET is_online = 1, last_seen = CURRENT_TIMESTAMP, status = ? WHERE id = ?').run('Online', user.id);
+                db.prepare('UPDATE users SET is_online = 1, last_seen = CURRENT_TIMESTAMP, login_attempts = 0, login_locked_until = NULL status = ? WHERE id = ?').run('Online', user.id);
                 reply.setCookie('auth_token', token, {
                     httpOnly: true,      // JS cannot read it
                     // secure: false,       // true in production HTTPS
@@ -388,7 +405,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
     });
     fastify.post('/auth/2fa/login', async (request, reply) => {
         try {
-            const tempToken = request.cookies?.auth_token;
+            const tempToken = request.cookies?.tmp_token;
 
             if (!tempToken) {
                 return reply.status(401).send({ message: 'Unauthorized' });
@@ -425,19 +442,37 @@ export default async function authRoutes(fastify: FastifyInstance) {
                     WHERE user_id = ? AND code_hash = ? AND used = 0
                 `).get(userId, hashed) as BackupCode | undefined;
                 if (!backup)
-                    return reply.status(401).send({ message: 'Invalid 2FA code' });
-                db.prepare(`
-                    UPDATE backup_codes SET used = 1 WHERE id = ?
-                `).run(backup.id);
+                {
+                    const now = new Date();
+                    const MAX_ATTEMPTS = 5;
+                    const LOCK_TIME_MINUTES = 15;
+                    if (user.login_locked_until && new Date(user.login_locked_until) > now) {
+                        return reply.status(401).send({ message: 'Account temporarily locked. Try again later.'});
+                    }
+
+                    const attempts = (user.login_attempts || 0) + 1;
+
+                    if (attempts >= MAX_ATTEMPTS) {
+                        const lockUntil = new Date(Date.now() + LOCK_TIME_MINUTES * 60 * 1000);
+
+                        db.prepare(`UPDATE users SET login_attempts = ?, login_locked_until = ?WHERE id = ?`).run(attempts, lockUntil.toISOString(), user.id);
+                        return reply.status(401).send({ message: `Too many attempts. Account Locked for ${LOCK_TIME_MINUTES} minutes.`});
+                    } else {
+                        db.prepare(`UPDATE users SET login_attempts = ? WHERE id = ?`).run(attempts, user.id);
+                        return reply.status(401).send({ message: 'Invalid 2FA code' });
+                    }
+                }
+                db.prepare(`UPDATE backup_codes SET used = 1 WHERE id = ?`).run(backup.id);
             }
 
             // mark user online and status Online
-            db.prepare('UPDATE users SET is_online = 1, last_seen = CURRENT_TIMESTAMP, status = ? WHERE id = ?').run('Online', user.id);
+            db.prepare('UPDATE users SET is_online = 1, last_seen = CURRENT_TIMESTAMP, login_attempts = 0, login_locked_until = NULL, status = ? WHERE id = ?').run('Online', user.id);
             const token = jwt.sign(
                 { userId: user.id },
                 config.jwt.secret as string,
                 { expiresIn: '7d', issuer: 'ft_transcendence' }
             );
+            reply.clearCookie('tmp_token', { path: '/' });
             reply.setCookie('auth_token', token, {
                     httpOnly: true,      // JS cannot read it
                     // secure: false,       // true in production HTTPS

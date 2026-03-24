@@ -12,9 +12,9 @@ High Priority
 
 Add backup codes --> Done
 
-Implement rate limiting / account lockout after failed attempts
+Implement rate limiting / account lockout after failed attempts --> Done
 
-Use existing DB fields twofa_attempts and twofa_locked_until.
+Use existing DB fields twofa_attempts and twofa_locked_until. --> Done also renamed to be login_attempts and login_locked_until and used for both 2fa and normal login
 
 Tournament Anonymous Mode
 
