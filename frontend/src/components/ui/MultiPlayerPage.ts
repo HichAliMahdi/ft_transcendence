@@ -319,11 +319,8 @@ export class MultiplayerPage {
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const host = window.location.host || `${window.location.hostname}${window.location.port ? ':' + window.location.port : ''}`;
         const base = `${protocol}//${host}`;
-        
-        // Get authentication token
-        const token = AuthService.getToken();
+
         const params: string[] = [];
-        if (token) params.push(`token=${encodeURIComponent(token)}`);
 
         if (extraQuery) {
             for (const k of Object.keys(extraQuery)) {

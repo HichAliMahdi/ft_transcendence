@@ -42,7 +42,7 @@ export default async function tournamentRoutes(fastify: FastifyInstance) {
   const formatErr = (e: any) => (e instanceof Error ? e.message : String(e));
 
   fastify.post<{ Body: CreateTournamentBody }>(
-    '/tournaments',
+    '/tournaments', {preHandler: fastify.csrfProtection},
     async (request, reply) => {
       try {
         const { name, maxPlayers, type = 'local' } = request.body;
@@ -131,7 +131,7 @@ export default async function tournamentRoutes(fastify: FastifyInstance) {
   );
 
   fastify.post<{ Params: TournamentParams; Body: AddPlayerBody }>(
-    '/tournaments/:id/players',
+    '/tournaments/:id/players', {preHandler: fastify.csrfProtection},
     async (request, reply) => {
       try {
         const { id } = request.params;
@@ -158,10 +158,8 @@ export default async function tournamentRoutes(fastify: FastifyInstance) {
 
         // Get user ID from token for online tournaments
         let userId: number | undefined;
-        const authHeader = request.headers.authorization;
-        if (authHeader) {
           try {
-            const token = authHeader.split(' ')[1];
+            const token = request.cookies?.auth_token;
             if (token) {
               // Fix: only call jwt.verify if token is defined
               const decoded = jwt.verify(token, config.jwt.secret) as unknown as { userId: number };
@@ -170,7 +168,6 @@ export default async function tournamentRoutes(fastify: FastifyInstance) {
           } catch (e) {
             // Ignore auth errors for local tournaments
           }
-        }
 
         const success = TournamentService.addPlayer(tournamentId, alias.trim(), userId);
         
@@ -202,7 +199,7 @@ export default async function tournamentRoutes(fastify: FastifyInstance) {
   );
 
   fastify.delete<{ Params: PlayerParams }>(
-    '/tournaments/:id/players/:playerId',
+    '/tournaments/:id/players/:playerId', {preHandler: fastify.csrfProtection},
     async (request, reply) => {
       try {
         const { id, playerId } = request.params;
@@ -243,7 +240,7 @@ export default async function tournamentRoutes(fastify: FastifyInstance) {
   );
 
   fastify.post<{ Params: TournamentParams }>(
-    '/tournaments/:id/start',
+    '/tournaments/:id/start', {preHandler: fastify.csrfProtection},
     async (request, reply) => {
       try {
         const { id } = request.params;
@@ -301,7 +298,7 @@ export default async function tournamentRoutes(fastify: FastifyInstance) {
   );
 
   fastify.post<{ Params: MatchParams; Body: RecordMatchResultBody }>(
-    '/tournaments/matches/:matchId/result',
+    '/tournaments/matches/:matchId/result', {preHandler: fastify.csrfProtection},
     async (request, reply) => {
       try {
         const { matchId } = request.params;
@@ -359,7 +356,7 @@ export default async function tournamentRoutes(fastify: FastifyInstance) {
   );
 
   fastify.delete<{ Params: TournamentParams }>(
-    '/tournaments/:id',
+    '/tournaments/:id', {preHandler: fastify.csrfProtection},
     async (request, reply) => {
       try {
         const { id } = request.params;
@@ -384,7 +381,7 @@ export default async function tournamentRoutes(fastify: FastifyInstance) {
   );
 
   fastify.post<{ Params: TournamentParams }>(
-    '/tournaments/:id/reset',
+    '/tournaments/:id/reset', {preHandler: fastify.csrfProtection},
     async (request, reply) => {
       try {
         const { id } = request.params;

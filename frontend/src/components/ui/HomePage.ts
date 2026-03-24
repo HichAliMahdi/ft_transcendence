@@ -87,9 +87,8 @@ export class HomePage {
 		}
 
 		try {
-			const token = AuthService.getToken();
 			const res = await fetch(`/api/users/${user.id}/stats`, {
-				headers: token ? { Authorization: `Bearer ${token}` } : undefined
+				credentials: 'include'
 			});
 
 			if (!res.ok) {

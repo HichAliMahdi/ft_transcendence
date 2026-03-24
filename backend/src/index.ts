@@ -1,8 +1,12 @@
 import Fastify from 'fastify';
+import fastifyCookie from '@fastify/cookie';
+import fastifyCsrf from '@fastify/csrf-protection';
+import fastifyRateLimit from '@fastify/rate-limit';
 import cors from '@fastify/cors';
 import websocketPlugin from '@fastify/websocket';
 import multipart from '@fastify/multipart';
 import fastifyStatic from '@fastify/static';
+import helmet from '@fastify/helmet';
 import path from 'path';
 import { config } from './config';
 import { initializeDatabase } from './database/db';
@@ -21,6 +25,64 @@ const fastify = Fastify({
       },
     } : undefined,
   }
+});
+
+const startfastify = async () => {
+  await fastify.register(helmet, {
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"], // Tailwind needs this
+        imgSrc: ["'self'", "data:"],
+        connectSrc: ["'self'"] // for API + WebSocket
+      }
+    }
+  });
+
+  // Register cookie plugin
+  await fastify.register(fastifyCookie, {
+    secret: process.env.COOKIE_SECRET || 'dev-secret', // optional, used for signed cookies
+    parseOptions: {}           // optional
+  });
+
+  await fastify.register(fastifyCsrf, {
+    cookieOpts: {
+      httpOnly: false,       // JS can read it
+      sameSite: 'strict',    // prevent CSRF
+      path: '/'
+    }
+  });
+
+  // Rate Limiting (global default)
+  await fastify.register(fastifyRateLimit, {
+    max: 100,              // max requests per timeWindow
+    timeWindow: '1 minute',
+    keyGenerator: (req) => req.ip,
+    errorResponseBuilder: (req, context) => ({
+      statusCode: 429,
+      error: 'Too Many Requests',
+      message: `You can make ${context.max} requests per ${context.after}`
+    })
+  });
+};
+
+startfastify().catch(err => {
+  fastify.log.error(err);
+  process.exit(1);
+});
+
+fastify.addHook('onRequest', (req, reply, done) => {
+    try {
+        const token = reply.generateCsrf();
+        reply.setCookie('XSRF-TOKEN', token, {
+            httpOnly: false,
+            sameSite: 'strict',
+            secure: process.env.NODE_ENV === 'production',
+            path: '/'
+        });
+    } catch (err) {}
+    done();
 });
 
 // Initialize database

@@ -47,7 +47,12 @@ class App {
 
     constructor() {
         this.router = new Router();
-        this.init();
+        this.initAsync();
+    }
+
+    private async initAsync() {
+        await AuthService.initializeAuth();
+        this.init(); // continue with normal init
     }
 
     private init(): void {
@@ -311,13 +316,10 @@ class App {
     private connectPresenceSocket(): void {
         if (!AuthService.isAuthenticated()) return;
 
-        const token = AuthService.getToken();
-        if (!token) return;
-
         try {
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
             const host = window.location.host;
-            const wsUrl = `${protocol}//${host}/ws?token=${encodeURIComponent(token)}`;
+            const wsUrl = `${protocol}//${host}/ws`;
 
             this.presenceSocket = new WebSocket(wsUrl);
 
