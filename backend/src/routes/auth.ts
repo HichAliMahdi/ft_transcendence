@@ -12,7 +12,7 @@ function generateBackupCodes(count = 8): string[] {
     const codes: string[] = [];
 
     for (let i = 0; i < count; i++) {
-        const code = crypto.randomBytes(4).toString('hex').toUpperCase();
+        const code = crypto.randomBytes(6).toString('hex').toUpperCase();
         codes.push(code);
     }
     return codes;
@@ -74,18 +74,17 @@ export default async function authRoutes(fastify: FastifyInstance) {
                     'INSERT INTO users (username, email, password_hash, display_name, is_online, status, avatar_url) VALUES (?, ?, ?, ?, 1, ?, ?)'
                 ).run(username, email, password_hash, display_name, 'Online', '/default-avatar.png');
 
-                const token = jwt.sign({ userId: result.lastInsertRowid }, config.jwt.secret as string, { expiresIn: '7d' });
+                const token = jwt.sign({ userId: result.lastInsertRowid }, config.jwt.secret as string, { expiresIn: '7d', issuer: 'ft_transcendence' });
                 reply.setCookie('auth_token', token, {
                     httpOnly: true,      // JS cannot read it
-                    // secure: false,       // true in production HTTPS
-                    sameSite: 'lax',     // CSRF protection
+                    secure: true,       // true in production HTTPS
+                    sameSite: 'strict',     // CSRF protection
                     path: '/',           // must match frontend requests
                     maxAge: 7 * 24 * 60 * 60 // 7 days
                 });
 
                 reply.code(201).send({
                     message: 'User registered successfully',
-                    token,
                     user: { id: result.lastInsertRowid, username, email, display_name, status: 'Online', is_online: 1, avatar_url: '/default-avatar.png', twofa_enabled: 0 }
                 });
             } catch (error) {
@@ -115,8 +114,8 @@ export default async function authRoutes(fastify: FastifyInstance) {
                 }
                 const passwordMatch = await bcrypt.compare(password, user.password_hash);
 
-                const MAX_ATTEMPTS = 5;
-                const LOCK_TIME_MINUTES = 15;
+                const MAX_ATTEMPTS = Number(process.env.MAX_ATTEMPTS) || 5;
+                const LOCK_TIME_MINUTES = Number(process.env.LOCK_TIME_MINUTES) || 15;
 
                 if (!passwordMatch) {
                     const attempts = (user.login_attempts || 0) + 1;
@@ -132,11 +131,11 @@ export default async function authRoutes(fastify: FastifyInstance) {
                     }
                 }
 
-                    reply.setCookie('XSRF-TOKEN', reply.generateCsrf(), {
-                        httpOnly: false,     // JS can read this
-                        sameSite: 'strict',  // prevent cross-site usage
-                        path: '/'             // available for entire SPA
-                    });
+                    // reply.setCookie('XSRF-TOKEN', reply.generateCsrf(), {
+                    //     httpOnly: false,     // JS can read this
+                    //     sameSite: 'strict',  // prevent cross-site usage
+                    //     path: '/'             // available for entire SPA
+                    // });
                     
                 if (user.twofa_enabled) {
                     const tempToken = jwt.sign(
@@ -146,14 +145,14 @@ export default async function authRoutes(fastify: FastifyInstance) {
                     );
                     reply.setCookie('tmp_token', tempToken, {
                         httpOnly: true,      // JS cannot read it
-                        // secure: false,       // true in production HTTPS
-                        sameSite: 'lax',     // CSRF protection
+                        secure: true,       // true in production HTTPS
+                        sameSite: 'strict',     // CSRF protection
                         path: '/',           // must match frontend requests
                         maxAge:300 // 5 minutes
                     });
                     return reply.send({
                         requires2FA: true,
-                        tempToken
+                        // tempToken
                     });
                 }
                 const token = jwt.sign(
@@ -162,17 +161,16 @@ export default async function authRoutes(fastify: FastifyInstance) {
                     { expiresIn: '7d', issuer: 'ft_transcendence' }
                 );
                 // mark user online and status Online
-                db.prepare('UPDATE users SET is_online = 1, last_seen = CURRENT_TIMESTAMP, login_attempts = 0, login_locked_until = NULL status = ? WHERE id = ?').run('Online', user.id);
+                db.prepare('UPDATE users SET is_online = 1, last_seen = CURRENT_TIMESTAMP, login_attempts = 0, login_locked_until = NULL, status = ? WHERE id = ?').run('Online', user.id);
                 reply.setCookie('auth_token', token, {
                     httpOnly: true,      // JS cannot read it
-                    // secure: false,       // true in production HTTPS
-                    sameSite: 'lax',     // CSRF protection
+                    secure: true,       // true in production HTTPS
+                    sameSite: 'strict',     // CSRF protection
                     path: '/',           // must match frontend requests
                     maxAge: 7 * 24 * 60 * 60 // 7 days
                 });
                 reply.code(200).send({
                     message: 'Login successful',
-                    token,
                     user: { id: user.id, username: user.username, email: user.email, display_name: user.display_name, status: 'Online', is_online: 1, twofa_enabled: user.twofa_enabled }
                 });
             } catch (error) {
@@ -185,22 +183,19 @@ export default async function authRoutes(fastify: FastifyInstance) {
     fastify.post('/auth/logout', async (request, reply) => {
         try {
             const token = request.cookies?.auth_token;
-            if (!token) {
-                return reply.status(401).send({ message: 'Token missing' });
+            if (token) {
+                try {
+                    const decoded = jwt.verify(token, config.jwt.secret, {issuer: 'ft_transcendence'}) as { userId: number };
+                    const userId = decoded.userId;
+
+                    db.prepare('UPDATE users SET is_online = 0, last_seen = CURRENT_TIMESTAMP, status = ? WHERE id = ?').run('Offline', userId);
+                    // Broadcast offline status to all connected clients
+                    broadcastPresenceUpdate(userId, 'Offline', false);
+                } catch (e) {
+                    fastify.log.debug({ err: e }, 'Failed to broadcast logout presence');
+                }
             }
-
-            const decoded = jwt.verify(token, config.jwt.secret) as { userId: number };
-            const userId = decoded.userId;
-
-            db.prepare('UPDATE users SET is_online = 0, last_seen = CURRENT_TIMESTAMP, status = ? WHERE id = ?').run('Offline', userId);
             reply.clearCookie('auth_token', { path: '/' });
-            // Broadcast offline status to all connected clients
-            try {
-                broadcastPresenceUpdate(userId, 'Offline', false);
-            } catch (e) {
-                fastify.log.debug({ err: e }, 'Failed to broadcast logout presence');
-            }
-
             reply.code(200).send({ message: 'Logout successful' });
         } catch (error) {
             fastify.log.error(error);
@@ -215,7 +210,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
                 return reply.status(401).send({ message: 'Token missing' });
             }
 
-            const decoded = jwt.verify(token, config.jwt.secret) as { userId: number };
+            const decoded = jwt.verify(token, config.jwt.secret, {issuer: 'ft_transcendence'}) as { userId: number };
             const userId = decoded.userId;
             reply.clearCookie('auth_token', { path: '/' });
             db.prepare('DELETE FROM backup_codes WHERE user_id = ?').run(userId);
@@ -243,18 +238,18 @@ export default async function authRoutes(fastify: FastifyInstance) {
                 return reply.status(401).send({ message: 'Token missing' });
             }
 
-            const decoded = jwt.verify(token, config.jwt.secret) as { userId: number };
+            const decoded = jwt.verify(token, config.jwt.secret, {issuer: 'ft_transcendence'}) as { userId: number };
             const userId = decoded.userId;
 
             const user = db.prepare('SELECT id, username, email, display_name, avatar_url, is_online, status, last_seen, twofa_enabled, created_at, updated_at FROM users WHERE id = ?').get(userId);
             if (!user) {
                 return reply.status(401).send({ message: 'User not found' });
             }
-            reply.setCookie('XSRF-TOKEN', reply.generateCsrf(), {
-                httpOnly: false,     // JS can read this
-                sameSite: 'strict',  // prevent cross-site usage
-                path: '/'             // available for entire SPA
-            });
+            // reply.setCookie('XSRF-TOKEN', reply.generateCsrf(), {
+            //     httpOnly: false,     // JS can read this
+            //     sameSite: 'strict',  // prevent cross-site usage
+            //     path: '/'             // available for entire SPA
+            // });
             reply.code(200).send({ user });
         } catch (error) {
             fastify.log.error(error);
@@ -267,7 +262,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
             const token = request.cookies?.auth_token;
             if (!token) return reply.status(401).send({ message: 'Token missing' });
 
-            const decoded = jwt.verify(token, config.jwt.secret) as { userId: number };
+            const decoded = jwt.verify(token, config.jwt.secret, {issuer: 'ft_transcendence'}) as { userId: number };
             const { currentPassword, newPassword } = request.body as any;
 
             if (!currentPassword || !newPassword) return reply.status(400).send({ message: 'All fields required' });
@@ -292,7 +287,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
             const token = request.cookies?.auth_token;
             if (!token) return reply.status(401).send({ message: 'Token missing' });
 
-            const decoded = jwt.verify(token, config.jwt.secret) as { userId: number };
+            const decoded = jwt.verify(token, config.jwt.secret, {issuer: 'ft_transcendence'}) as { userId: number };
             const userId = decoded.userId;
 
             // Fetch user from DB
@@ -328,7 +323,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
             const token = request.cookies?.auth_token;
             if (!token) return reply.status(401).send({ message: 'Token missing' });
 
-            const decoded = jwt.verify(token, config.jwt.secret) as { userId: number };
+            const decoded = jwt.verify(token, config.jwt.secret, {issuer: 'ft_transcendence'}) as { userId: number };
             const userId = decoded.userId;
 
             const { code } = request.body as any;
@@ -370,7 +365,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
             const token = request.cookies?.auth_token;
             if (!token) return reply.status(401).send({ message: 'Token missing' });
 
-            const decoded = jwt.verify(token, config.jwt.secret) as { userId: number };
+            const decoded = jwt.verify(token, config.jwt.secret, {issuer: 'ft_transcendence'}) as { userId: number };
             const userId = decoded.userId;
 
             // delete old codes
@@ -394,7 +389,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
             const token = request.cookies?.auth_token;
             if (!token) return reply.status(401).send({ message: 'Token missing' });
 
-            const decoded = jwt.verify(token, config.jwt.secret) as { userId: number };
+            const decoded = jwt.verify(token, config.jwt.secret, {issuer: 'ft_transcendence'}) as { userId: number };
             const userId = decoded.userId;
 
             // Disable 2FA
@@ -423,7 +418,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
 
             const decoded = jwt.verify(
                 tempToken,
-                config.jwt.secret as string
+                config.jwt.secret as string, {issuer: 'ft_transcendence_2fa'}
             ) as unknown as { userId: number; stage?: string };
 
             if (decoded.stage !== '2fa')
@@ -454,8 +449,8 @@ export default async function authRoutes(fastify: FastifyInstance) {
                 if (!backup)
                 {
                     const now = new Date();
-                    const MAX_ATTEMPTS = 5;
-                    const LOCK_TIME_MINUTES = 15;
+                    const MAX_ATTEMPTS = Number(process.env.MAX_ATTEMPTS) || 5;
+                    const LOCK_TIME_MINUTES = Number(process.env.LOCK_TIME_MINUTES) || 15;
                     if (user.login_locked_until && new Date(user.login_locked_until) > now) {
                         return reply.status(401).send({ message: 'Account temporarily locked. Try again later.'});
                     }
@@ -465,7 +460,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
                     if (attempts >= MAX_ATTEMPTS) {
                         const lockUntil = new Date(Date.now() + LOCK_TIME_MINUTES * 60 * 1000);
 
-                        db.prepare(`UPDATE users SET login_attempts = ?, login_locked_until = ?WHERE id = ?`).run(attempts, lockUntil.toISOString(), user.id);
+                        db.prepare(`UPDATE users SET login_attempts = ?, login_locked_until = ? WHERE id = ?`).run(attempts, lockUntil.toISOString(), user.id);
                         return reply.status(401).send({ message: `Too many attempts. Account Locked for ${LOCK_TIME_MINUTES} minutes.`});
                     } else {
                         db.prepare(`UPDATE users SET login_attempts = ? WHERE id = ?`).run(attempts, user.id);
@@ -485,14 +480,13 @@ export default async function authRoutes(fastify: FastifyInstance) {
             reply.clearCookie('tmp_token', { path: '/' });
             reply.setCookie('auth_token', token, {
                     httpOnly: true,      // JS cannot read it
-                    // secure: false,       // true in production HTTPS
-                    sameSite: 'lax',     // CSRF protection
+                    secure: true,       // true in production HTTPS
+                    sameSite: 'strict',     // CSRF protection
                     path: '/',           // must match frontend requests
                     maxAge: 7 * 24 * 60 * 60 // 7 days
             });
             reply.code(200).send({
                 message: 'Login successful',
-                token,
                 user: { id: user.id, username: user.username, email: user.email, display_name: user.display_name, status: 'Online', is_online: 1, twofa_enabled: user.twofa_enabled }
             });
 

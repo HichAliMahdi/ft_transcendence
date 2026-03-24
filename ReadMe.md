@@ -30,11 +30,11 @@ Security
 
 XSS Protection: Sanitize user content (e.g., DOMPurify) and avoid unsafe innerHTML.
 
-Security Headers: Add Helmet.js (CSP, X-Frame-Options, etc.).
+Security Headers: Add Helmet.js (CSP, X-Frame-Options, etc.). --> Done
 
-CSRF Protection: Add CSRF middleware for state-changing requests.
+CSRF Protection: Add CSRF middleware for state-changing requests. --> Done
 
-Rate Limiting: Protect login, register, and 2FA endpoints.
+Rate Limiting: Protect login, register, and 2FA endpoints. --> Done
 
 Optional Module Choice (1 point)
 
