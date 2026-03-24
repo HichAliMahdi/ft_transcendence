@@ -130,12 +130,6 @@ export default async function authRoutes(fastify: FastifyInstance) {
                         return reply.status(404).send({ message: 'Invalid username or password'});
                     }
                 }
-
-                    // reply.setCookie('XSRF-TOKEN', reply.generateCsrf(), {
-                    //     httpOnly: false,     // JS can read this
-                    //     sameSite: 'strict',  // prevent cross-site usage
-                    //     path: '/'             // available for entire SPA
-                    // });
                     
                 if (user.twofa_enabled) {
                     const tempToken = jwt.sign(
@@ -245,11 +239,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
             if (!user) {
                 return reply.status(401).send({ message: 'User not found' });
             }
-            // reply.setCookie('XSRF-TOKEN', reply.generateCsrf(), {
-            //     httpOnly: false,     // JS can read this
-            //     sameSite: 'strict',  // prevent cross-site usage
-            //     path: '/'             // available for entire SPA
-            // });
+
             reply.code(200).send({ user });
         } catch (error) {
             fastify.log.error(error);
