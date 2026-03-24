@@ -25,6 +25,7 @@ type AIDifficulty = 'easy' | 'medium' | 'hard';
 interface GameConfig {
     mode: GameMode;
     aiDifficulty?: AIDifficulty;
+    onGameEnd?: (score1: number, score2: number) => void;
 }
 
 export class PongGame {
@@ -58,6 +59,7 @@ export class PongGame {
     private aiDifficulty: AIDifficulty;
     private aiTarget = 0;
     private aiLastUpdate = 0;
+    private onGameEnd?: (score1: number, score2: number) => void;
 
     constructor(canvas: HTMLCanvasElement, config: GameConfig = { mode: 'pvp' }) {
         this.canvas = canvas;
@@ -67,6 +69,7 @@ export class PongGame {
 
         this.gameMode = config.mode;
         this.aiDifficulty = config.aiDifficulty ?? 'medium';
+        this.onGameEnd = config.onGameEnd;
 
         // initialize css sizes and create DPR-backed buffer
         this.cssWidth = 800;
@@ -328,6 +331,10 @@ export class PongGame {
 
         this.ctx.font = '18px Arial';
         this.ctx.fillStyle = 'rgba(255,255,255,0.8)';
+        
+        if (this.onGameEnd) {
+            this.onGameEnd(this.score.player1, this.score.player2);
+        }
     }
 
     public togglePause(): boolean {

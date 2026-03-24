@@ -3,6 +3,7 @@ import { TournamentService, TournamentSize } from '../services/TournamentService
 import { broadcastToTournament } from './websocket';
 import jwt from 'jsonwebtoken';
 import { config } from '../config';
+import { db } from '../database/db';
 
 interface CreateTournamentBody {
   name: string;
@@ -18,6 +19,11 @@ interface RecordMatchResultBody {
   winnerId: number;
   score1: number;
   score2: number;
+}
+
+interface RecordSoloMatchBody {
+  player1Score: number;
+  player2Score: number;
 }
 
 interface TournamentParams {
@@ -103,7 +109,7 @@ export default async function tournamentRoutes(fastify: FastifyInstance) {
           tournament,
           participants,
           matches
-        });
+          });
       } catch (error) {
         fastify.log.error(error);
         return reply.code(500).send({ message: formatErr(error) });
@@ -330,6 +336,63 @@ export default async function tournamentRoutes(fastify: FastifyInstance) {
         return reply.send({ 
           success: true,
           message: 'Match result recorded successfully' 
+        });
+      } catch (error) {
+        fastify.log.error(error);
+        return reply.code(500).send({ message: formatErr(error) });
+      }
+    }
+  );
+
+  fastify.post<{ Body: RecordSoloMatchBody }>(
+    '/matches/solo-result',
+    async (request, reply) => {
+      try {
+        let userId: number | undefined;
+        const authHeader = request.headers.authorization;
+        if (authHeader) {
+          try {
+            const token = authHeader.split(' ')[1];
+            if (token) {
+              const decoded = jwt.verify(token, config.jwt.secret) as unknown as { userId: number };
+              userId = decoded.userId;
+            }
+          } catch (e) {
+            userId = undefined;
+          }
+        }
+
+        if (!userId) {
+          return reply.code(401).send({ message: 'Unauthorized' });
+        }
+
+        const { player1Score, player2Score } = request.body;
+
+        if (typeof player1Score !== 'number' || typeof player2Score !== 'number') {
+          return reply.code(400).send({ message: 'Scores are required' });
+        }
+
+        db.prepare(`
+          INSERT OR IGNORE INTO users (username, display_name, password_hash, status, is_online)
+          VALUES ('AI_BOT', 'AI Bot', '', 'Offline', 0)
+        `).run();
+
+        const aiUser = db.prepare(`SELECT id FROM users WHERE username = 'AI_BOT'`).get() as { id: number } | undefined;
+        if (!aiUser) {
+          return reply.code(500).send({ message: 'Could not resolve AI user' });
+        }
+
+        const winnerId = player1Score > player2Score ? userId : aiUser.id;
+
+        const stmt = db.prepare(`
+          INSERT INTO matches (player1_id, player2_id, player1_score, player2_score, winner_id)
+          VALUES (?, ?, ?, ?, ?)
+        `);
+        stmt.run(userId, aiUser.id, player1Score, player2Score, winnerId);
+
+        return reply.send({ 
+          success: true,
+          message: 'Solo match result recorded successfully' 
         });
       } catch (error) {
         fastify.log.error(error);
