@@ -28,7 +28,7 @@ Results from the games table (tournaments) must also be included for correct win
 
 Security
 
-XSS Protection: Sanitize user content (e.g., DOMPurify) and avoid unsafe innerHTML.
+XSS Protection: Sanitize user content (e.g., DOMPurify) and avoid unsafe innerHTML. --> we don't use any dynamic randider to innerHTML so our code already XSS protected.
 
 Security Headers: Add Helmet.js (CSP, X-Frame-Options, etc.). --> Done
 
