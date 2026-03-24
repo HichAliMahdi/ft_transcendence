@@ -1,12 +1,13 @@
 const API_BASE = '/api';
 import Cookies from 'js-cookie';
-const headers: Record<string, string> = {
-  'Content-Type': 'application/json'
-};
 
-const csrfToken = Cookies.get('XSRF-TOKEN');
-if (csrfToken) {
-  headers['x-xsrf-token'] = csrfToken;
+function getHeaders(type = ''): Record<string, string> {
+    const headers: Record<string, string> = {};
+    if (type != '')
+        headers['Content-Type'] = type;
+    const csrf = Cookies.get('XSRF-TOKEN');
+    if (csrf) headers['x-xsrf-token'] = csrf;
+    return headers;
 }
 
 /**
@@ -74,7 +75,7 @@ export class TournamentAPI {
     static async createTournament(name: string, maxPlayers: TournamentSize, type: TournamentType = 'local'): Promise<Tournament> {
         const response = await fetch(`${API_BASE}/tournaments`, {
             method: 'POST',
-            headers,
+            headers: getHeaders('application/json'),
             body: JSON.stringify({ name, maxPlayers, type })
         });
 
@@ -158,7 +159,7 @@ export class TournamentAPI {
     static async addPlayer(tournamentId: number, alias: string): Promise<Player[]> {
         const response = await fetch(`${API_BASE}/tournaments/${tournamentId}/players`, {
             method: 'POST',
-            headers,
+            headers: getHeaders('application/json'),
             body: JSON.stringify({ alias })
         });
 
@@ -199,7 +200,7 @@ export class TournamentAPI {
     static async startTournament(tournamentId: number): Promise<{ tournament: Tournament; currentMatch: Match | null }> {
         const response = await fetch(`${API_BASE}/tournaments/${tournamentId}/start`, {
             method: 'POST',
-            headers: csrfToken ? { 'x-xsrf-token': csrfToken } : {},
+            headers: getHeaders(''),
         });
 
         if (!response.ok) {
@@ -263,7 +264,7 @@ export class TournamentAPI {
     ): Promise<void> {
         const response = await fetch(`${API_BASE}/tournaments/matches/${matchId}/result`, {
             method: 'POST',
-            headers,
+            headers: getHeaders('application/json'),
             body: JSON.stringify({ winnerId, score1, score2 })
         });
 
@@ -307,7 +308,7 @@ export class TournamentAPI {
     static async resetTournament(tournamentId: number): Promise<Tournament> {
         const response = await fetch(`${API_BASE}/tournaments/${tournamentId}/reset`, {
             method: 'POST',
-            headers: csrfToken ? { 'x-xsrf-token': csrfToken } : {},
+            headers: getHeaders(''),
         });
 
         if (!response.ok) {

@@ -1,18 +1,18 @@
 const API_BASE = '/api';
 
 import Cookies from 'js-cookie';
-const headers: Record<string, string> = {
-  'Content-Type': 'application/json'
-};
 
-const csrfToken = Cookies.get('XSRF-TOKEN');
-if (csrfToken) {
-  headers['x-xsrf-token'] = csrfToken;
+function getHeaders(type = ''): Record<string, string> {
+    const headers: Record<string, string> = {};
+    if (type != '')
+        headers['Content-Type'] = type;
+    const csrf = Cookies.get('XSRF-TOKEN');
+    if (csrf) headers['x-xsrf-token'] = csrf;
+    return headers;
 }
 
 interface AuthResponse {
     message: string;
-    token: string;
     user: {
         id: number;
         username: string;
@@ -20,7 +20,6 @@ interface AuthResponse {
         display_name: string;
     };
     requires2FA?: boolean;
-    tempToken?: string;
 }
 
 interface User {
@@ -38,11 +37,10 @@ export class AuthService {
     private static USER_KEY = 'user_data';
     private static PREVIOUS_STATUS_KEY = 'previous_status';
 
-    private static memoryToken: string | null = null;
     private static memoryUser: User | null = null;
 
     static async initializeAuth(): Promise<void> {
-        if (this.memoryToken && this.memoryUser) return; // already set
+        if (this.memoryUser) return; // already set
 
         try {
             const res = await fetch(`${API_BASE}/auth/me`, {
@@ -54,10 +52,8 @@ export class AuthService {
             const data = await res.json();
 
             // Set in-memory token if backend returns one (optional)
-            if (data.token) this.memoryToken = data.token;
             this.memoryUser = data.user;
         } catch {
-            this.memoryToken = null;
             this.memoryUser = null;
         }
     }
@@ -166,7 +162,7 @@ export class AuthService {
         }
 
         const data: AuthResponse = await response.json();
-        this.storeAuthData(data.token, data.user);
+        this.storeUsrData(data.user);
         return data;
     }
 
@@ -184,8 +180,8 @@ export class AuthService {
         }
 
         const data: AuthResponse = await response.json();
-        if (data?.token && data?.user) {
-            this.storeAuthData(data.token, data.user);
+        if (data?.user) {
+           this.storeUsrData(data.user);
         }
         return data;
     }
@@ -208,7 +204,7 @@ export class AuthService {
         try {
             const response = await fetch(`${API_BASE}/auth/delete`, {
                 method: 'POST',
-                headers: csrfToken ? { 'x-xsrf-token': csrfToken } : {},
+                headers: getHeaders(''),
                 credentials: 'include'
             });
             if (!response.ok) {
@@ -246,7 +242,7 @@ export class AuthService {
         if (!this.isAuthenticated() || !user) throw new Error('Not authenticated');
         const resp = await fetch(`${API_BASE}/users/${user.id}/status`, {
             method: 'POST',
-            headers,
+            headers: getHeaders('application/json'),
             credentials: 'include',
             body: JSON.stringify({ status })
         });
@@ -308,7 +304,7 @@ export class AuthService {
     }
 
     static isAuthenticated(): boolean {
-        return !!this.memoryToken || !!this.memoryUser;
+        return !!this.memoryUser;
     }
 
     static getUser(): User | null {
@@ -324,18 +320,8 @@ export class AuthService {
         try { window.dispatchEvent(new Event('auth:change')); } catch (e) {}
     }
 
-    private static storeAuthData(token: string, user: User): void {
-        // localStorage.setItem(this.TOKEN_KEY, token);
-        this.memoryToken = token;
-        this.memoryUser = user;
-        localStorage.setItem(this.USER_KEY, JSON.stringify(user));
-        // notify app that authentication state changed (login)
-        try { window.dispatchEvent(new Event('auth:change')); } catch (e) {}
-    }
-
     private static clearAuth(): void {
         this.memoryUser = null;
-        this.memoryToken = null;
         // localStorage.removeItem(this.TOKEN_KEY);
         localStorage.removeItem(this.USER_KEY);
         // notify app that authentication state changed (logout)
@@ -370,7 +356,7 @@ export class AuthService {
         if (!this.isAuthenticated()) throw new Error('Not authenticated');
         const resp = await fetch(`${API_BASE}/users/${targetUserId}/friends`, {
             method: 'POST',
-            headers: csrfToken ? { 'x-xsrf-token': csrfToken } : {},
+            headers: getHeaders(''),
             credentials: 'include'
         });
         if (!resp.ok) {
@@ -382,7 +368,7 @@ export class AuthService {
         if (!this.isAuthenticated()) throw new Error('Not authenticated');
         const resp = await fetch(`${API_BASE}/users/friends`, {
             method: 'POST',
-            headers,
+            headers: getHeaders('application/json'),
             credentials: 'include',
             body: JSON.stringify({ username })
         });
@@ -407,7 +393,7 @@ export class AuthService {
         if (!this.isAuthenticated()) throw new Error('Not authenticated');
         const resp = await fetch(`${API_BASE}/users/${userId}/friends/${friendId}/accept`, {
             method: 'POST',
-            headers: csrfToken ? { 'x-xsrf-token': csrfToken } : {},
+            headers: getHeaders(''),
             credentials: 'include'
         });
         if (!resp.ok) {
@@ -433,7 +419,7 @@ export class AuthService {
         if (!this.isAuthenticated()) throw new Error('Not authenticated');
         const resp = await fetch(`${API_BASE}/notifications/${notificationId}/read`, {
             method: 'POST',
-            headers: csrfToken ? { 'x-xsrf-token': csrfToken } : {},
+            headers: getHeaders(''),
             credentials: 'include'
         });
         if (!resp.ok) {
@@ -470,7 +456,7 @@ export class AuthService {
         if (!this.isAuthenticated()) throw new Error('Not authenticated');
         const resp = await fetch(`${API_BASE}/notifications/read-all`, {
             method: 'POST',
-            headers: csrfToken ? { 'x-xsrf-token': csrfToken } : {},
+            headers: getHeaders(''),
             credentials: 'include',
         });
         if (!resp.ok) {
@@ -527,7 +513,7 @@ export class AuthService {
         if (!this.isAuthenticated()) throw new Error('Not authenticated');
         const resp = await fetch(`${API_BASE}/users/${peerId}/messages`, {
             method: 'POST',
-            headers,
+            headers: getHeaders('application/json'),
             credentials: 'include',
             body: JSON.stringify({ message })
         });
@@ -545,7 +531,6 @@ export class AuthService {
 
         const resp = await fetch(`${API_BASE}/users/${user.id}/avatar`, {
             method: 'POST',
-            headers,
             credentials: 'include',
             body: formData
         });
@@ -607,7 +592,7 @@ export class AuthService {
         if (!this.isAuthenticated()) throw new Error('Not authenticated');
         const resp = await fetch(`${API_BASE}/auth/change-password`, {
             method: 'POST',
-            headers,
+            headers: getHeaders('application/json'),
             credentials: 'include',
             body: JSON.stringify({ currentPassword, newPassword })
         });
@@ -616,7 +601,7 @@ export class AuthService {
     static async submit2FA(code: string): Promise<AuthResponse> {
         const res = await fetch(`${API_BASE}/auth/2fa/login`, {
             method: 'POST',
-            headers,
+            headers: getHeaders('application/json'),
             credentials: 'include',
             body: JSON.stringify({ code })
         });
@@ -624,7 +609,7 @@ export class AuthService {
         const data: AuthResponse = await res.json();
         if (!res.ok) throw data;
 
-        if (!data.requires2FA && data.token && data.user) this.storeAuthData(data.token, data.user);
+        if (!data.requires2FA && data.user) this.storeUsrData(data.user);
 
         return data;
     }
