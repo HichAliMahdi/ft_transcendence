@@ -42,7 +42,7 @@ export default async function tournamentRoutes(fastify: FastifyInstance) {
   const formatErr = (e: any) => (e instanceof Error ? e.message : String(e));
 
   fastify.post<{ Body: CreateTournamentBody }>(
-    '/tournaments',
+    '/tournaments', {preHandler: fastify.csrfProtection},
     async (request, reply) => {
       try {
         const { name, maxPlayers, type = 'local' } = request.body;
@@ -131,7 +131,7 @@ export default async function tournamentRoutes(fastify: FastifyInstance) {
   );
 
   fastify.post<{ Params: TournamentParams; Body: AddPlayerBody }>(
-    '/tournaments/:id/players',
+    '/tournaments/:id/players', {preHandler: fastify.csrfProtection},
     async (request, reply) => {
       try {
         const { id } = request.params;
@@ -199,7 +199,7 @@ export default async function tournamentRoutes(fastify: FastifyInstance) {
   );
 
   fastify.delete<{ Params: PlayerParams }>(
-    '/tournaments/:id/players/:playerId',
+    '/tournaments/:id/players/:playerId', {preHandler: fastify.csrfProtection},
     async (request, reply) => {
       try {
         const { id, playerId } = request.params;
@@ -240,7 +240,7 @@ export default async function tournamentRoutes(fastify: FastifyInstance) {
   );
 
   fastify.post<{ Params: TournamentParams }>(
-    '/tournaments/:id/start',
+    '/tournaments/:id/start', {preHandler: fastify.csrfProtection},
     async (request, reply) => {
       try {
         const { id } = request.params;
@@ -298,7 +298,7 @@ export default async function tournamentRoutes(fastify: FastifyInstance) {
   );
 
   fastify.post<{ Params: MatchParams; Body: RecordMatchResultBody }>(
-    '/tournaments/matches/:matchId/result',
+    '/tournaments/matches/:matchId/result', {preHandler: fastify.csrfProtection},
     async (request, reply) => {
       try {
         const { matchId } = request.params;
@@ -356,7 +356,7 @@ export default async function tournamentRoutes(fastify: FastifyInstance) {
   );
 
   fastify.delete<{ Params: TournamentParams }>(
-    '/tournaments/:id',
+    '/tournaments/:id', {preHandler: fastify.csrfProtection},
     async (request, reply) => {
       try {
         const { id } = request.params;
@@ -381,7 +381,7 @@ export default async function tournamentRoutes(fastify: FastifyInstance) {
   );
 
   fastify.post<{ Params: TournamentParams }>(
-    '/tournaments/:id/reset',
+    '/tournaments/:id/reset', {preHandler: fastify.csrfProtection},
     async (request, reply) => {
       try {
         const { id } = request.params;

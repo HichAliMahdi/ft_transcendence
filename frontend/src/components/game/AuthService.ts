@@ -1,5 +1,15 @@
 const API_BASE = '/api';
 
+import Cookies from 'js-cookie';
+const headers: Record<string, string> = {
+  'Content-Type': 'application/json'
+};
+
+const csrfToken = Cookies.get('XSRF-TOKEN');
+if (csrfToken) {
+  headers['x-xsrf-token'] = csrfToken;
+}
+
 interface AuthResponse {
     message: string;
     token: string;
@@ -198,6 +208,7 @@ export class AuthService {
         try {
             const response = await fetch(`${API_BASE}/auth/delete`, {
                 method: 'POST',
+                headers: csrfToken ? { 'x-xsrf-token': csrfToken } : {},
                 credentials: 'include'
             });
             if (!response.ok) {
@@ -235,7 +246,7 @@ export class AuthService {
         if (!this.isAuthenticated() || !user) throw new Error('Not authenticated');
         const resp = await fetch(`${API_BASE}/users/${user.id}/status`, {
             method: 'POST',
-            headers: {'Content-Type': 'application/json' },
+            headers,
             credentials: 'include',
             body: JSON.stringify({ status })
         });
@@ -359,7 +370,7 @@ export class AuthService {
         if (!this.isAuthenticated()) throw new Error('Not authenticated');
         const resp = await fetch(`${API_BASE}/users/${targetUserId}/friends`, {
             method: 'POST',
-            headers: {'Content-Type': 'application/json' },
+            headers: csrfToken ? { 'x-xsrf-token': csrfToken } : {},
             credentials: 'include'
         });
         if (!resp.ok) {
@@ -371,7 +382,7 @@ export class AuthService {
         if (!this.isAuthenticated()) throw new Error('Not authenticated');
         const resp = await fetch(`${API_BASE}/users/friends`, {
             method: 'POST',
-            headers: {'Content-Type': 'application/json' },
+            headers,
             credentials: 'include',
             body: JSON.stringify({ username })
         });
@@ -396,6 +407,7 @@ export class AuthService {
         if (!this.isAuthenticated()) throw new Error('Not authenticated');
         const resp = await fetch(`${API_BASE}/users/${userId}/friends/${friendId}/accept`, {
             method: 'POST',
+            headers: csrfToken ? { 'x-xsrf-token': csrfToken } : {},
             credentials: 'include'
         });
         if (!resp.ok) {
@@ -421,6 +433,7 @@ export class AuthService {
         if (!this.isAuthenticated()) throw new Error('Not authenticated');
         const resp = await fetch(`${API_BASE}/notifications/${notificationId}/read`, {
             method: 'POST',
+            headers: csrfToken ? { 'x-xsrf-token': csrfToken } : {},
             credentials: 'include'
         });
         if (!resp.ok) {
@@ -457,6 +470,7 @@ export class AuthService {
         if (!this.isAuthenticated()) throw new Error('Not authenticated');
         const resp = await fetch(`${API_BASE}/notifications/read-all`, {
             method: 'POST',
+            headers: csrfToken ? { 'x-xsrf-token': csrfToken } : {},
             credentials: 'include',
         });
         if (!resp.ok) {
@@ -513,7 +527,7 @@ export class AuthService {
         if (!this.isAuthenticated()) throw new Error('Not authenticated');
         const resp = await fetch(`${API_BASE}/users/${peerId}/messages`, {
             method: 'POST',
-            headers: {'Content-Type': 'application/json' },
+            headers,
             credentials: 'include',
             body: JSON.stringify({ message })
         });
@@ -531,6 +545,7 @@ export class AuthService {
 
         const resp = await fetch(`${API_BASE}/users/${user.id}/avatar`, {
             method: 'POST',
+            headers,
             credentials: 'include',
             body: formData
         });
@@ -592,19 +607,17 @@ export class AuthService {
         if (!this.isAuthenticated()) throw new Error('Not authenticated');
         const resp = await fetch(`${API_BASE}/auth/change-password`, {
             method: 'POST',
-            headers: {'Content-Type': 'application/json' },
+            headers,
             credentials: 'include',
             body: JSON.stringify({ currentPassword, newPassword })
         });
         if (!resp.ok) await this.parseResponseError(resp);
     }
-    static async submit2FA(code: string, tempToken: string): Promise<AuthResponse> {
+    static async submit2FA(code: string): Promise<AuthResponse> {
         const res = await fetch(`${API_BASE}/auth/2fa/login`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${tempToken}`
-            },
+            headers,
+            credentials: 'include',
             body: JSON.stringify({ code })
         });
 

@@ -142,7 +142,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
     }
   });
 
-  fastify.post('/users/:id/friends', async (request: FastifyRequest, reply: FastifyReply) => {
+  fastify.post('/users/:id/friends', {preHandler: fastify.csrfProtection}, async (request: FastifyRequest, reply: FastifyReply) => {
     const auth = verifyAuth(request, reply);
     if (!auth) return;
 
@@ -180,7 +180,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
     }
   });
 
-  fastify.post('/users/:userId/friends/:friendId/accept', async (request: FastifyRequest, reply: FastifyReply) => {
+  fastify.post('/users/:userId/friends/:friendId/accept', {preHandler: fastify.csrfProtection}, async (request: FastifyRequest, reply: FastifyReply) => {
     const auth = verifyAuth(request, reply);
     if (!auth) return;
 
@@ -221,7 +221,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
     }
   });
 
-  fastify.delete('/users/:userId/friends/:friendId', async (request: FastifyRequest, reply: FastifyReply) => {
+  fastify.delete('/users/:userId/friends/:friendId', {preHandler: fastify.csrfProtection}, async (request: FastifyRequest, reply: FastifyReply) => {
     const auth = verifyAuth(request, reply);
     if (!auth) return;
 
@@ -295,7 +295,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
     }
   });
 
-  fastify.post('/users/friends', async (request: FastifyRequest, reply: FastifyReply) => {
+  fastify.post('/users/friends', {preHandler: fastify.csrfProtection}, async (request: FastifyRequest, reply: FastifyReply) => {
     const auth = verifyAuth(request, reply);
     if (!auth) return;
 
@@ -365,7 +365,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
     }
   });
 
-  fastify.post('/users/:id/messages', async (request: FastifyRequest, reply: FastifyReply) => {
+  fastify.post('/users/:id/messages', {preHandler: fastify.csrfProtection}, async (request: FastifyRequest, reply: FastifyReply) => {
     const auth = verifyAuth(request, reply);
     if (!auth) return;
     const senderId = auth.userId;
@@ -413,7 +413,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
     }
   });
 
-  fastify.delete('/notifications/:id', async (request: FastifyRequest, reply: FastifyReply) => {
+  fastify.delete('/notifications/:id', {preHandler: fastify.csrfProtection}, async (request: FastifyRequest, reply: FastifyReply) => {
     const auth = verifyAuth(request, reply);
     if (!auth) return;
     try {
@@ -428,7 +428,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
     }
   });
 
-  fastify.delete('/notifications', async (request: FastifyRequest, reply: FastifyReply) => {
+  fastify.delete('/notifications', {preHandler: fastify.csrfProtection}, async (request: FastifyRequest, reply: FastifyReply) => {
     const auth = verifyAuth(request, reply);
     if (!auth) return;
     try {
@@ -440,7 +440,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
     }
   });
 
-  fastify.post('/notifications/read-all', async (request: FastifyRequest, reply: FastifyReply) => {
+  fastify.post('/notifications/read-all', {preHandler: fastify.csrfProtection}, async (request: FastifyRequest, reply: FastifyReply) => {
     const auth = verifyAuth(request, reply);
     if (!auth) return;
     try {
@@ -452,7 +452,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
     }
   });
 
-  fastify.post('/notifications/:id/read', async (request: FastifyRequest, reply: FastifyReply) => {
+  fastify.post('/notifications/:id/read', {preHandler: fastify.csrfProtection}, async (request: FastifyRequest, reply: FastifyReply) => {
     const auth = verifyAuth(request, reply);
     if (!auth) return;
     try {
@@ -470,7 +470,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
     }
   });
 
-  fastify.post('/users/:id/status', async (request: FastifyRequest, reply: FastifyReply) => {
+  fastify.post('/users/:id/status', {preHandler: fastify.csrfProtection}, async (request: FastifyRequest, reply: FastifyReply) => {
     const auth = verifyAuth(request, reply);
     if (!auth) return;
     const targetId = Number((request.params as any).id);
@@ -498,7 +498,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
     }
   });
 
-  fastify.put('/users/:id/display-name', async (request: FastifyRequest, reply: FastifyReply) => {
+  fastify.put('/users/:id/display-name', {preHandler: fastify.csrfProtection}, async (request: FastifyRequest, reply: FastifyReply) => {
     const auth = verifyAuth(request, reply);
     if (!auth) return;
     
@@ -536,7 +536,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
     }
   });
 
-  fastify.post('/users/:id/avatar', async (request: FastifyRequest, reply: FastifyReply) => {
+  fastify.post('/users/:id/avatar', {preHandler: fastify.csrfProtection}, async (request: FastifyRequest, reply: FastifyReply) => {
     const auth = verifyAuth(request, reply);
     if (!auth) return;
     
@@ -625,7 +625,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
   });
 
   // Add endpoint to delete avatar
-  fastify.delete('/users/:id/avatar', async (request: FastifyRequest, reply: FastifyReply) => {
+  fastify.delete('/users/:id/avatar', {preHandler: fastify.csrfProtection}, async (request: FastifyRequest, reply: FastifyReply) => {
     const auth = verifyAuth(request, reply);
     if (!auth) return;
     

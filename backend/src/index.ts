@@ -1,5 +1,7 @@
 import Fastify from 'fastify';
 import fastifyCookie from '@fastify/cookie';
+import fastifyCsrf from '@fastify/csrf-protection';
+import fastifyRateLimit from '@fastify/rate-limit';
 import cors from '@fastify/cors';
 import websocketPlugin from '@fastify/websocket';
 import multipart from '@fastify/multipart';
@@ -30,6 +32,25 @@ fastify.register(fastifyCookie, {
     parseOptions: {}           // optional
 });
 
+fastify.register(fastifyCsrf, {
+    cookieOpts: {
+        httpOnly: false,       // JS can read it
+        sameSite: 'strict',    // prevent CSRF
+        path: '/'              
+    }
+});
+
+// Rate Limiting (global default)
+fastify.register(fastifyRateLimit, {
+    max: 100,              // max requests per timeWindow
+    timeWindow: '1 minute', 
+    keyGenerator: (req) => req.ip,
+    errorResponseBuilder: (req, context) => ({
+        statusCode: 429,
+        error: 'Too Many Requests',
+        message: `You can make ${context.max} requests per ${context.after}`
+    })
+});
 
 // Initialize database
 initializeDatabase();

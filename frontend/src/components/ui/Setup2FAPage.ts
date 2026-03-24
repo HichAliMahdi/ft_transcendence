@@ -1,5 +1,15 @@
 const API_BASE = '/api';
 import { AuthService } from '../game/AuthService';
+import Cookies from 'js-cookie';
+const headers: Record<string, string> = {
+  'Content-Type': 'application/json'
+};
+
+const csrfToken = Cookies.get('XSRF-TOKEN');
+if (csrfToken) {
+  headers['x-xsrf-token'] = csrfToken;
+}
+
 
 export class Setup2FAPage {
     private container: HTMLElement | null = null;
@@ -61,6 +71,7 @@ export class Setup2FAPage {
                 try {
                     const res = await fetch(`${API_BASE}/auth/2fa/backup/regenerate`, {
                         method: 'POST',
+                        headers: csrfToken ? { 'x-xsrf-token': csrfToken } : {},
                         credentials: 'include'
                     });
                     const data = await res.json();
@@ -133,6 +144,7 @@ export class Setup2FAPage {
                 try {
                     const res = await fetch(`${API_BASE}/auth/2fa/disable`, {
                         method: 'POST',
+                        headers: csrfToken ? { 'x-xsrf-token': csrfToken } : {},
                         credentials: 'include'
                     });
                     const data = await res.json();
@@ -160,6 +172,7 @@ export class Setup2FAPage {
                 try {
                     const res = await fetch(`${API_BASE}/auth/2fa/setup`, {
                         method: 'POST',
+                        headers: csrfToken ? { 'x-xsrf-token': csrfToken } : {},
                         credentials: 'include'
                     });
                     const data = await res.json();
@@ -183,9 +196,7 @@ export class Setup2FAPage {
                             if (!code) throw { message: 'Code required' };
                             const verifyRes = await fetch(`${API_BASE}/auth/2fa/verify`, {
                                 method: 'POST',
-                                headers: {
-                                    'Content-Type': 'application/json',
-                                },
+                                headers,
                                 credentials: 'include',
                                 body: JSON.stringify({ code })
                             });

@@ -45,7 +45,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
     const formatErr = (e: any) => (e instanceof Error ? e.message : String(e));
 
     fastify.post<{ Body: RegisterBody }>(
-        '/auth/register',
+        '/auth/register', {config: { rateLimit: { max: 5, timeWindow: '1 hour' } },},
         async (request, reply) => {
             const { username, email, password, display_name } = request.body;
 
@@ -96,7 +96,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
     );
 
     fastify.post<{ Body: LoginBody }>(
-        '/auth/login',
+        '/auth/login', {config: { rateLimit: { max: 5, timeWindow: '15 minutes' } }},
         async (request, reply) => {
             const { username, password } = request.body;
 
@@ -132,6 +132,12 @@ export default async function authRoutes(fastify: FastifyInstance) {
                     }
                 }
 
+                    reply.setCookie('XSRF-TOKEN', reply.generateCsrf(), {
+                        httpOnly: false,     // JS can read this
+                        sameSite: 'strict',  // prevent cross-site usage
+                        path: '/'             // available for entire SPA
+                    });
+                    
                 if (user.twofa_enabled) {
                     const tempToken = jwt.sign(
                         { userId: user.id, stage: '2fa' },
@@ -202,7 +208,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
         }
     });
 
-    fastify.post('/auth/delete', async (request, reply) => {
+    fastify.post('/auth/delete', {preHandler: fastify.csrfProtection}, async (request, reply) => {
         try {
             const token = request.cookies?.auth_token;
             if (!token) {
@@ -244,7 +250,11 @@ export default async function authRoutes(fastify: FastifyInstance) {
             if (!user) {
                 return reply.status(401).send({ message: 'User not found' });
             }
-
+            reply.setCookie('XSRF-TOKEN', reply.generateCsrf(), {
+                httpOnly: false,     // JS can read this
+                sameSite: 'strict',  // prevent cross-site usage
+                path: '/'             // available for entire SPA
+            });
             reply.code(200).send({ user });
         } catch (error) {
             fastify.log.error(error);
@@ -252,7 +262,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
         }
     });
 
-    fastify.post('/auth/change-password', async (request, reply) => {
+    fastify.post('/auth/change-password', {preHandler: fastify.csrfProtection}, async (request, reply) => {
         try {
             const token = request.cookies?.auth_token;
             if (!token) return reply.status(401).send({ message: 'Token missing' });
@@ -277,7 +287,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
             reply.code(500).send({ message: formatErr(error) });
         }
     });
-    fastify.post('/auth/2fa/setup', async (request, reply) => {
+    fastify.post('/auth/2fa/setup', {preHandler: fastify.csrfProtection}, async (request, reply) => {
         try {
             const token = request.cookies?.auth_token;
             if (!token) return reply.status(401).send({ message: 'Token missing' });
@@ -313,7 +323,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
             reply.status(500).send({ message: '2FA setup failed', details: String(error) });
         }
     });
-    fastify.post('/auth/2fa/verify', async (request, reply) => {
+    fastify.post('/auth/2fa/verify', {preHandler: fastify.csrfProtection}, async (request, reply) => {
         try {
             const token = request.cookies?.auth_token;
             if (!token) return reply.status(401).send({ message: 'Token missing' });
@@ -355,7 +365,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
             reply.status(500).send({ message: 'Verification failed' });
         }
     });
-    fastify.post('/auth/2fa/backup/regenerate', async (request, reply) => {
+    fastify.post('/auth/2fa/backup/regenerate', {preHandler: fastify.csrfProtection}, async (request, reply) => {
         try {
             const token = request.cookies?.auth_token;
             if (!token) return reply.status(401).send({ message: 'Token missing' });
@@ -379,7 +389,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
             reply.code(500).send({ message: formatErr(error) });
         }
     });
-    fastify.post('/auth/2fa/disable', async (request, reply) => {
+    fastify.post('/auth/2fa/disable', {preHandler: fastify.csrfProtection}, async (request, reply) => {
         try {
             const token = request.cookies?.auth_token;
             if (!token) return reply.status(401).send({ message: 'Token missing' });
@@ -403,7 +413,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
             reply.status(500).send({ message: 'Failed to disable 2FA' });
         }
     });
-    fastify.post('/auth/2fa/login', async (request, reply) => {
+    fastify.post('/auth/2fa/login', {preHandler: fastify.csrfProtection}, async (request, reply) => {
         try {
             const tempToken = request.cookies?.tmp_token;
 

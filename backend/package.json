@@ -10,6 +10,8 @@
   },
   "dependencies": {
     "@fastify/cookie": "^8.2.0",
+    "@fastify/csrf-protection": "^6.0.0",
+    "@fastify/rate-limit": "^7.0.0",
     "fastify": "^4.24.3",
     "@fastify/websocket": "^8.3.0",
     "@fastify/cors": "^8.4.1",

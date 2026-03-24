@@ -2,7 +2,7 @@ import { AuthService } from "../game/AuthService";
 
 export class LoginPage {
     private container: HTMLElement | null = null;
-    private tempToken: string | null = null; // For 2FA stage
+    // private tempToken: string | null = null; // For 2FA stage
 
     public render(): HTMLElement {
         this.container = document.createElement('div');
@@ -78,7 +78,7 @@ export class LoginPage {
                 if (!twofaInput.classList.contains('hidden')) {
                     // Stage 2: submit 2FA code
                     submitButton.textContent = 'Verifying 2FA...';
-                    const res = await AuthService.submit2FA(twofaInput.value, this.tempToken!);
+                    const res = await AuthService.submit2FA(twofaInput.value);
                     if (res.user) AuthService.setCurrentUser(res.user);
 
                 } else {
@@ -90,7 +90,7 @@ export class LoginPage {
                         // Show 2FA input
                         twofaLabel.classList.remove('hidden');
                         twofaInput.classList.remove('hidden');
-                        this.tempToken = res.tempToken || null;
+                        // this.tempToken = res.tempToken || null;
                         submitButton.textContent = 'Verify 2FA';
                         submitButton.disabled = false;
                         return;
@@ -136,7 +136,7 @@ export class LoginPage {
         if (this.container) {
             this.container.remove();
             this.container = null;
-            this.tempToken = null;
+            // this.tempToken = null;
         }
     }
 }
