@@ -16,9 +16,9 @@ Implement rate limiting / account lockout after failed attempts --> Done
 
 Use existing DB fields twofa_attempts and twofa_locked_until. --> Done also renamed to be login_attempts and login_locked_until and used for both 2fa and normal login
 
-Tournament Anonymous Mode
+Tournament Anonymous Mode --> Done
 
-Local tournaments must work without authentication.
+Local tournaments must work without authentication. --> Done
 
 Game Statistics
 
@@ -55,6 +55,6 @@ Additional Checks
 
 Add footer links to legal pages.
 
-Verify multi-user simultaneous support (WebSockets, sessions).
+Verify multi-user simultaneous support (WebSockets, sessions). --> Done
 
 Ensure compatibility with latest stable Chrome.
