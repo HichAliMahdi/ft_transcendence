@@ -528,8 +528,8 @@ class App {
                 dropdownContent.appendChild(settingsLink);
                 dropdownContent.appendChild(divider);
                 dropdownContent.appendChild(settings2faLink);
+                dropdownContent.appendChild(divider);
             }
-            dropdownContent.appendChild(divider);
             dropdownContent.appendChild(logoutBtn);
             dropdown.appendChild(dropdownContent);
 
