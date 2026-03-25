@@ -177,6 +177,7 @@ export default async function websocketRoutes(fastify: FastifyInstance) {
 
           // Handle presence cleanup
           const userId = (socket as any).user?.id;
+          fastify.log.info(`Socket closed for user ${userId}`);
           if (userId) {
             const userSockets = presenceConnections.get(userId);
             if (userSockets) {
@@ -219,18 +220,7 @@ export default async function websocketRoutes(fastify: FastifyInstance) {
     // Attempt to decode JWT from query parameter or authorization header
     try {
       let token: string | null = null;
-      
-      // First try query parameter (for browser WebSocket connections)
-      if (query.token) {
-        token = query.token;
-      } else {
-        // Fallback to authorization header
-        const authHeader = (request.headers.authorization || '') as string;
-        const parts = authHeader.split(' ');
-        if (parts.length === 2 && parts[0] === 'Bearer' && parts[1]) {
-          token = parts[1];
-        }
-      }
+      token = request.cookies?.auth_token ?? null;
       
       if (token) {
         try {
@@ -295,6 +285,9 @@ export default async function websocketRoutes(fastify: FastifyInstance) {
       });
 
       socket.on('close', () => {
+                  const userId = (socket as any).user?.id;
+          fastify.log.info(`Socket closed 300 for user ${userId}`);
+
         try {
           removeFromQueue(socket);
         } catch (e) {
@@ -349,6 +342,8 @@ export default async function websocketRoutes(fastify: FastifyInstance) {
     });
 
     socket.on('close', () => {
+                const userId = (socket as any).user?.id;
+          fastify.log.info(`Socket closed 357 for user ${userId}`);
       try {
         room.removeClient(socket);
         if (room.getClientCount && room.getClientCount() === 0) {
