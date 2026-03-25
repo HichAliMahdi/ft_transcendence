@@ -41,9 +41,44 @@ export class LocalGamePage {
         this.container.appendChild(disconnectButton);
 
         // Initialize game engine
-        this.game = new PongGame(canvas);
+        this.game = new PongGame(canvas, {
+            mode: 'pve',
+            onGameEnd: this.recordSoloMatch.bind(this)
+        });
 
         return this.container;
+    }
+
+    private async recordSoloMatch(player1Score: number, player2Score: number): Promise<void> {
+        try {
+            const token = localStorage.getItem('auth_token');
+            if (!token) {
+                console.warn('No auth token found, cannot record match');
+                return;
+            }
+
+            const response = await fetch('/api/matches/solo-result', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    player1Score,
+                    player2Score
+                })
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                console.error('Failed to record solo match:', error.message);
+                return;
+            }
+
+            console.log('Solo match result recorded successfully');
+        } catch (error) {
+            console.error('Error recording solo match:', error);
+        }
     }
 
     public cleanup(): void {

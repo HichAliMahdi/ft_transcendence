@@ -9,6 +9,29 @@ export class GamePage {
     private selectedDifficulty: AIDifficulty = 'medium';
     private container: HTMLElement | null = null;
 
+    private async recordSoloMatch(player1Score: number, player2Score: number): Promise<void> {
+        try {
+            const token = localStorage.getItem('auth_token');
+            if (!token) {
+                return;
+            }
+
+            await fetch('/api/matches/solo-result', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    player1Score,
+                    player2Score
+                })
+            });
+        } catch (error) {
+            console.error('Error recording solo match:', error);
+        }
+    }
+
     public render(): HTMLElement {
         this.container = document.createElement('div');
         this.container.className = 'container mx-auto p-8 fade-in';
@@ -208,7 +231,10 @@ export class GamePage {
             if (!this.game) {
                 this.game = new PongGame(canvas, {
                     mode: this.selectedMode,
-                    aiDifficulty: this.selectedDifficulty
+                    aiDifficulty: this.selectedDifficulty,
+                    onGameEnd: this.selectedMode === 'pve'
+                        ? this.recordSoloMatch.bind(this)
+                        : undefined
                 });
             }
             this.game.start();
