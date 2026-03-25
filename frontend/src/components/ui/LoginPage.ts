@@ -56,6 +56,26 @@ export class LoginPage {
         submitButton.textContent = 'Login';
         submitButton.className = 'btn-primary w-full text-lg py-3';
 
+        const guestButton = document.createElement('button');
+        guestButton.type = 'submit';
+        guestButton.textContent = 'Play as guest';
+        guestButton.className = 'btn-primary w-full text-lg py-3 mt-4';
+        guestButton.onclick = async (e) => {
+            e.preventDefault();
+            errorMsg.classList.add('hidden');
+            guestButton.disabled = true;
+            try {
+                await AuthService.guest();
+                // Navigate to app root via router (no full reload)
+                history.replaceState(null, '', '/');
+                window.dispatchEvent(new PopStateEvent('popstate'));
+            } catch (error: any) {
+                errorMsg.textContent = AuthService.extractErrorMessage(error);
+                errorMsg.classList.remove('hidden');
+                submitButton.disabled = false;
+                submitButton.textContent = 'Register';
+            }
+        }
         // Register Link
         const registerLink = document.createElement('p');
         registerLink.className = 'text-center text-gray-300 mt-4';
@@ -125,6 +145,7 @@ export class LoginPage {
         form.appendChild(errorMsg);
         form.appendChild(submitButton);
         form.appendChild(registerLink);
+        form.appendChild(guestButton);
 
         this.container.appendChild(title);
         this.container.appendChild(form);

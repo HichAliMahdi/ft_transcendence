@@ -20,6 +20,7 @@ export function initializeDatabase(): void {
             twofa_temp_secret TEXT,
             login_attempts INTEGER DEFAULT 0,
             login_locked_until DATETIME,
+            is_guest INTEGER DEFAULT 0,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )

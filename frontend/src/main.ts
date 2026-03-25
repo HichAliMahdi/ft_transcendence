@@ -516,14 +516,19 @@ class App {
                     this.presenceSocket.close();
                     this.presenceSocket = null;
                 }
-                await AuthService.logout();
+                if (user && user.is_guest === 1)
+                    await AuthService.delete();
+                else
+                    await AuthService.logout();
                 this.updateAuthSection();
                 this.router.navigateTo('/login');
             };
-            
-            dropdownContent.appendChild(settingsLink);
-            dropdownContent.appendChild(divider);
-            dropdownContent.appendChild(settings2faLink);
+            if (user && user.is_guest !== 1)
+            {
+                dropdownContent.appendChild(settingsLink);
+                dropdownContent.appendChild(divider);
+                dropdownContent.appendChild(settings2faLink);
+            }
             dropdownContent.appendChild(divider);
             dropdownContent.appendChild(logoutBtn);
             dropdown.appendChild(dropdownContent);

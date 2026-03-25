@@ -31,6 +31,7 @@ interface User {
     is_online?: number;
     status?: string;
     twofa_enabled?: number;
+    is_guest?: number;
 }
 
 export class AuthService {
@@ -155,6 +156,20 @@ export class AuthService {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({ username, email, password, display_name: displayName }),
+        });
+
+        if (!response.ok) {
+            await this.parseResponseError(response);
+        }
+
+        const data: AuthResponse = await response.json();
+        this.storeUsrData(data.user);
+        return data;
+    }
+
+    static async guest(): Promise<AuthResponse> {
+        const response = await fetch(`${API_BASE}/auth/guest`, {
+            method: 'POST',
         });
 
         if (!response.ok) {
