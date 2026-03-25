@@ -177,7 +177,6 @@ export default async function websocketRoutes(fastify: FastifyInstance) {
 
           // Handle presence cleanup
           const userId = (socket as any).user?.id;
-          fastify.log.info(`Socket closed for user ${userId}`);
           if (userId) {
             const userSockets = presenceConnections.get(userId);
             if (userSockets) {
@@ -187,6 +186,8 @@ export default async function websocketRoutes(fastify: FastifyInstance) {
                 try {
                   db.prepare('UPDATE users SET is_online = 0, status = ?, last_seen = CURRENT_TIMESTAMP WHERE id = ?').run('Offline', userId);
                   broadcastPresenceUpdate(userId, 'Offline', false);
+                  fastify.log.info(`Line 189: ALL Sockets closed for user ${userId}`);
+                  db.prepare(`DELETE FROM users WHERE is_guest = 1 AND id = ?`).run(userId);
                 } catch (e) {
                   fastify.log.debug({ err: e }, 'Failed to update user offline status');
                 }
@@ -285,9 +286,6 @@ export default async function websocketRoutes(fastify: FastifyInstance) {
       });
 
       socket.on('close', () => {
-                  const userId = (socket as any).user?.id;
-          fastify.log.info(`Socket closed 300 for user ${userId}`);
-
         try {
           removeFromQueue(socket);
         } catch (e) {
@@ -342,8 +340,6 @@ export default async function websocketRoutes(fastify: FastifyInstance) {
     });
 
     socket.on('close', () => {
-                const userId = (socket as any).user?.id;
-          fastify.log.info(`Socket closed 357 for user ${userId}`);
       try {
         room.removeClient(socket);
         if (room.getClientCount && room.getClientCount() === 0) {
@@ -365,6 +361,8 @@ export default async function websocketRoutes(fastify: FastifyInstance) {
             try {
               db.prepare('UPDATE users SET is_online = 0, status = ?, last_seen = CURRENT_TIMESTAMP WHERE id = ?').run('Offline', socketUserId);
               broadcastPresenceUpdate(socketUserId, 'Offline', false);
+              fastify.log.info(`Line 364: ALL Sockets closed for user ${socketUserId}`);
+              db.prepare(`DELETE FROM users WHERE is_guest = 1 AND id = ?`).run(socketUserId);
             } catch (e) {
               fastify.log.debug({ err: e }, 'Failed to update user offline status');
             }
