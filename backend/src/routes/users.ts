@@ -11,8 +11,7 @@ import crypto from 'crypto';
 export default async function userRoutes(fastify: FastifyInstance) {
   fastify.get('/users/:id/stats', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
-      const authHeader = (request.headers.authorization || '') as string;
-      const token = authHeader.startsWith('Bearer ') ? authHeader.split(' ')[1] : null;
+      const token = request.cookies?.auth_token;
       if (!token) {
         return reply.status(401).send({ message: 'Token missing' });
       }
@@ -62,8 +61,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
   });
 
   function verifyAuth(request: FastifyRequest, reply: FastifyReply): { userId: number } | null {
-    const authHeader = (request.headers.authorization || '') as string;
-    const token = authHeader.startsWith('Bearer ') ? authHeader.split(' ')[1] : null;
+    const token = request.cookies?.auth_token;
     if (!token) {
       reply.status(401).send({ message: 'Token missing' });
       return null;
@@ -144,7 +142,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
     }
   });
 
-  fastify.post('/users/:id/friends', async (request: FastifyRequest, reply: FastifyReply) => {
+  fastify.post('/users/:id/friends', {preHandler: fastify.csrfProtection}, async (request: FastifyRequest, reply: FastifyReply) => {
     const auth = verifyAuth(request, reply);
     if (!auth) return;
 
@@ -182,7 +180,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
     }
   });
 
-  fastify.post('/users/:userId/friends/:friendId/accept', async (request: FastifyRequest, reply: FastifyReply) => {
+  fastify.post('/users/:userId/friends/:friendId/accept', {preHandler: fastify.csrfProtection}, async (request: FastifyRequest, reply: FastifyReply) => {
     const auth = verifyAuth(request, reply);
     if (!auth) return;
 
@@ -223,7 +221,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
     }
   });
 
-  fastify.delete('/users/:userId/friends/:friendId', async (request: FastifyRequest, reply: FastifyReply) => {
+  fastify.delete('/users/:userId/friends/:friendId', {preHandler: fastify.csrfProtection}, async (request: FastifyRequest, reply: FastifyReply) => {
     const auth = verifyAuth(request, reply);
     if (!auth) return;
 
@@ -297,7 +295,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
     }
   });
 
-  fastify.post('/users/friends', async (request: FastifyRequest, reply: FastifyReply) => {
+  fastify.post('/users/friends', {preHandler: fastify.csrfProtection}, async (request: FastifyRequest, reply: FastifyReply) => {
     const auth = verifyAuth(request, reply);
     if (!auth) return;
 
@@ -367,7 +365,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
     }
   });
 
-  fastify.post('/users/:id/messages', async (request: FastifyRequest, reply: FastifyReply) => {
+  fastify.post('/users/:id/messages', {preHandler: fastify.csrfProtection}, async (request: FastifyRequest, reply: FastifyReply) => {
     const auth = verifyAuth(request, reply);
     if (!auth) return;
     const senderId = auth.userId;
@@ -415,7 +413,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
     }
   });
 
-  fastify.delete('/notifications/:id', async (request: FastifyRequest, reply: FastifyReply) => {
+  fastify.delete('/notifications/:id', {preHandler: fastify.csrfProtection}, async (request: FastifyRequest, reply: FastifyReply) => {
     const auth = verifyAuth(request, reply);
     if (!auth) return;
     try {
@@ -430,7 +428,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
     }
   });
 
-  fastify.delete('/notifications', async (request: FastifyRequest, reply: FastifyReply) => {
+  fastify.delete('/notifications', {preHandler: fastify.csrfProtection}, async (request: FastifyRequest, reply: FastifyReply) => {
     const auth = verifyAuth(request, reply);
     if (!auth) return;
     try {
@@ -442,7 +440,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
     }
   });
 
-  fastify.post('/notifications/read-all', async (request: FastifyRequest, reply: FastifyReply) => {
+  fastify.post('/notifications/read-all', {preHandler: fastify.csrfProtection}, async (request: FastifyRequest, reply: FastifyReply) => {
     const auth = verifyAuth(request, reply);
     if (!auth) return;
     try {
@@ -454,7 +452,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
     }
   });
 
-  fastify.post('/notifications/:id/read', async (request: FastifyRequest, reply: FastifyReply) => {
+  fastify.post('/notifications/:id/read', {preHandler: fastify.csrfProtection}, async (request: FastifyRequest, reply: FastifyReply) => {
     const auth = verifyAuth(request, reply);
     if (!auth) return;
     try {
@@ -472,7 +470,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
     }
   });
 
-  fastify.post('/users/:id/status', async (request: FastifyRequest, reply: FastifyReply) => {
+  fastify.post('/users/:id/status', {preHandler: fastify.csrfProtection}, async (request: FastifyRequest, reply: FastifyReply) => {
     const auth = verifyAuth(request, reply);
     if (!auth) return;
     const targetId = Number((request.params as any).id);
@@ -492,7 +490,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
 
       broadcastPresenceUpdate(targetId, status, isOnline === 1);
 
-      const updated = db.prepare('SELECT id, username, display_name, avatar_url, is_online, status, last_seen, created_at, updated_at FROM users WHERE id = ?').get(targetId);
+      const updated = db.prepare('SELECT id, username, display_name, avatar_url, is_online, status, last_seen, twofa_enabled, created_at, updated_at FROM users WHERE id = ?').get(targetId);
       return reply.code(200).send({ user: updated });
     } catch (err) {
       request.log.error(err);
@@ -500,7 +498,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
     }
   });
 
-  fastify.put('/users/:id/display-name', async (request: FastifyRequest, reply: FastifyReply) => {
+  fastify.put('/users/:id/display-name', {preHandler: fastify.csrfProtection}, async (request: FastifyRequest, reply: FastifyReply) => {
     const auth = verifyAuth(request, reply);
     if (!auth) return;
     
@@ -529,7 +527,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
 
       db.prepare('UPDATE users SET display_name = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(newDisplayName, targetId);
 
-      const updated = db.prepare('SELECT id, username, email, display_name, avatar_url, is_online, status, last_seen, created_at, updated_at FROM users WHERE id = ?').get(targetId);
+      const updated = db.prepare('SELECT id, username, email, display_name, avatar_url, is_online, status, last_seen, twofa_enabled, created_at, updated_at FROM users WHERE id = ?').get(targetId);
       
       return reply.code(200).send({ user: updated, message: 'Display name updated successfully' });
     } catch (err) {
@@ -538,7 +536,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
     }
   });
 
-  fastify.post('/users/:id/avatar', async (request: FastifyRequest, reply: FastifyReply) => {
+  fastify.post('/users/:id/avatar', {preHandler: fastify.csrfProtection}, async (request: FastifyRequest, reply: FastifyReply) => {
     const auth = verifyAuth(request, reply);
     if (!auth) return;
     
@@ -614,7 +612,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
       db.prepare('UPDATE users SET avatar_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
         .run(avatarUrl, targetId);
 
-      const updated = db.prepare('SELECT id, username, email, display_name, avatar_url, is_online, status, last_seen, created_at, updated_at FROM users WHERE id = ?').get(targetId);
+      const updated = db.prepare('SELECT id, username, email, display_name, avatar_url, is_online, status, last_seen, twofa_enabled, created_at, updated_at FROM users WHERE id = ?').get(targetId);
       
       return reply.code(200).send({ 
         user: updated, 
@@ -627,7 +625,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
   });
 
   // Add endpoint to delete avatar
-  fastify.delete('/users/:id/avatar', async (request: FastifyRequest, reply: FastifyReply) => {
+  fastify.delete('/users/:id/avatar', {preHandler: fastify.csrfProtection}, async (request: FastifyRequest, reply: FastifyReply) => {
     const auth = verifyAuth(request, reply);
     if (!auth) return;
     
@@ -655,7 +653,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
       db.prepare('UPDATE users SET avatar_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
         .run('/default-avatar.png', targetId);
 
-      const updated = db.prepare('SELECT id, username, email, display_name, avatar_url, is_online, status, last_seen, created_at, updated_at FROM users WHERE id = ?').get(targetId);
+      const updated = db.prepare('SELECT id, username, email, display_name, avatar_url, is_online, status, last_seen, twofa_enabled, created_at, updated_at FROM users WHERE id = ?').get(targetId);
       
       return reply.code(200).send({ 
         user: updated, 

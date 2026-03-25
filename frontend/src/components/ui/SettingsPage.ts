@@ -303,7 +303,7 @@ export class SettingsPage {
             <div class="mb-6 m2-4">
                 <hr class="mt-6">
                 <div id="2fa-toggle" class="flex items-center gap-3 px-4 py-3 rounded-lg bg-game-dark border-2 border-gray-600 cursor-pointer hover:border-accent-pink transition-colors">
-                    <a class="btn-primary w-full text-lg py-3 text-center">Enable/Disable 2 Factor Authentication</a>
+                    <a href="/settings2fa" class="btn-primary w-full text-lg py-3 text-center">Enable/Disable 2 Factor Authentication</a>
                 </div>
             </div>
         `;
@@ -357,20 +357,57 @@ export class SettingsPage {
             catch (err: any) { msg.textContent = AuthService.extractErrorMessage(err); msg.className = 'text-sm text-red-500'; msg.classList.remove('hidden'); }
         };
 
+        const deleteUsrBtn = document.createElement('button');
+        deleteUsrBtn.className = 'bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm transition-colors duration-200';
+        deleteUsrBtn.innerHTML = '<span class="text-lg">X </span><span>🗑️ Delete my account</span>';
+        deleteUsrBtn.onclick = () => {
+            const modal = document.createElement('div');
+            modal.className = 'fixed inset-0 flex items-center justify-center bg-black/50 z-50';
+
+            const box = document.createElement('div');
+            box.className = 'bg-game-dark p-6 rounded-xl shadow-xl text-white w-96';
+
+            box.innerHTML = `
+                <h2 class="text-xl font-bold mb-4">Confirm delete</h2>
+                <p class="mb-6">Are you sure you want to delete your account?</p>
+                <div class="flex justify-end gap-3">
+                    <button id="cancelBtn" class="px-4 py-2 rounded-lg bg-gray-600 hover:bg-gray-500">No</button>
+                    <button id="confirmBtn" class="px-4 py-2 rounded-lg bg-red-500 hover:bg-red-400">Yes</button>
+                </div>
+            `;
+
+            modal.appendChild(box);
+            document.body.appendChild(modal);
+
+            const cancelBtn = box.querySelector('#cancelBtn') as HTMLButtonElement;
+            const confirmBtn = box.querySelector('#confirmBtn') as HTMLButtonElement;
+
+            cancelBtn.onclick = () => modal.remove();
+
+            confirmBtn.onclick = async () => {
+                modal.remove();
+                await AuthService.delete();
+
+                history.pushState(null, '', '/login');
+                window.dispatchEvent(new PopStateEvent('popstate'));
+            };
+        };
+
         // Placeholder sections for future settings
-        const preferencesSection = document.createElement('div');
-        preferencesSection.className = 'mb-8';
-        preferencesSection.innerHTML = `
-            <h2 class="text-2xl font-bold text-white mb-4">Preferences</h2>
+        const gdbrSection = document.createElement('div');
+        gdbrSection.className = 'mb-8';
+        gdbrSection.innerHTML = `
+            <h2 class="text-2xl font-bold text-white mb-4">GDBR</h2>
             <div class="text-gray-400 text-center py-8">
-                <p>⚙️ More settings coming soon...</p>
+                <p>⚙️ GDBR Setting allow you to delete your account...</p>
             </div>
         `;
 
         settingsCard.appendChild(profileSection);
         settingsCard.appendChild(avatarSection);
         settingsCard.appendChild(securitySection);
-        settingsCard.appendChild(preferencesSection);
+        gdbrSection.appendChild(deleteUsrBtn);
+        settingsCard.appendChild(gdbrSection);
 
         this.container.appendChild(title);
         this.container.appendChild(settingsCard);

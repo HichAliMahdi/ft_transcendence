@@ -18,8 +18,8 @@ export function initializeDatabase(): void {
             twofa_enabled INTEGER DEFAULT 0,
             twofa_secret TEXT,
             twofa_temp_secret TEXT,
-            twofa_attempts INTEGER DEFAULT 0,
-            twofa_locked_until DATETIME,
+            login_attempts INTEGER DEFAULT 0,
+            login_locked_until DATETIME,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
@@ -197,5 +197,14 @@ export function initializeDatabase(): void {
             ) AS tournaments_won
         FROM users u
     `);
-    
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS backup_codes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            code_hash TEXT NOT NULL,
+            used INTEGER DEFAULT 0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        )
+    `);
 }

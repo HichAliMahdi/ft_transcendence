@@ -1,6 +1,6 @@
 Critical Requirements
 
-Privacy Policy & Terms of Service: Two pages with real content, accessible from the app footer. Missing pages may lead to project rejection during peer review.
+Privacy Policy & Terms of Service: Two pages with real content, accessible from the app footer. Missing pages may lead to project rejection during peer review. ✅
 
 README.md must include:
 Italicized first line with test logins, Description, Setup Instructions, Resources (including AI usage), and the following sections:
@@ -8,19 +8,19 @@ Team Information (roles), Project Management, Technical Stack, Database Schema, 
 
 High Priority
 
-2FA Completion
+2FA Completion --> Done
 
-Add backup codes
+Add backup codes --> Done
 
-Implement rate limiting / account lockout after failed attempts
+Implement rate limiting / account lockout after failed attempts --> Done
 
-Use existing DB fields twofa_attempts and twofa_locked_until.
+Use existing DB fields twofa_attempts and twofa_locked_until. --> Done also renamed to be login_attempts and login_locked_until and used for both 2fa and normal login
 
-Tournament Anonymous Mode
+Tournament Anonymous Mode ✅
 
 Local tournaments must work without authentication.
 
-Game Statistics
+Game Statistics ✅
 
 Stats currently use the matches table only.
 
@@ -28,13 +28,13 @@ Results from the games table (tournaments) must also be included for correct win
 
 Security
 
-XSS Protection: Sanitize user content (e.g., DOMPurify) and avoid unsafe innerHTML.
+XSS Protection: Sanitize user content (e.g., DOMPurify) and avoid unsafe innerHTML. --> we don't use any dynamic randider to innerHTML so our code already XSS protected.
 
-Security Headers: Add Helmet.js (CSP, X-Frame-Options, etc.).
+Security Headers: Add Helmet.js (CSP, X-Frame-Options, etc.). --> Done
 
-CSRF Protection: Add CSRF middleware for state-changing requests.
+CSRF Protection: Add CSRF middleware for state-changing requests. --> Done
 
-Rate Limiting: Protect login, register, and 2FA endpoints.
+Rate Limiting: Protect login, register, and 2FA endpoints. --> Done
 
 Optional Module Choice (1 point)
 
@@ -49,11 +49,11 @@ No browser console errors or warnings (latest Chrome).
 
 Clean TypeScript build (make check-frontend).
 
-Add .env.example and remove .env secrets from the repository.
+Add .env.example and remove .env secrets from the repository. ✅
 
 Additional Checks
 
-Add footer links to legal pages.
+Add footer links to legal pages. ✅
 
 Verify multi-user simultaneous support (WebSockets, sessions).
 
