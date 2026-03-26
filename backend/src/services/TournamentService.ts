@@ -365,6 +365,13 @@ export class TournamentService {
                 }
             }
 
+            const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000) // JS Date
+                .toISOString() // "2026-03-25T15:25:00.000Z"
+                .replace('T', ' ')
+                .substring(0, 19); // "YYYY-MM-DD HH:MM:SS"
+
+            db.prepare(`DELETE FROM users WHERE is_guest = 1 AND last_seen < ?`).run(fiveMinutesAgo);
+
             return deletedCount;
         } catch (error) {
             return 0;

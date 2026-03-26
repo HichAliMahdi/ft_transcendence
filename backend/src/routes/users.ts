@@ -490,7 +490,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
 
       broadcastPresenceUpdate(targetId, status, isOnline === 1);
 
-      const updated = db.prepare('SELECT id, username, display_name, avatar_url, is_online, status, last_seen, twofa_enabled, created_at, updated_at FROM users WHERE id = ?').get(targetId);
+      const updated = db.prepare('SELECT id, username, display_name, avatar_url, is_online, status, last_seen, twofa_enabled, is_guest, created_at, updated_at FROM users WHERE id = ?').get(targetId);
       return reply.code(200).send({ user: updated });
     } catch (err) {
       request.log.error(err);
@@ -527,7 +527,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
 
       db.prepare('UPDATE users SET display_name = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(newDisplayName, targetId);
 
-      const updated = db.prepare('SELECT id, username, email, display_name, avatar_url, is_online, status, last_seen, twofa_enabled, created_at, updated_at FROM users WHERE id = ?').get(targetId);
+      const updated = db.prepare('SELECT id, username, email, display_name, avatar_url, is_online, status, last_seen, twofa_enabled, is_guest, created_at, updated_at FROM users WHERE id = ?').get(targetId);
       
       return reply.code(200).send({ user: updated, message: 'Display name updated successfully' });
     } catch (err) {
@@ -612,7 +612,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
       db.prepare('UPDATE users SET avatar_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
         .run(avatarUrl, targetId);
 
-      const updated = db.prepare('SELECT id, username, email, display_name, avatar_url, is_online, status, last_seen, twofa_enabled, created_at, updated_at FROM users WHERE id = ?').get(targetId);
+      const updated = db.prepare('SELECT id, username, email, display_name, avatar_url, is_online, status, last_seen, twofa_enabled, is_guest, created_at, updated_at FROM users WHERE id = ?').get(targetId);
       
       return reply.code(200).send({ 
         user: updated, 
@@ -653,7 +653,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
       db.prepare('UPDATE users SET avatar_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
         .run('/default-avatar.png', targetId);
 
-      const updated = db.prepare('SELECT id, username, email, display_name, avatar_url, is_online, status, last_seen, twofa_enabled, created_at, updated_at FROM users WHERE id = ?').get(targetId);
+      const updated = db.prepare('SELECT id, username, email, display_name, avatar_url, is_online, status, last_seen, twofa_enabled, is_guest, created_at, updated_at FROM users WHERE id = ?').get(targetId);
       
       return reply.code(200).send({ 
         user: updated, 
