@@ -18,6 +18,12 @@ function generateBackupCodes(count = 8): string[] {
     return codes;
 }
 
+function generateUniqueNumber(): number {
+  const timestamp = Math.floor(Date.now() / 1000); // Unix time (seconds)
+  const random = Math.floor(100 + Math.random() * 900); // 100–999
+  return timestamp * 1000 + random;
+}
+
 function hashCode(code: string): string {
     return crypto.createHash('sha256').update(code).digest('hex');
 }
@@ -85,7 +91,55 @@ export default async function authRoutes(fastify: FastifyInstance) {
 
                 reply.code(201).send({
                     message: 'User registered successfully',
-                    user: { id: result.lastInsertRowid, username, email, display_name, status: 'Online', is_online: 1, avatar_url: '/default-avatar.png', twofa_enabled: 0 }
+                    user: { id: result.lastInsertRowid, username, email, display_name, status: 'Online', is_online: 1, avatar_url: '/default-avatar.png', twofa_enabled: 0, is_guest: 0 }
+                });
+            } catch (error) {
+                fastify.log.error(error);
+                reply.code(500).send({ message: formatErr(error) });
+            }
+        }
+    );
+
+        fastify.post (
+        '/auth/guest', {config: { rateLimit: { max: 5, timeWindow: '1 hour' } },},
+        async (request, reply) => {
+            try {
+                let guestUserID: number;
+                let username: string;
+                let email: string;
+                let display_name: string;
+                let existingUser;
+
+                do {
+                    guestUserID = generateUniqueNumber();
+                    username = `guest_${guestUserID}`;
+                    email = `${username}@guest`;
+                    display_name = username;
+                    existingUser = db
+                        .prepare('SELECT 1 FROM users WHERE username = ? OR email = ? OR display_name = ?')
+                        .get(username, email, display_name);
+
+                } while (existingUser);
+
+
+                const password_hash = await bcrypt.hash(username, 10);
+                // mark new user as online immediately and set status = 'Online'
+                const result = db.prepare(
+                    'INSERT INTO users (username, email, password_hash, display_name, is_online, status, avatar_url, is_guest) VALUES (?, ?, ?, ?, 1, ?, ?, 1)'
+                ).run(username, email, password_hash, display_name, 'Online', '/default-avatar.png');
+
+                const token = jwt.sign({ userId: result.lastInsertRowid }, config.jwt.secret as string, { expiresIn: '1d', issuer: 'ft_transcendence' });
+                reply.setCookie('auth_token', token, {
+                    httpOnly: true,      // JS cannot read it
+                    secure: true,       // true in production HTTPS
+                    sameSite: 'strict',     // CSRF protection
+                    path: '/',           // must match frontend requests
+                    maxAge: 1 * 24 * 60 * 60 // 1 day
+                });
+
+                reply.code(201).send({
+                    message: 'User registered successfully',
+                    user: { id: result.lastInsertRowid, username, email, display_name, status: 'Online', is_online: 1, avatar_url: '/default-avatar.png', twofa_enabled: 0, is_guest: 1 }
                 });
             } catch (error) {
                 fastify.log.error(error);
@@ -104,7 +158,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
             }
 
             try {
-                const user = db.prepare('SELECT id, username, email, display_name, password_hash, twofa_enabled, login_attempts, login_locked_until FROM users WHERE username = ?').get(username) as any;
+                const user = db.prepare('SELECT id, username, email, display_name, password_hash, twofa_enabled, login_attempts, login_locked_until FROM users WHERE is_guest = 0 AND username = ?').get(username) as any;
                 if (!user) {
                     return reply.status(404).send({ message: 'Invalid username or password' });
                 }
@@ -165,7 +219,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
                 });
                 reply.code(200).send({
                     message: 'Login successful',
-                    user: { id: user.id, username: user.username, email: user.email, display_name: user.display_name, status: 'Online', is_online: 1, twofa_enabled: user.twofa_enabled }
+                    user: { id: user.id, username: user.username, email: user.email, display_name: user.display_name, status: 'Online', is_online: 1, twofa_enabled: user.twofa_enabled, is_guest: 0 }
                 });
             } catch (error) {
                 fastify.log.error(error);
@@ -235,7 +289,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
             const decoded = jwt.verify(token, config.jwt.secret, {issuer: 'ft_transcendence'}) as { userId: number };
             const userId = decoded.userId;
 
-            const user = db.prepare('SELECT id, username, email, display_name, avatar_url, is_online, status, last_seen, twofa_enabled, created_at, updated_at FROM users WHERE id = ?').get(userId);
+            const user = db.prepare('SELECT id, username, email, display_name, avatar_url, is_online, status, last_seen, twofa_enabled, is_guest, created_at, updated_at FROM users WHERE id = ?').get(userId) as any;
             if (!user) {
                 return reply.status(401).send({ message: 'User not found' });
             }
@@ -258,7 +312,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
             if (!currentPassword || !newPassword) return reply.status(400).send({ message: 'All fields required' });
             if (newPassword.length < 8) return reply.status(400).send({ message: 'Password must be 8+ characters' });
 
-            const user = db.prepare('SELECT * FROM users WHERE id = ?').get(decoded.userId) as any;
+            const user = db.prepare('SELECT * FROM users WHERE is_guest = 0 AND id = ?').get(decoded.userId) as any;
             if (!user) return reply.status(401).send({ message: 'User not found' });
 
             const valid = await bcrypt.compare(currentPassword, user.password_hash);
@@ -281,7 +335,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
             const userId = decoded.userId;
 
             // Fetch user from DB
-            const user = db.prepare('SELECT twofa_enabled FROM users WHERE id = ?').get(userId) as any;
+            const user = db.prepare('SELECT twofa_enabled FROM users WHERE is_guest = 0 AND id = ?').get(userId) as any;
             if (!user) {
                 return reply.status(401).send({ message: 'User not found' });
             }
@@ -319,7 +373,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
             const { code } = request.body as any;
             if (!code) return reply.status(400).send({ message: 'Code required' });
 
-            const user = db.prepare('SELECT twofa_temp_secret FROM users WHERE id = ?').get(userId) as any;
+            const user = db.prepare('SELECT twofa_temp_secret FROM users WHERE is_guest = 0 AND id = ?').get(userId) as any;
             if (!user?.twofa_temp_secret) return reply.status(400).send({ message: '2FA not initialized' });
 
             const isValid = authenticator.verify({
@@ -419,7 +473,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
             if (!userId || !code)
                 return reply.status(400).send({ message: 'Missing data' });
 
-            const user = db.prepare('SELECT * FROM users WHERE id = ?')
+            const user = db.prepare('SELECT * FROM users WHERE is_guest = 0 AND id = ?')
                 .get(userId) as any;
 
             if (!user || !user.twofa_enabled)
@@ -477,7 +531,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
             });
             reply.code(200).send({
                 message: 'Login successful',
-                user: { id: user.id, username: user.username, email: user.email, display_name: user.display_name, status: 'Online', is_online: 1, twofa_enabled: user.twofa_enabled }
+                user: { id: user.id, username: user.username, email: user.email, display_name: user.display_name, status: 'Online', is_online: 1, twofa_enabled: user.twofa_enabled, is_guest: 0 }
             });
 
         } catch (error) {

@@ -1,4 +1,5 @@
 import { PongGame } from '../game/PongGame';
+import Cookies from 'js-cookie';
 
 type GameMode = 'pvp' | 'pve';
 type AIDifficulty = 'easy' | 'medium' | 'hard';
@@ -11,16 +12,13 @@ export class GamePage {
 
     private async recordSoloMatch(player1Score: number, player2Score: number): Promise<void> {
         try {
-            const token = localStorage.getItem('auth_token');
-            if (!token) {
-                return;
-            }
-
+            const csrf = Cookies.get('XSRF-TOKEN');
             await fetch('/api/matches/solo-result', {
                 method: 'POST',
+                credentials: 'include',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
+                    ...(csrf ? { 'x-xsrf-token': csrf } : {})
                 },
                 body: JSON.stringify({
                     player1Score,

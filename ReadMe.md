@@ -18,7 +18,7 @@ Use existing DB fields twofa_attempts and twofa_locked_until. --> Done also rena
 
 Tournament Anonymous Mode ✅
 
-Local tournaments must work without authentication.
+Local tournaments must work without authentication. --> Done
 
 Game Statistics ✅
 
@@ -55,6 +55,6 @@ Additional Checks
 
 Add footer links to legal pages. ✅
 
-Verify multi-user simultaneous support (WebSockets, sessions).
+Verify multi-user simultaneous support (WebSockets, sessions). --> Done
 
 Ensure compatibility with latest stable Chrome.

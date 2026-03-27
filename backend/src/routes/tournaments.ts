@@ -346,17 +346,14 @@ export default async function tournamentRoutes(fastify: FastifyInstance) {
     async (request, reply) => {
       try {
         let userId: number | undefined;
-        const authHeader = request.headers.authorization;
-        if (authHeader) {
-          try {
-            const token = authHeader.split(' ')[1];
-            if (token) {
-              const decoded = jwt.verify(token, config.jwt.secret) as unknown as { userId: number };
-              userId = decoded.userId;
-            }
-          } catch (e) {
-            userId = undefined;
+        try {
+          const token = request.cookies?.auth_token;
+          if (token) {
+            const decoded = jwt.verify(token, config.jwt.secret) as unknown as { userId: number };
+            userId = decoded.userId;
           }
+        } catch (e) {
+          userId = undefined;
         }
 
         if (!userId) {

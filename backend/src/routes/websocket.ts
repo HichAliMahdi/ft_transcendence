@@ -186,6 +186,8 @@ export default async function websocketRoutes(fastify: FastifyInstance) {
                 try {
                   db.prepare('UPDATE users SET is_online = 0, status = ?, last_seen = CURRENT_TIMESTAMP WHERE id = ?').run('Offline', userId);
                   broadcastPresenceUpdate(userId, 'Offline', false);
+                  fastify.log.info(`Line 189: ALL Sockets closed for user ${userId}`);
+                  db.prepare(`DELETE FROM users WHERE is_guest = 1 AND id = ?`).run(userId);
                 } catch (e) {
                   fastify.log.debug({ err: e }, 'Failed to update user offline status');
                 }
@@ -219,18 +221,7 @@ export default async function websocketRoutes(fastify: FastifyInstance) {
     // Attempt to decode JWT from query parameter or authorization header
     try {
       let token: string | null = null;
-      
-      // First try query parameter (for browser WebSocket connections)
-      if (query.token) {
-        token = query.token;
-      } else {
-        // Fallback to authorization header
-        const authHeader = (request.headers.authorization || '') as string;
-        const parts = authHeader.split(' ');
-        if (parts.length === 2 && parts[0] === 'Bearer' && parts[1]) {
-          token = parts[1];
-        }
-      }
+      token = request.cookies?.auth_token ?? null;
       
       if (token) {
         try {
@@ -370,6 +361,8 @@ export default async function websocketRoutes(fastify: FastifyInstance) {
             try {
               db.prepare('UPDATE users SET is_online = 0, status = ?, last_seen = CURRENT_TIMESTAMP WHERE id = ?').run('Offline', socketUserId);
               broadcastPresenceUpdate(socketUserId, 'Offline', false);
+              fastify.log.info(`Line 364: ALL Sockets closed for user ${socketUserId}`);
+              db.prepare(`DELETE FROM users WHERE is_guest = 1 AND id = ?`).run(socketUserId);
             } catch (e) {
               fastify.log.debug({ err: e }, 'Failed to update user offline status');
             }

@@ -51,17 +51,13 @@ export class LocalGamePage {
 
     private async recordSoloMatch(player1Score: number, player2Score: number): Promise<void> {
         try {
-            const token = localStorage.getItem('auth_token');
-            if (!token) {
-                console.warn('No auth token found, cannot record match');
-                return;
-            }
-
+            const csrf = (await import('js-cookie')).default.get('XSRF-TOKEN');
             const response = await fetch('/api/matches/solo-result', {
                 method: 'POST',
+                credentials: 'include',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
+                    ...(csrf ? { 'x-xsrf-token': csrf } : {})
                 },
                 body: JSON.stringify({
                     player1Score,
